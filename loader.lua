@@ -13,7 +13,7 @@ local CONFIG = {
         [71724366181884] = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/worldcup.lua",
     },
     Title = "IBdihP Hub",
-    Subtitle = "FREE KEY IN DISCORD",
+    Subtitle = "PERMANENT FREE KEY IN DISCORD",
     Version = "v6.7",
 }
 
