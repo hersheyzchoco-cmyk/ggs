@@ -5,7 +5,7 @@
 
 local CONFIG = {
     ValidKeys = {
-        "ilyguys",
+        "ilyguyss",
     },
     KeyLink = "https://discord.gg/DHeCNzTypH",
     GameScripts = {
