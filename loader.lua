@@ -1,8 +1,3 @@
--- ══════════════════════════════════════════════════════════════
---   IBdihP Hub — Professional Script Loader v3
---   Auto-detect game • Key saving • Colorful & Clean
--- ══════════════════════════════════════════════════════════════
-
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
