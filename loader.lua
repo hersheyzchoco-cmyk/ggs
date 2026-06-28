@@ -30,6 +30,13 @@ local SCRIPTS = {
         GameId = 109715918987082,
     },
     {
+        Name = "Anime Powerscaling Card Collection",
+        Description = "Auto buy, auto grade, auto tokens, etc",
+        Icon = "🌟",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/apcc.lua",
+        GameId = 85580552562948,
+    },
+    {
         Name = "Anime Astral Simulator",
         Description = "Auto mobs, auto trial, auto gate, auto raid, auto craft and more",
         Icon = "🔥",
