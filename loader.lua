@@ -26,7 +26,7 @@ local SCRIPTS = {
         Name = "Anime Stars Card Collection",
         Description = "Auto buy, auto grade, auto tokens, auto showdown, and more",
         Icon = "🌸",
-        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/main.lua",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/ascc.lua",
         GameId = 109715918987082,
     },
     {
