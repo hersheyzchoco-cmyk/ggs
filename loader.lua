@@ -16,11 +16,18 @@ local KEY_SAVE_NAME = "IBdihPHub_SavedKey.txt"
 
 local SCRIPTS = {
     {
-        Name = "World Cup Album",
-        Description = "Auto collect, buy & open packs, equip best, stick cards, sell dupes",
-        Icon = "🏆",
-        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/worldcup.lua",
-        GameId = 71724366181884,
+        Name = "Anime Astral Simulator",
+        Description = "Auto mobs, auto trial, auto gate, auto raid, auto craft and more",
+        Icon = "🔥",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/astral.lua",
+        GameId = 113236157544232,
+    },
+    {
+        Name = "Anime Card Farm",
+        Description = "Auto buy, auto place, auto tower, auto sell, auto upgrade and more",
+        Icon = "🃟",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/acf.lua",
+        GameId = 125039473548047,
     },
     {
         Name = "Anime Stars Card Collection",
@@ -36,12 +43,20 @@ local SCRIPTS = {
         URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/apcc.lua",
         GameId = 85580552562948,
     },
+
     {
-        Name = "Anime Astral Simulator",
-        Description = "Auto mobs, auto trial, auto gate, auto raid, auto craft and more",
-        Icon = "🔥",
-        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/astral.lua",
-        GameId = 113236157544232,
+        Name = "Sports Card Collection",
+        Description = "Auto buy, auto grade, auto tokens, and more",
+        Icon = "⚡",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/sports.lua",
+        GameId = 72831706183896,
+    },
+    {
+        Name = "World Cup Album",
+        Description = "Auto collect, buy & open packs, equip best, stick cards, sell dupes",
+        Icon = "🏆",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/worldcup.lua",
+        GameId = 71724366181884,
     },
     {
         Name = "Youtuber Card Collection",
@@ -49,13 +64,6 @@ local SCRIPTS = {
         Icon = "💻",
         URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/ycc.lua",
         GameId = 81440501385895,
-    },
-    {
-        Name = "Sports Card Collection",
-        Description = "Auto buy, auto grade, auto tokens, and more",
-        Icon = "⚡",
-        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/sports.lua",
-        GameId = 72831706183896,
     },
 }
 
