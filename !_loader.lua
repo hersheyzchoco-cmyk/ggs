@@ -25,7 +25,7 @@ local SCRIPTS = {
     {
         Name = "Anime Card Farm",
         Description = "Auto buy, auto place, auto tower, auto sell, auto upgrade and more",
-        Icon = "🃟",
+        Icon = "🃏",
         URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/acf.lua",
         GameId = 125039473548047,
     },
@@ -53,7 +53,7 @@ local SCRIPTS = {
     {
         Name = "Chicken Farm",
         Description = "Auto collect egg, auto collect lucky block, auto deposit, auto upgrade, and more",
-        Icon = "🎣",
+        Icon = "🐓",
         URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/cf.lua",
         GameId = 137233438285284,
     },
