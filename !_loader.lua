@@ -19,7 +19,7 @@ local SCRIPTS = {
         Name = "Anime Astral Simulator",
         Description = "Auto mobs, auto trial, auto gate, auto raid, auto craft and more",
         Icon = "🔥",
-        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/astral.lua",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/aas.lua",
         GameId = 113236157544232,
     },
     {
