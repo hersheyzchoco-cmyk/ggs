@@ -60,16 +60,9 @@ local SCRIPTS = {
     {
         Name = "Loot RNG",
         Description = "Aura kill fast, auto sword best, auto best zone, full automation, and more",
-        Icon = "🐓",
+        Icon = "🗡️",
         URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/lr.lua",
         GameId = 118575129990331,
-    },
-    {
-        Name = "Sports Card Collection",
-        Description = "Auto buy, auto grade, auto tokens, and more",
-        Icon = "⚡",
-        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/sports.lua",
-        GameId = 72831706183896,
     },
     {
         Name = "World Cup Album",
