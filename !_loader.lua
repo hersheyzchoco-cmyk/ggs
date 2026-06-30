@@ -61,7 +61,7 @@ local SCRIPTS = {
         Name = "World Cup Album",
         Description = "Auto collect, buy & open packs, equip best, stick cards, sell dupes, and more",
         Icon = "🏆",
-        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/worldcup.lua",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/wc.lua",
         GameId = 71724366181884,
     },
     {
