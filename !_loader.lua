@@ -51,6 +51,13 @@ local SCRIPTS = {
         GameId = 118677256126351,
     },
     {
+        Name = "Chicken Farm",
+        Description = "Auto collect egg, auto collect lucky block, auto deposit, auto upgrade, and more",
+        Icon = "🎣",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/cf.lua",
+        GameId = 137233438285284,
+    },
+    {
         Name = "Sports Card Collection",
         Description = "Auto buy, auto grade, auto tokens, and more",
         Icon = "⚡",
