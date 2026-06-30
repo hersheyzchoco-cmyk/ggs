@@ -58,6 +58,13 @@ local SCRIPTS = {
         GameId = 137233438285284,
     },
     {
+        Name = "Crab Tycoon",
+        Description = "Auto spawn egg, auto merge, auto collect, auto upgrade, and more",
+        Icon = "🦀",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/ct.lua",
+        GameId = 92605157087535,
+    },
+    {
         Name = "Loot RNG",
         Description = "Aura kill fast, auto sword best, auto best zone, full automation, and more",
         Icon = "🗡️",
