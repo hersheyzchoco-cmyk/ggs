@@ -38,12 +38,18 @@ local SCRIPTS = {
     },
     {
         Name = "Anime Powerscaling Card Collection",
-        Description = "Auto buy, auto grade, auto tokens, etc",
+        Description = "Auto buy, auto grade, auto tokens, and more",
         Icon = "🌟",
         URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/apcc.lua",
         GameId = 85580552562948,
     },
-
+    {
+        Name = "Bomb Fishing",
+        Description = "Auto bomb, auto sell, auto upgrade, auto rebirth, and more",
+        Icon = "🎣",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/bf.lua",
+        GameId = 118677256126351,
+    },
     {
         Name = "Sports Card Collection",
         Description = "Auto buy, auto grade, auto tokens, and more",
@@ -53,7 +59,7 @@ local SCRIPTS = {
     },
     {
         Name = "World Cup Album",
-        Description = "Auto collect, buy & open packs, equip best, stick cards, sell dupes",
+        Description = "Auto collect, buy & open packs, equip best, stick cards, sell dupes, and more",
         Icon = "🏆",
         URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/worldcup.lua",
         GameId = 71724366181884,
