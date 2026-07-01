@@ -79,6 +79,13 @@ local SCRIPTS = {
         GameId = 71724366181884,
     },
     {
+        Name = "World Cup Manager",
+        Description = "Auto match, insta open pack, equip best, auto trail, sell dupes, and more",
+        Icon = "🏟️",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/wcm.lua",
+        GameId = 71463030387257,
+    },
+    {
         Name = "Youtuber Card Collection",
         Description = "Auto buy, auto grade, auto tokens, and more",
         Icon = "💻",
