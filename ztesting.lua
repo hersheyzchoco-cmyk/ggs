@@ -1,4 +1,4 @@
--- Anime Astral Simulator Script with Obsidian UI - v2.1
+-- fix this
 -- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -77,6 +77,7 @@ local aas_ProgressionConfig  = GameLibrary.getConfig("ProgressionConfig")
 local aas_UpgradesConfig     = GameLibrary.getConfig("UpgradesConfig")
 local aas_CraftConfig        = GameLibrary.getConfig("CraftConfig")
 local aas_TrialConfig        = GameLibrary.getConfig("TimeTrialConfig")
+local aas_Upgrades2Config = GameLibrary.getConfig("Upgrades2Config")
 local aas_TitleConfig        = require(ReplicatedStorage.SimpleWorld.Library.Config.TitleConfig)
 
 -- ══════════════════════════════════════════
@@ -110,6 +111,11 @@ local aas_trialJoinRemote             = GameLibrary.getBridge("TimeTrialJoin")
 local aas_trialLeaveRemote            = GameLibrary.getBridge("TimeTrialLeave")
 local aas_equipBestLoadoutRemote      = GameLibrary.getBridge("EquipBestLoadout")
 local aas_titlesActionRemote          = GameLibrary.getBridge("TitlesAction")
+-- Upgrades2 remotes
+local aas_upgrades2DataRemote    = GameLibrary.getBridge("Upgrades2Data")
+local aas_upgrades2RequestRemote = GameLibrary.getBridge("Upgrades2Request")
+local aas_upgrades2ResultRemote  = GameLibrary.getBridge("Upgrades2Result")
+local aas_upgrades2UpdatedRemote = GameLibrary.getBridge("Upgrades2Updated")
 local aas_getPlayerDataFunc           = ReplicatedStorage.SimpleWorld.Library.Network.Functions:WaitForChild("GetPlayerData", 10)
 
 -- BridgeNet2 remote for Fuse All
@@ -160,126 +166,70 @@ local function aas_equipLoadout(stat)
     pcall(function() aas_equipBestLoadoutRemote:Fire(stat) end)
 end
 
--- ══════════════════════════════════════════
---   STATE VARIABLES
--- ══════════════════════════════════════════
-local aas_autoClickRunning             = false
-local aas_autoClaimAchievementsEnabled = false
-local aas_autoAvatarEnabled            = false
-local aas_autoRankEnabled              = false
-local aas_autoStatEnabled              = false
-local aas_autoClaimRewardsEnabled      = false
-local aas_currentStatSelection         = "Power"
-local aas_crowClaiming = false  -- Add this near your other state variables at the top
+-- We use a single table "S" to bypass the 200-local limit
+local S = {
+    -- Auto States
+    autoClickRunning = false, autoClaimAchievementsEnabled = false, autoAvatarEnabled = false,
+    autoRankEnabled = false, autoStatEnabled = false, autoClaimRewardsEnabled = false,
+    currentStatSelection = "Power", crowClaiming = false, autoBallEnabled = false,
+    ballThread = nil, ballClaiming = false, upgrades2SystemKey = "World0",
+    
+    -- Farming
+    farmEnabled = false, farmThread = nil, currentWorldTracked = nil, worldDropdowns = {},
+    
+    -- Activities
+    activeRaidKey = nil, raidThread = nil, raidEnabled = {},
+    activeDefenseKey = nil, defenseThread = nil, defenseEnabled = {},
+    trialEnabled = {}, trialThreads = {}, gateEnabled = false, gateThread = nil,
+    gateAutoArise = false, gateCooldown = false,
+    
+    -- Gacha/Items
+    gachaEnabled = {}, gachaThreads = {}, activeGachaRarities = {}, gachaLabelRefs = {},
+    swordThreads = {}, autoFuseAllEnabled = false, fuseAllThread = nil,
+    passiveAutoEnabled = false, passiveThread = nil, passiveLabelRef = nil,
+    activePassiveData = nil, titanAutoEnabled = false, titanThread = nil,
+    titanLabelRef = nil, activeTitanData = nil,
+    
+    -- Sword Passives
+    swordPassive1Enabled = false, swordPassive1Thread = nil, sword1Data = nil,
+    sword1CurrentBreathing = nil, sword1InfoLabelRef = nil, sword1BreathingLabelRef = nil,
+    swordPassive2Enabled = false, swordPassive2Thread = nil, sword2Data = nil,
+    sword2CurrentBreathing = nil, sword2InfoLabelRef = nil, sword2BreathingLabelRef = nil,
+    
+    -- Grimoires
+    grimoire1Enabled = false, grimoire1Thread = nil, grimoire1LabelRef = nil,
+    grimoire2Enabled = false, grimoire2Thread = nil, grimoire2LabelRef = nil,
+    activeGrimoireSlot1 = nil, activeGrimoireSlot2 = nil,
+    
+    -- Progression
+    progressionEnabled = {}, progressionThreads = {}, progressionLevels = {},
+    rangeUpgradeEnabled = {}, rangeUpgradeThreads = {},
+    upgrades2Enabled = {}, upgrades2Threads = {}, upgrades2Data = {},
+    
+    -- Others
+    starEnabled = false, starThread = nil, starEggKey = nil,
+    craftEnabled = {}, craftThreads = {}, craftShiny = {},
+    priorityChoice = "Trial", gateSuppressedByPriority = false, trialSuppressedByPriority = false,
+    autoCrowEnabled = false, crowThread = nil, cachedPlayerData = nil,
+    progressionLevelLabelRefs = {},
+    
+    -- Data Lists
+    WorldList = {}, sortedWorldIndices = {}, RaidList = {}, sortedRaidKeys = {},
+    GateData = nil, GateRanks = {}, DefenseList = {}, sortedDefenseKeys = {},
+    GachaList = {}, sortedGachaKeys = {}, SwordList = {}, sortedSwordKeys = {},
+    ProgressionList = {}, sortedProgressionKeys = {}, UpgradeSystemList = {},
+    sortedUpgradeSystemKeys = {}, StarWorldList = {}, sortedStarWorldKeys = {},
+    CraftList = {}, sortedCraftKeys = {}, TrialList = {}, sortedTrialKeys = {},
+    WorldNameOverrides = {}, SwordWorld0Enabled = false, SwordWorld8Enabled = false,
+    SwordWorld0Thread = nil, SwordWorld8Thread = nil
+}
 
--- Farm state
-local aas_farmEnabled         = false
-local aas_farmThread          = nil
-local aas_currentWorldTracked = nil
-local aas_worldDropdowns      = {}
-
--- Raid state
-local aas_activeRaidKey = nil
-local aas_raidThread    = nil
-local aas_raidEnabled   = {}
-
--- Defense state
-local aas_activeDefenseKey = nil
-local aas_defenseThread    = nil
-local aas_defenseEnabled   = {}
-
--- Gacha state
-local aas_gachaEnabled        = {}
-local aas_gachaThreads        = {}
-local aas_activeGachaRarities = {}
-local aas_gachaLabelRefs      = {}
-
--- Sword state
-local aas_swordThreads = {}
-
--- Auto Fuse All
-local aas_autoFuseAllEnabled = false
-local aas_fuseAllThread      = nil
-
--- Passive state
-local aas_passiveAutoEnabled = false
-local aas_passiveThread      = nil
-local aas_passiveLabelRef    = nil
-local aas_activePassiveData  = nil
-
--- Titan state
-local aas_titanAutoEnabled = false
-local aas_titanThread      = nil
-local aas_titanLabelRef    = nil
-local aas_activeTitanData  = nil
-
--- Sword Passive 1
-local aas_swordPassive1Enabled    = false
-local aas_swordPassive1Thread     = nil
-local aas_sword1Data              = nil
-local aas_sword1CurrentBreathing  = nil
-local aas_sword1InfoLabelRef      = nil
-local aas_sword1BreathingLabelRef = nil
-
--- Sword Passive 2
-local aas_swordPassive2Enabled    = false
-local aas_swordPassive2Thread     = nil
-local aas_sword2Data              = nil
-local aas_sword2CurrentBreathing  = nil
-local aas_sword2InfoLabelRef      = nil
-local aas_sword2BreathingLabelRef = nil
-
--- Grimoire state
-local aas_grimoire1Enabled    = false
-local aas_grimoire1Thread     = nil
-local aas_grimoire1LabelRef   = nil
-local aas_grimoire2Enabled    = false
-local aas_grimoire2Thread     = nil
-local aas_grimoire2LabelRef   = nil
-local aas_activeGrimoireSlot1 = nil
-local aas_activeGrimoireSlot2 = nil
-
--- Progression state
-local aas_progressionEnabled = {}
-local aas_progressionThreads = {}
-local aas_progressionLevels  = {}
-
--- Range Upgrades state
-local aas_rangeUpgradeEnabled = {}
-local aas_rangeUpgradeThreads = {}
-
--- Star (egg) state
-local aas_starEnabled = false
-local aas_starThread  = nil
-local aas_starEggKey  = nil
-
--- Craft state
-local aas_craftEnabled = {}
-local aas_craftThreads = {}
-local aas_craftShiny   = {}
-
--- Trial state
-local aas_trialEnabled = {}
-local aas_trialThreads = {}
-
--- Gate state
-local aas_gateEnabled   = false
-local aas_gateThread    = nil
-local aas_gateAutoArise = false
-
--- Priority state
-local aas_priorityChoice              = "Trial"
-local aas_gateSuppressedByPriority    = false
-local aas_trialSuppressedByPriority   = false
-
--- Crow state
-local aas_autoCrowEnabled = false
-local aas_crowThread      = nil
-
--- Player data cache
-local aas_cachedPlayerData = nil
-
-local AAS_DIVINE = "Divine"
+-- Loadout assignments
+S.LoadoutValues = { "Power", "Yen", "Damage", "XP", "Drop", "Luck" }
+S.LoadoutAssignments = { Farm = "Power", Gate = "Power" }
+S.RaidLoadouts = {}
+S.DefenseLoadouts = {}
+S.TrialLoadouts = {}
 
 -- ══════════════════════════════════════════
 --   DYNAMIC WORLD + ENEMY DATA
@@ -759,56 +709,98 @@ end
 -- ══════════════════════════════════════════
 --   SNAPSHOT / RESUME
 -- ══════════════════════════════════════════
-local function aas_snapshotAndPauseActivities()
-    local snapshot = { farmWasActive=false, raidKey=nil, defenseKey=nil }
+-- ══════════════════════════════════════════
+--   SNAPSHOT / RESUME
+-- ══════════════════════════════════════════
 
+-- Forward declarations (This fixes the main error)
+local aas_raidArenaExists
+local aas_defenseArenaExists
+
+local function aas_snapshotAndPauseActivities()
+    local snapshot = {
+        farmWasActive = false,
+        raidKey       = nil,
+        defenseKey    = nil,
+    }
+
+    -- Pause farm
     if aas_farmEnabled then
         snapshot.farmWasActive = true
         aas_farmEnabled = false
-        if aas_farmThread then task.cancel(aas_farmThread) aas_farmThread = nil end
+        if aas_farmThread then
+            task.cancel(aas_farmThread)
+            aas_farmThread = nil
+        end
         aas_currentWorldTracked = nil
     end
 
+    -- Pause raid
     if aas_activeRaidKey then
         snapshot.raidKey = aas_activeRaidKey
-        local rk = snapshot.raidKey
+        local rk = aas_activeRaidKey
         aas_raidEnabled[rk] = false
-        if aas_raidThread then task.cancel(aas_raidThread) aas_raidThread = nil end
-        pcall(function() aas_raidLeaveRemote:Fire() end)
-        task.wait(5)
         aas_activeRaidKey = nil
+        if aas_raidThread then
+            task.cancel(aas_raidThread)
+            aas_raidThread = nil
+        end
+        if aas_raidArenaExists(rk) then
+            pcall(function() aas_raidLeaveRemote:Fire() end)
+        end
+        task.wait(3)
     end
 
+    -- Pause defense
     if aas_activeDefenseKey then
         snapshot.defenseKey = aas_activeDefenseKey
-        local dk = snapshot.defenseKey
+        local dk = aas_activeDefenseKey
         aas_defenseEnabled[dk] = false
-        if aas_defenseThread then task.cancel(aas_defenseThread) aas_defenseThread = nil end
-        pcall(function() aas_defenseLeaveRemote:Fire() end)
-        task.wait(5)
         aas_activeDefenseKey = nil
+        if aas_defenseThread then
+            task.cancel(aas_defenseThread)
+            aas_defenseThread = nil
+        end
+        if aas_defenseArenaExists(dk) then
+            pcall(function() aas_defenseLeaveRemote:Fire() end)
+        end
+        task.wait(3)
     end
 
     return snapshot
 end
 
+-- Define the functions that were being called too early
+aas_raidArenaExists = function(raidKey)
+    local arenas = workspace:FindFirstChild("RaidArenas")
+    return arenas and arenas:FindFirstChild(raidKey) ~= nil
+end
+
+aas_defenseArenaExists = function(defKey)
+    local arenas = workspace:FindFirstChild("DefenseArenas")
+    return arenas and arenas:FindFirstChild(defKey) ~= nil
+end
+
 local function aas_resumeFromSnapshot(snapshot)
     if not snapshot then return end
+
+    -- Give the server time to fully process the leave
     task.wait(5)
 
     if snapshot.farmWasActive then
         aas_equipLoadout(aas_LoadoutAssignments.Farm)
         aas_farmEnabled = true
         if aas_farmThread then task.cancel(aas_farmThread) end
-        aas_farmThread = task.spawn(function() aas_farmLoop() end)
+        aas_farmThread = task.spawn(aas_farmLoop)
     end
 
     if snapshot.raidKey then
         local rk = snapshot.raidKey
+        -- Only resume if toggle is still on
         if Toggles["AutoRaid_"..rk] and Toggles["AutoRaid_"..rk].Value then
             aas_equipLoadout(aas_RaidLoadouts[rk] or "Power")
             aas_raidEnabled[rk] = true
-            aas_activeRaidKey = rk
+            aas_activeRaidKey   = rk
             if aas_raidThread then task.cancel(aas_raidThread) end
             aas_raidThread = task.spawn(function() aas_raidLoop(rk) end)
         end
@@ -816,10 +808,17 @@ local function aas_resumeFromSnapshot(snapshot)
 
     if snapshot.defenseKey then
         local dk = snapshot.defenseKey
+        -- Only resume if toggle is still on
         if Toggles["AutoDefense_"..dk] and Toggles["AutoDefense_"..dk].Value then
+            -- Teleport to the defense's world first so the arena can be found
+            local defData = aas_DefenseList[dk]
+            if defData and defData.WorldId then
+                pcall(function() aas_requestChangeWorldRemote:Fire(defData.WorldId) end)
+                task.wait(3)
+            end
             aas_equipLoadout(aas_DefenseLoadouts[dk] or "Power")
             aas_defenseEnabled[dk] = true
-            aas_activeDefenseKey = dk
+            aas_activeDefenseKey   = dk
             if aas_defenseThread then task.cancel(aas_defenseThread) end
             aas_defenseThread = task.spawn(function() aas_defenseLoop(dk) end)
         end
@@ -887,8 +886,15 @@ local function aas_crowMonitorLoop()
             continue
         end
 
+        -- Don't try to claim crow if ball is currently claiming
+        if aas_ballClaiming then
+            task.wait(1)
+            continue
+        end
+
         local corvo = aas_getCorvo()
         if corvo then
+            -- ... rest of the existing crow loop unchanged ...
             aas_crowClaiming = true
 
             UILibrary:Notify({
@@ -980,6 +986,160 @@ local function aas_crowMonitorLoop()
         task.wait(1)
     end
     aas_crowClaiming = false
+end
+
+-- ══════════════════════════════════════════
+--   BALL SYSTEM (World 8)
+-- ══════════════════════════════════════════
+local function aas_getBall()
+    local folder = workspace:FindFirstChild("World8Balls")
+    if not folder then return nil end
+    for _, child in ipairs(folder:GetChildren()) do
+        if child.Name:match("^Ball_") then
+            return child
+        end
+    end
+    return nil
+end
+
+local function aas_claimBall(ball)
+    local target = nil
+    if ball:IsA("BasePart") then
+        target = ball
+    elseif ball:IsA("Model") then
+        target = ball.PrimaryPart or ball:FindFirstChildOfClass("BasePart")
+    end
+    if not target then
+        for _, v in ipairs(ball:GetDescendants()) do
+            if v:IsA("BasePart") then
+                target = v
+                break
+            end
+        end
+    end
+    if not target then
+        warn("[Ball] Could not find a BasePart inside: " .. ball.Name)
+        return
+    end
+
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    hrp.CFrame = target.CFrame * CFrame.new(0, 3, 0)
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    task.wait(0.5)
+
+    game:GetService("VirtualInputManager"):SendKeyEvent(true, Enum.KeyCode.E, false, game)
+    task.wait(3)
+    game:GetService("VirtualInputManager"):SendKeyEvent(false, Enum.KeyCode.E, false, game)
+end
+
+local function aas_ballMonitorLoop()
+    while aas_autoBallEnabled do
+        if aas_ballClaiming then
+            task.wait(1)
+            continue
+        end
+
+        -- Don't try to claim ball if crow is currently claiming
+        if aas_crowClaiming then
+            task.wait(1)
+            continue
+        end
+
+        local ball = aas_getBall()
+        if ball then
+            aas_ballClaiming = true
+
+            UILibrary:Notify({
+                Title       = "🌟 BALL DETECTED!",
+                Description = "Pausing all activities to claim: " .. ball.Name,
+                Time        = 6,
+            })
+
+            -- Pause farm / raid / defense
+            local snapshot = aas_snapshotAndPauseActivities()
+
+            -- Stop active trial threads
+            for tk, t in pairs(aas_trialThreads) do
+                task.cancel(t)
+                aas_trialThreads[tk] = nil
+            end
+
+            -- Stop gate thread
+            if aas_gateThread then
+                task.cancel(aas_gateThread)
+                aas_gateThread = nil
+            end
+
+            -- Leave any active raid/trial/defense
+            pcall(function() aas_raidLeaveRemote:Fire() end)
+            pcall(function() aas_trialLeaveRemote:Fire() end)
+            pcall(function() aas_defenseLeaveRemote:Fire() end)
+            task.wait(3)
+
+            -- Step 1: Fire world change remote to World 8
+            pcall(function() aas_requestChangeWorldRemote:Fire(8) end)
+            task.wait(3)
+
+            -- Step 2: Wait for ball to appear (up to 15s)
+            local waited = 0
+            local foundBall = aas_getBall()
+            while not foundBall and waited < 15 do
+                task.wait(1)
+                waited = waited + 1
+                foundBall = aas_getBall()
+            end
+
+            if foundBall then
+                aas_claimBall(foundBall)
+                task.wait(2)
+                UILibrary:Notify({
+                    Title       = "✅ Ball Claimed!",
+                    Description = "Resuming previous activities...",
+                    Time        = 4,
+                })
+            else
+                UILibrary:Notify({
+                    Title       = "❌ Ball Lost",
+                    Description = "Ball disappeared before we could claim it.",
+                    Time        = 4,
+                })
+            end
+
+            -- Resume trial threads
+            for _, tk in ipairs(aas_sortedTrialKeys) do
+                if aas_trialEnabled[tk] then
+                    aas_trialThreads[tk] = task.spawn(function()
+                        aas_trialLoop(tk)
+                    end)
+                end
+            end
+
+            -- Resume gate thread
+            if aas_gateEnabled then
+                aas_gateThread = task.spawn(aas_gateLoop)
+            end
+
+            -- Resume farm / raid / defense
+            aas_resumeFromSnapshot(snapshot)
+
+            -- Wait until ball folder is empty before monitoring again
+            local clearDeadline = tick() + 30
+            while tick() < clearDeadline do
+                local b = aas_getBall()
+                if not b then break end
+                task.wait(1)
+            end
+
+            task.wait(5)
+            aas_ballClaiming = false
+        end
+
+        task.wait(1)
+    end
+    aas_ballClaiming = false
 end
 
 -- ══════════════════════════════════════════
@@ -1633,9 +1793,11 @@ function aas_gateLoop()
             aas_gateCooldown = false
         end)
 
-        aas_resumeFromSnapshot(snapshot)
         aas_trialSuppressedByPriority = false
-        task.wait(1)
+        aas_gateSuppressedByPriority  = false
+        aas_resumeFromSnapshot(snapshot)
+        
+        task.wait(3)
     end
 
     -- Cleanup on toggle off
@@ -1967,6 +2129,67 @@ local function aas_syncAllPlayerData()
     aas_updateProgressionLabels()
 end
 
+-- ══════════════════════════════════════════
+--   UPGRADES2 LIVE DATA SYNC
+-- ══════════════════════════════════════════
+local function aas_applyUpgrades2Payload(systemKey, payload)
+    if type(payload) ~= "table" then return end
+    if systemKey ~= aas_upgrades2SystemKey then return end
+    local upgrades = payload.Upgrades
+    if type(upgrades) ~= "table" then return end
+    for _, entry in ipairs(upgrades) do
+        if type(entry) == "table" and type(entry.Multiplier) == "string" then
+            aas_upgrades2Data[entry.Multiplier] = entry
+        end
+    end
+end
+
+-- Connect live update remote (fires when any upgrade changes server-side)
+if aas_upgrades2UpdatedRemote then
+    aas_upgrades2UpdatedRemote:Connect(function(payload)
+        if type(payload) == "table" and type(payload.SystemKey) == "string" then
+            aas_applyUpgrades2Payload(payload.SystemKey, payload)
+        end
+    end)
+end
+
+-- Connect data response remote
+if aas_upgrades2DataRemote then
+    aas_upgrades2DataRemote:Connect(function(payload)
+        if type(payload) ~= "table" then return end
+        local systems = payload.Systems
+        if type(systems) == "table" then
+            for sysKey, sysData in pairs(systems) do
+                if type(sysKey) == "string" then
+                    aas_applyUpgrades2Payload(sysKey, sysData)
+                end
+            end
+        end
+    end)
+end
+
+-- Request fresh data every 10 seconds
+task.spawn(function()
+    while true do
+        task.wait(10)
+        pcall(function()
+            if aas_upgrades2DataRemote then
+                aas_upgrades2DataRemote:Fire()
+            end
+        end)
+    end
+end)
+
+-- Initial data fetch
+task.spawn(function()
+    task.wait(3)
+    pcall(function()
+        if aas_upgrades2DataRemote then
+            aas_upgrades2DataRemote:Fire()
+        end
+    end)
+end)
+
 task.spawn(function()
     while true do
         task.wait(15)
@@ -2238,6 +2461,52 @@ local function aas_progressionLoop(progKey)
 end
 
 -- ══════════════════════════════════════════
+--   UPGRADES2 (PROFESSIONS) LOOP
+-- ══════════════════════════════════════════
+local function aas_upgrades2Loop(multiplierKey)
+    while aas_upgrades2Enabled[multiplierKey] do
+        -- Check live data: is this upgrade at max or not upgradeable?
+        local entry = aas_upgrades2Data[multiplierKey]
+
+        -- If we have live data and CanUpgrade is explicitly false, wait and retry
+        -- (CanUpgrade being nil means we haven't received data yet — still try)
+        if entry and entry.CanUpgrade == false then
+            -- Could be max level or requirement not met
+            local sysConfig = aas_Upgrades2Config:GetSystem(aas_upgrades2SystemKey)
+            local upgradeConfig = sysConfig and sysConfig.Upgrades[multiplierKey]
+            local currentLevel = entry.Level or 0
+            local maxLevel = upgradeConfig and upgradeConfig.MaxLevel or math.huge
+
+            if currentLevel >= maxLevel then
+                -- Reached max level, stop
+                aas_upgrades2Enabled[multiplierKey] = false
+                local tk = "AutoUpgrades2_" .. multiplierKey
+                if Toggles[tk] then Toggles[tk]:SetValue(false) end
+                UILibrary:Notify({
+                    Title       = "Professions: " .. multiplierKey,
+                    Description = "Reached max level " .. tostring(currentLevel) .. "! Stopped.",
+                    Time        = 5,
+                })
+                break
+            end
+
+            -- Requirement not met yet, wait and retry
+            task.wait(2)
+            continue
+        end
+
+        -- Fire the upgrade request: systemKey, multiplierKey
+        pcall(function()
+            aas_upgrades2RequestRemote:Fire(aas_upgrades2SystemKey, multiplierKey)
+        end)
+
+        -- Wait for result — the Updated remote will update aas_upgrades2Data automatically
+        -- Use a moderate delay to avoid rate limiting (controller uses 5s timeout)
+        task.wait(1.5)
+    end
+end
+
+-- ══════════════════════════════════════════
 --   RANGE UPGRADE LOOP
 -- ══════════════════════════════════════════
 local function aas_rangeUpgradeLoop(sysKey)
@@ -2353,6 +2622,18 @@ local function aas_cleanup()
     aas_swordWorld8Enabled = false
     if aas_swordWorld8Thread then task.cancel(aas_swordWorld8Thread) aas_swordWorld8Thread = nil end
     aas_crowClaiming = false
+
+        -- Ball cleanup (add after crow cleanup lines)
+    aas_autoBallEnabled = false
+    if aas_ballThread then task.cancel(aas_ballThread) aas_ballThread = nil end
+    aas_ballClaiming = false
+
+        -- Upgrades2 (Professions) cleanup
+    for k in pairs(aas_upgrades2Enabled) do aas_upgrades2Enabled[k] = false end
+    for k, t in pairs(aas_upgrades2Threads) do
+        task.cancel(t)
+        aas_upgrades2Threads[k] = nil
+    end
 
     print("Anime Astral Simulator script unloaded!")
 end
@@ -2476,11 +2757,13 @@ aas_MainGroup:AddToggle("AutoClaimRewards", {
     end,
 })
 
--- ── Auto Crow ──────────────────────────────
-local aas_CrowGroup = aas_Tabs.Main:AddLeftGroupbox("Auto Crow", "feather")
+-- ── Auto Crow (World 6) ────────────────────────────────────────────
+local aas_CrowGroup = aas_Tabs.Main:AddLeftGroupbox("Auto Crow (World 6)", "feather")
 aas_CrowGroup:AddLabel(
-    "⚠ IMPORTANT: You MUST have manually visited\nWorld 6 at least once before enabling this!\n"..
-    "When a crow spawns, ALL active farming will\nbe paused, crow will be claimed, then resumed.",
+    "⚠ IMPORTANT: You MUST have manually visited\n"..
+    "World 6 at least once before enabling this!\n"..
+    "When a crow spawns, ALL active farming will\n"..
+    "be paused, crow will be claimed, then resumed.",
     true
 )
 aas_CrowGroup:AddToggle("AutoCrow", {
@@ -2492,10 +2775,52 @@ aas_CrowGroup:AddToggle("AutoCrow", {
         if value then
             if aas_crowThread then task.cancel(aas_crowThread) end
             aas_crowThread = task.spawn(aas_crowMonitorLoop)
-            UILibrary:Notify({ Title="Auto Crow", Description="Enabled! Monitoring World 6 Corvos...", Time=5 })
+            UILibrary:Notify({
+                Title       = "Auto Crow",
+                Description = "Enabled! Monitoring World 6 Corvos...",
+                Time        = 5,
+            })
         else
-            if aas_crowThread then task.cancel(aas_crowThread) end
-            UILibrary:Notify({ Title="Auto Crow", Description="Disabled.", Time=3 })
+            if aas_crowThread then
+                task.cancel(aas_crowThread)
+                aas_crowThread = nil
+            end
+            aas_crowClaiming = false
+            UILibrary:Notify({ Title = "Auto Crow", Description = "Disabled.", Time = 3 })
+        end
+    end,
+})
+
+-- ── Auto Ball (World 8) ────────────────────────────────────────────
+local aas_BallGroup = aas_Tabs.Main:AddLeftGroupbox("Auto Ball (World 8)", "circle")
+aas_BallGroup:AddLabel(
+    "⚠ IMPORTANT: You MUST have World 8 unlocked\n"..
+    "before enabling this!\n"..
+    "When a ball spawns, ALL active farming will\n"..
+    "be paused, ball will be claimed, then resumed.",
+    true
+)
+aas_BallGroup:AddToggle("AutoBall", {
+    Text    = "Enable Auto Ball (World 8)",
+    Tooltip = "Monitors workspace.World8Balls for balls. Pauses all activities to claim the ball, then resumes.",
+    Default = false,
+    Callback = function(value)
+        aas_autoBallEnabled = value
+        if value then
+            if aas_ballThread then task.cancel(aas_ballThread) end
+            aas_ballThread = task.spawn(aas_ballMonitorLoop)
+            UILibrary:Notify({
+                Title       = "Auto Ball",
+                Description = "Enabled! Monitoring World 8 Balls...",
+                Time        = 5,
+            })
+        else
+            if aas_ballThread then
+                task.cancel(aas_ballThread)
+                aas_ballThread = nil
+            end
+            aas_ballClaiming = false
+            UILibrary:Notify({ Title = "Auto Ball", Description = "Disabled.", Time = 3 })
         end
     end,
 })
@@ -3364,6 +3689,76 @@ for _, sysKey in ipairs(aas_sortedUpgradeSystemKeys) do
             end
         end,
     })
+end
+
+-- ══════════════════════════════════════════
+--   PROFESSIONS (UPGRADES2) UI
+-- ══════════════════════════════════════════
+local aas_ProfessionsGroup = aas_Tabs.Progression:AddRightGroupbox("Professions (Upgrades2)", "briefcase")
+aas_ProfessionsGroup:AddLabel("Auto upgrades Professions stats using activity-based currencies.", true)
+aas_ProfessionsGroup:AddLabel("Auto stops at max level per stat.", true)
+aas_ProfessionsGroup:AddLabel("Currencies: Raid Waves, Kills, Gacha Rolls, Star Spins", true)
+aas_ProfessionsGroup:AddDivider()
+
+-- Get all upgrades from config for World0 / Professions
+local aas_professionSystem = aas_Upgrades2Config:GetSystem(aas_upgrades2SystemKey)
+local aas_professionUpgrades = aas_professionSystem and aas_professionSystem.UpgradeList or {}
+
+for _, upgradeData in ipairs(aas_professionUpgrades) do
+    local multiplierKey = upgradeData.Multiplier
+    local displayName   = upgradeData.DisplayName or multiplierKey
+    local costType      = upgradeData.CostType or "?"
+    local maxLevel      = upgradeData.MaxLevel
+    local maxLevelStr   = (maxLevel == math.huge or maxLevel == nil) and "∞" or tostring(maxLevel)
+    local toggleKey     = "AutoUpgrades2_" .. multiplierKey
+
+    aas_upgrades2Enabled[multiplierKey] = false
+
+    local subGroup = aas_ProfessionsGroup
+
+    subGroup:AddLabel(displayName .. " (Cost: " .. costType .. " | Max: " .. maxLevelStr .. ")", true)
+
+    subGroup:AddToggle(toggleKey, {
+        Text    = "Enable Auto Upgrade: " .. displayName,
+        Tooltip = "Automatically upgrade " .. displayName .. " profession until max level. Costs: " .. costType,
+        Default = false,
+        Callback = function(value)
+            aas_upgrades2Enabled[multiplierKey] = value
+            if value then
+                -- Request fresh data first
+                pcall(function()
+                    if aas_upgrades2DataRemote then
+                        aas_upgrades2DataRemote:Fire()
+                    end
+                end)
+                task.wait(0.5)
+
+                if aas_upgrades2Threads[multiplierKey] then
+                    task.cancel(aas_upgrades2Threads[multiplierKey])
+                end
+                aas_upgrades2Threads[multiplierKey] = task.spawn(function()
+                    aas_upgrades2Loop(multiplierKey)
+                end)
+                UILibrary:Notify({
+                    Title       = "Professions: " .. displayName,
+                    Description = "Auto Upgrade started!",
+                    Time        = 3,
+                })
+            else
+                if aas_upgrades2Threads[multiplierKey] then
+                    task.cancel(aas_upgrades2Threads[multiplierKey])
+                    aas_upgrades2Threads[multiplierKey] = nil
+                end
+                UILibrary:Notify({
+                    Title       = "Professions: " .. displayName,
+                    Description = "Auto Upgrade stopped.",
+                    Time        = 3,
+                })
+            end
+        end,
+    })
+
+    subGroup:AddDivider()
 end
 
 -- ══════════════════════════════════════════
