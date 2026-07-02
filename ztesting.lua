@@ -1,5 +1,4 @@
-task.spawn(function()
-  -- fix this
+-- fix this
 -- Services
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -3928,5 +3927,3 @@ UILibrary:Notify({
     Time        = 5,
 })
 
-
-end)
