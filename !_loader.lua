@@ -76,7 +76,7 @@ local SCRIPTS = {
         Description = "Aura roll, auto index, auto upgrades, auto zone, full automation, and more",
         Icon = "🛡️",
         URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/rtd.lua",
-        GameId = 12955957978936,
+        GameId = 129559579789369,
     },
     {
         Name = "World Cup Album",
