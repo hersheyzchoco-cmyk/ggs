@@ -79,6 +79,13 @@ local SCRIPTS = {
         GameId = 118575129990331,
     },
     {
+        Name = "My Fishing Anime",
+        Description = "Aura roll egg, auto buy egg, auto buy upgrade, auto buy rod, and more",
+        Icon = "🪝",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/mfa.lua",
+        GameId = 112244246405144,
+    },
+    {
         Name = "Roll to Defend",
         Description = "Aura roll, auto index, auto upgrades, auto zone, full automation, and more",
         Icon = "🛡️",
