@@ -51,6 +51,13 @@ local SCRIPTS = {
         GameId = 118677256126351,
     },
     {
+        Name = "Catch and Tame",
+        Description = "Instant catch, automated farm, auto food, auto buy, autocollect money, and more",
+        Icon = "🐒",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/cat.lua",
+        GameId = 96645548064314,
+    },
+    {
         Name = "Chicken Farm",
         Description = "Auto collect egg, auto collect lucky block, auto deposit, auto upgrade, and more",
         Icon = "🐓",
