@@ -79,6 +79,13 @@ local SCRIPTS = {
         GameId = 118575129990331,
     },
     {
+        Name = "Make Hotsauce",
+        Description = "Fast roll, fast buy, auto pepper, auto brew, auto sell, and more",
+        Icon = "🌶️",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/mh.lua",
+        GameId = 122391683154858,
+    },
+    {
         Name = "My Fishing Anime",
         Description = "Aura roll egg, auto buy egg, auto buy upgrade, auto buy rod, and more",
         Icon = "🪝",
