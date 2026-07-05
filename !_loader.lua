@@ -23,6 +23,13 @@ local SCRIPTS = {
         GameId = 113236157544232,
     },
     {
+        Name = "Anime Battles",
+        Description = "Auto mobs, auto upgrade, auto gacha, auto quest, auto roll and more",
+        Icon = "🤺",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/ab.lua",
+        GameId = 126229277218112,
+    },
+    {
         Name = "Anime Card Farm",
         Description = "Auto buy, auto place, auto tower, auto sell, auto upgrade and more",
         Icon = "🃏",
