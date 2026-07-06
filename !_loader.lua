@@ -114,6 +114,13 @@ local SCRIPTS = {
         GameId = 129559579789369,
     },
     {
+        Name = "Snowcone Stand",
+        Description = "Aura perfect, auto sell, auto buy flavor, auto buy table, and more",
+        Icon = "❄️",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/ss.lua",
+        GameId = 76113971506717,
+    },
+    {
         Name = "World Cup Album",
         Description = "Auto collect, buy & open packs, equip best, stick cards, sell dupes, and more",
         Icon = "🏆",
