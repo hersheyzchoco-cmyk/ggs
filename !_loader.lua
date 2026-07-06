@@ -44,6 +44,13 @@ local SCRIPTS = {
         GameId = 85580552562948,
     },
     {
+        Name = "Anime RNG Defense",
+        Description = "Auto roll, auto upgrade, auto equip best, auto trait, and more",
+        Icon = "🏰",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/ard.lua",
+        GameId = 104693964860826,
+    },
+    {
         Name = "Anime Stars Card Collection",
         Description = "Auto buy, auto grade, auto tokens, auto showdown, and more",
         Icon = "🌸",
