@@ -107,6 +107,13 @@ local SCRIPTS = {
         GameId = 112244246405144,
     },
     {
+        Name = "Roll Anime",
+        Description = "Aura roll, auto equip best, auto upgrades, auto monarch, full automation, and more",
+        Icon = "🎲",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/ra.lua",
+        GameId = 134898243790699,
+    },
+    {
         Name = "Roll to Defend",
         Description = "Aura roll, auto index, auto upgrades, auto zone, full automation, and more",
         Icon = "🛡️",
