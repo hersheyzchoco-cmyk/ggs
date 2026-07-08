@@ -132,7 +132,7 @@ local SCRIPTS = {
         Description = "Auto match, insta open pack, equip best, auto trail, sell dupes, and more",
         Icon = "🏟️",
         URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/wcm.lua",
-        GameId = 71463030387257,
+        GameId = 83988958116126,
     },
     {
         Name = "Youtuber Card Collection",
