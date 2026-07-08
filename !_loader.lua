@@ -128,6 +128,13 @@ local SCRIPTS = {
         GameId = 76113971506717,
     },
     {
+        Name = "Spin a Car",
+        Description = "Aura roll, auto equip best, auto upgrades, auto lapshop, full automation, and more",
+        Icon = "🏎️",
+        URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/sac.lua",
+        GameId = 136758055891411,
+    },
+    {
         Name = "World Cup Album",
         Description = "Auto collect, buy & open packs, equip best, stick cards, sell dupes, and more",
         Icon = "🏆",
