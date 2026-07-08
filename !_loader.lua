@@ -13,6 +13,7 @@ local SCRIPTS = {
     { Name = "Anime Astral Simulator", Icon = "🔥", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/aas.lua", GameId = 113236157544232 },
     { Name = "Anime Battles", Icon = "🤺", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/ab.lua", GameId = 126229277218112 },
     { Name = "Anime Card Farm", Icon = "🃏", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/acf.lua", GameId = 125039473548047 },
+    { Name = "Anime Duelists", Icon = "⚔️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/ad.lua", GameId = 135858844777165 },
     { Name = "Anime Powerscaling Card Collection", Icon = "🌟", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/apcc.lua", GameId = 85580552562948 },
     { Name = "Anime RNG Defense", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/ard.lua", GameId = 104693964860826 },
     { Name = "Anime Stars Card Collection", Icon = "🌸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/ascc.lua", GameId = 109715918987082 },
