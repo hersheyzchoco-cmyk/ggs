@@ -21,15 +21,16 @@ local SCRIPTS = {
     { Name = "Catch and Tame", Icon = "🐒", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/cat.lua", GameId = 96645548064314 },
     { Name = "Chicken Farm", Icon = "🐓", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/cf.lua", GameId = 137233438285284 },
     { Name = "Crab Tycoon", Icon = "🦀", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/ct.lua", GameId = 92605157087535 },
+    { Name = "Digimon Era", Icon = "🦖", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/de.lua", GameId = 87810101348327 },
     { Name = "Loot RNG", Icon = "🗡️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/lr.lua", GameId = 118575129990331 },
     { Name = "Make Hotsauce", Icon = "🌶️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/mh.lua", GameId = 122391683154858 },
     { Name = "My Fishing Anime", Icon = "🪝", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/mfa.lua", GameId = 112244246405144 },
     { Name = "Roll Anime", Icon = "🎲", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/ra.lua", GameId = 134898243790699 },
     { Name = "Roll to Defend", Icon = "🛡️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/rtd.lua", GameId = 129559579789369 },
+    { Name = "Soccer Manager", Icon = "🏟️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/sm.lua", GameId = 83988958116126 },
     { Name = "Snowcone Stand", Icon = "❄️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/ss.lua", GameId = 76113971506717 },
     { Name = "Spin a Car", Icon = "🏎️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/sac.lua", GameId = 136758055891411 },
     { Name = "World Cup Album", Icon = "🏆", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/wca.lua", GameId = 71724366181884 },
-    { Name = "World Cup Manager", Icon = "🏟️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/wcm.lua", GameId = 83988958116126 },
     { Name = "Youtuber Card Collection", Icon = "💻", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/ycc.lua", GameId = 81440501385895 },
 }
 
