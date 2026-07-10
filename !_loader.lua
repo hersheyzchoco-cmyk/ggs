@@ -31,6 +31,7 @@ local SCRIPTS = {
     { Name = "Soccer Manager", Icon = "🏟️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/soccer-manager.lua", GameId = 83988958116126 },
     { Name = "Snowcone Stand", Icon = "❄️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/snowcone-stand.lua", GameId = 76113971506717 },
     { Name = "Spin a Car", Icon = "🏎️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/spin-a-car.lua", GameId = 136758055891411 },
+    { Name = "Throw a Coin", Icon = "🪙", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/throw-a-coin.lua", GameId = 115681808123944 },
     { Name = "World Cup Album", Icon = "🏆", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/world-cup-album.lua", GameId = 71724366181884 },
     { Name = "Youtuber Card Collection", Icon = "💻", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/youtuber-card-collection.lua", GameId = 81440501385895 },
 }
