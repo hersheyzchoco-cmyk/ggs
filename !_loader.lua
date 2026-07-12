@@ -10,7 +10,7 @@ local DISCORD_LINK = "https://discord.gg/DHeCNzTypH"
 local KEY_FILE = "IBdihPHub_SavedKey.txt"
 
 local SCRIPTS = {
-    { Name = "+1 Wood per Click", Icon = "🪵", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/1keyboard%3D1%24s.lua", GameId = 112231208081788 },
+    { Name = "+1 Wood per Click", Icon = "🪵", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/1wood-per-click", GameId = 112231208081788 },
     { Name = "1 Keyboard = 1$/s", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/1keyboard%3D1%24s.lua", GameId = 121003786627094 },
     { Name = "Anime Astral Simulator", Icon = "🔥", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-astral-simulator.lua", GameId = 113236157544232 },
     { Name = "Anime Battles", Icon = "🤺", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-battles.lua", GameId = 126229277218112 },
