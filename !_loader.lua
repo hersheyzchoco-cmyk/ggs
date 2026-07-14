@@ -37,6 +37,7 @@ local SCRIPTS = {
     { Name = "Missiles vs Cities", Icon = "🚀", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/missiles-vs-cities.lua", GameId = 112641748896693 },
     { Name = "My Fishing Anime", Icon = "🪝", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/my-fishing-anime.lua", GameId = 112244246405144 },
     { Name = "My Wood Farm", Icon = "🪵", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/my-wood-farm.lua", GameId = 79267089300389 },
+    { Name = "Place the Keycaps", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/place-the-keycaps.lua", GameId = 103984418130080 },
     { Name = "RNG Heroes", Icon = "🦸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/rng-heroes.lua", GameId = 108307565942574 },
     { Name = "Roll Anime", Icon = "🎲", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/roll-anime.lua", GameId = 134898243790699 },
     { Name = "Roll to Defend", Icon = "🛡️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/roll-to-defend.lua", GameId = 129559579789369 },
