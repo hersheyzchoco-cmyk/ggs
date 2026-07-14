@@ -28,6 +28,7 @@ local SCRIPTS = {
     { Name = "Digimon Era", Icon = "🦖", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/digimon-era.lua", GameId = 77192431769439 },
     { Name = "Egg Case Farm", Icon = "🥚", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/egg-case-farm.lua", GameId = 74144293690546 },
     { Name = "Grow it RNG", Icon = "🪴", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/grow-it-rng.lua", GameId = 78292727217500 },
+    { Name = "Grow Your Land", Icon = "🧑‍🌾", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/grow-your-land.lua", GameId = 78769336859161 },
     { Name = "Loot RNG", Icon = "🗡️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/loot-rng.lua", GameId = 118575129990331 },
     { Name = "Make a Drill Farm", Icon = "⛏️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/make-a-drill-farm.lua", GameId = 79315121100812 },
     { Name = "Make Hotsauce", Icon = "🌶️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/make-hotsauce.lua", GameId = 122391683154858 },
