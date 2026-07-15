@@ -35,6 +35,7 @@ local SCRIPTS = {
     { Name = "Make a Drill Farm", Icon = "⛏️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/make-a-drill-farm.lua", GameId = 79315121100812 },
     { Name = "Make Hotsauce", Icon = "🌶️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/make-hotsauce.lua", GameId = 122391683154858 },
     { Name = "Mine a Mountain", Icon = "🏔️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/mine-a-mountain.lua", GameId = 125927821145949 },
+    { Name = "Mine a Planet", Icon = "🌎", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/mine-a-planet.lua", GameId = 121125129560252 },
     { Name = "Missiles vs Cities", Icon = "🚀", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/missiles-vs-cities.lua", GameId = 112641748896693 },
     { Name = "My Fishing Anime", Icon = "🪝", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/my-fishing-anime.lua", GameId = 112244246405144 },
     { Name = "My Giant Sandwich", Icon = "🥪", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/my-giant-sandwich.lua", GameId = 139546619723000 },
