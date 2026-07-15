@@ -20,6 +20,7 @@ local SCRIPTS = {
     { Name = "Anime Powerscaling Card Collection", Icon = "🌟", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-powerscaling-card-collection.lua", GameId = 85580552562948 },
     { Name = "Anime RNG Defense", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-rng-defense.lua", GameId = 104693964860826 },
     { Name = "Anime Stars Card Collection", Icon = "🌸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-stars-card-collection.lua", GameId = 109715918987082 },
+    { Name = "Battle Cat Power Evolution", Icon = "😺", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/battle-cat-power-evolution.lua", GameId = 111044895242311 },
     { Name = "Bomb Fishing", Icon = "🎣", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/bomb-fishing.lua", GameId = 118677256126351 },
     { Name = "Build a Base and Steal", Icon = "🏯", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/build-a-base-and-steal.lua", GameId = 132016691802922 },
     { Name = "Build a Keyboard", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/build-a-keyboard.lua", GameId = 91679585668032 },
