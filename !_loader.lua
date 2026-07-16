@@ -53,6 +53,7 @@ local SCRIPTS = {
     { Name = "Throw a Coin - World 2", Icon = "🪙", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/throw-a-coin-world-2.lua", GameId = 72042130041700 },
     { Name = "World Cup Album", Icon = "🏆", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/world-cup-album.lua", GameId = 71724366181884 },
     { Name = "Youtuber Card Collection", Icon = "💻", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/youtuber-card-collection.lua", GameId = 81440501385895 },
+    { Name = "temp", Icon = "💻", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/temp.lua", GameId = 14728552283 },
 }
 
 -- ═══ HELPERS ═══
