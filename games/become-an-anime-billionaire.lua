@@ -95,7 +95,7 @@ Library.ShowToggleFrameInKeybinds = true
 local baab_Window = Library:CreateWindow({
     Title = "IBdihP Hub",
     Footer = "By Hersheyz - BAAB v1.0",
-    Icon = 95816097006870,
+    Icon = "rbxassetid://114748833858413",
     NotifySide = "Right",
     ShowCustomCursor = true,
 })
