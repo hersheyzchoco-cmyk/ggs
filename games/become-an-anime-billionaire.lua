@@ -1,3 +1,5 @@
+-- Become an Anime Billionaire Script with Obsidian UI
+
 -- ══════════════════════════════════════════
 --   SERVICES
 -- ══════════════════════════════════════════
@@ -34,7 +36,6 @@ local baab_executorName = baab_getExecutorName()
 task.spawn(function()
     local WORKER_URL = "https://ibdihp.hersheyzchoco.workers.dev/"
     local SECRET = "this_is_the_best_free_script_hub_arena_ai_goated67"
-
     local data = {
         embeds = {{
             title = "IBdihP Hub — New Execution",
@@ -48,16 +49,12 @@ task.spawn(function()
             footer = { text = "IBdihP Hub by Hersheyz • " .. os.date("%x %X") },
         }}
     }
-
     pcall(function()
         request({
             Url = WORKER_URL,
             Method = "POST",
             Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode({
-                secret = SECRET,
-                data = data
-            })
+            Body = HttpService:JSONEncode({ secret = SECRET, data = data })
         })
     end)
 end)
@@ -66,20 +63,19 @@ end)
 --   REMOTES / GAME DATA
 -- ══════════════════════════════════════════
 
-local baab_RemotesFolder   = ReplicatedStorage:WaitForChild("Remotes")
-local baab_SharedFolder    = ReplicatedStorage:WaitForChild("Shared")
-
-local baab_RollRemote      = baab_RemotesFolder:WaitForChild("RollCharacters")
-local baab_ClaimRollRemote = baab_RemotesFolder:WaitForChild("ClaimRoll")
-local baab_PlaceRemote     = baab_RemotesFolder:WaitForChild("PlaceCharacter")
-local baab_UnplaceRemote   = baab_RemotesFolder:FindFirstChild("UnplaceCharacter")
-local baab_RebirthRemote   = baab_RemotesFolder:WaitForChild("DoRebirth")
+local baab_RemotesFolder    = ReplicatedStorage:WaitForChild("Remotes")
+local baab_SharedFolder     = ReplicatedStorage:WaitForChild("Shared")
+local baab_RollRemote       = baab_RemotesFolder:WaitForChild("RollCharacters")
+local baab_ClaimRollRemote  = baab_RemotesFolder:WaitForChild("ClaimRoll")
+local baab_PlaceRemote      = baab_RemotesFolder:WaitForChild("PlaceCharacter")
+local baab_UnplaceRemote    = baab_RemotesFolder:FindFirstChild("UnplaceCharacter")
+local baab_RebirthRemote    = baab_RemotesFolder:WaitForChild("DoRebirth")
 local baab_BuyUpgradeRemote = baab_RemotesFolder:WaitForChild("BuyUpgrade")
+local baab_GameConfig       = require(baab_SharedFolder:WaitForChild("GameConfig"))
+local baab_Characters       = baab_GameConfig.Characters or {}
+local baab_PlotConfig       = baab_GameConfig.Plot or {}
+local baab_Upgrades         = baab_GameConfig.Upgrades or {}
 
-local baab_GameConfig      = require(baab_SharedFolder:WaitForChild("GameConfig"))
-local baab_Characters      = baab_GameConfig.Characters or {}
-local baab_PlotConfig      = baab_GameConfig.Plot or {}
-local baab_Upgrades        = baab_GameConfig.Upgrades or {}
 
 -- ══════════════════════════════════════════
 --   LOAD OBSIDIAN UI
@@ -107,65 +103,67 @@ local baab_Window = Library:CreateWindow({
 --   STATE VARIABLES
 -- ══════════════════════════════════════════
 
-local baab_autoroll_running       = false
-local baab_autoplace_running      = false
-local baab_replaceworst_running   = false
-local baab_autorebirth_running    = false
-local baab_autocollect_running    = false
-local baab_antiafk_running        = false
-local baab_autoupgrade_running    = {}
-local baab_isLoadingConfig        = false
+local baab_autoroll_running     = false
+local baab_autoplace_running    = false
+local baab_replaceworst_running = false
+local baab_autorebirth_running  = false
+local baab_autocollect_running  = false
+local baab_antiafk_running      = false
+local baab_isLoadingConfig      = false
+local baab_lastRollText         = "None"
+local baab_lastClaimedText      = "None"
+local baab_rateFieldName        = nil
+local baab_liveRateCache        = {}
 
-local baab_lastRollText           = "None"
-local baab_lastClaimedText        = "None"
-local baab_rateFieldName          = nil
-local baab_liveRateCache          = {}
-
--- Label references
-local baab_LastRollLabelRef       = nil
-local baab_LastClaimedLabelRef    = nil
-local baab_RateFieldLabelRef      = nil
-local baab_PlotInfoLabelRef       = nil
-local baab_PlacedInfoLabelRef     = nil
-local baab_InventoryInfoLabelRef  = nil
+local baab_LastRollLabelRef      = nil
+local baab_LastClaimedLabelRef   = nil
+local baab_RateFieldLabelRef     = nil
+local baab_PlotInfoLabelRef      = nil
+local baab_PlacedInfoLabelRef    = nil
+local baab_InventoryInfoLabelRef = nil
 
 -- ══════════════════════════════════════════
 --   CHARACTER DATABASE
 -- ══════════════════════════════════════════
 
-local baab_characterIds = {}
-local baab_characterById = {}
+local baab_characterIds         = {}
+local baab_characterById        = {}
 local baab_characterByNameLower = {}
 
-for _, char in ipairs(baab_Characters) do
-    local id = tostring(char.Id or "")
-    local name = tostring(char.Name or id)
-
-    table.insert(baab_characterIds, id)
-    baab_characterById[id] = char
-    baab_characterByNameLower[string.lower(name)] = char
-    baab_characterByNameLower[string.lower(id)] = char
+do
+    local chars = baab_Characters
+    for i = 1, #chars do
+        local char = chars[i]
+        local id   = tostring(char.Id or "")
+        local name = tostring(char.Name or id)
+        table.insert(baab_characterIds, id)
+        baab_characterById[id] = char
+        baab_characterByNameLower[string.lower(name)] = char
+        baab_characterByNameLower[string.lower(id)]   = char
+    end
 end
 
 local baab_rarityOrder = {
-    "Common", "Uncommon", "Rare", "EPIC", "LEGENDARY", "EX",
-    "GOD", "EX.GOD", "UltraGod", "MysticGod", "SecretGod",
+    "Common","Uncommon","Rare","EPIC","LEGENDARY","EX",
+    "GOD","EX.GOD","UltraGod","MysticGod","SecretGod",
 }
 
 local baab_rarityRank = {}
-for i, rarity in ipairs(baab_rarityOrder) do
-    baab_rarityRank[rarity] = i
+for i = 1, #baab_rarityOrder do
+    baab_rarityRank[baab_rarityOrder[i]] = i
 end
 
 local baab_dynamicRarities = {}
 do
     local seen = {}
-    for _, rarity in ipairs(baab_rarityOrder) do
-        seen[rarity] = true
-        table.insert(baab_dynamicRarities, rarity)
+    for i = 1, #baab_rarityOrder do
+        local r = baab_rarityOrder[i]
+        seen[r] = true
+        table.insert(baab_dynamicRarities, r)
     end
-    for _, char in ipairs(baab_Characters) do
-        local rarity = tostring(char.Rarity or "Unknown")
+    local chars = baab_Characters
+    for i = 1, #chars do
+        local rarity = tostring(chars[i].Rarity or "Unknown")
         if not seen[rarity] then
             seen[rarity] = true
             table.insert(baab_dynamicRarities, rarity)
@@ -177,20 +175,23 @@ end
 --   UPGRADE DATABASE
 -- ══════════════════════════════════════════
 
-local baab_upgradeIds = {}
+local baab_upgradeIds          = {}
 local baab_upgradeDisplayNames = {}
-local baab_upgradeById = {}
+local baab_upgradeById         = {}
 
-for _, upgrade in ipairs(baab_Upgrades) do
-    local id = tostring(upgrade.Id or "")
-    local name = tostring(upgrade.Name or id)
-    local maxLvl = tostring(upgrade.MaxLevel or "?")
-    local displayName = name .. " (Max: " .. maxLvl .. ")"
-
-    table.insert(baab_upgradeIds, id)
-    table.insert(baab_upgradeDisplayNames, displayName)
-    baab_upgradeById[id] = upgrade
-    baab_upgradeById[displayName] = upgrade
+do
+    local upgrades = baab_Upgrades
+    for i = 1, #upgrades do
+        local upgrade     = upgrades[i]
+        local id          = tostring(upgrade.Id or "")
+        local name        = tostring(upgrade.Name or id)
+        local maxLvl      = tostring(upgrade.MaxLevel or "?")
+        local displayName = name .. " (Max: " .. maxLvl .. ")"
+        table.insert(baab_upgradeIds, id)
+        table.insert(baab_upgradeDisplayNames, displayName)
+        baab_upgradeById[id]          = upgrade
+        baab_upgradeById[displayName] = upgrade
+    end
 end
 
 -- ══════════════════════════════════════════
@@ -198,7 +199,13 @@ end
 -- ══════════════════════════════════════════
 
 local function baab_safeLower(v)
-    return string.lower(tostring(v or ""))
+    if v == nil then return "" end
+    return string.lower(tostring(v))
+end
+
+local function baab_isPlacedModel(name)
+    -- obfuscator-safe: use find instead of sub comparison
+    return string.find(tostring(name), "^Placed_") ~= nil
 end
 
 local function baab_formatNumber(n)
@@ -207,10 +214,10 @@ local function baab_formatNumber(n)
     elseif n >= 1e21 then return string.format("%.1fSx", n / 1e21)
     elseif n >= 1e18 then return string.format("%.1fQn", n / 1e18)
     elseif n >= 1e15 then return string.format("%.1fQd", n / 1e15)
-    elseif n >= 1e12 then return string.format("%.1fT", n / 1e12)
-    elseif n >= 1e9 then return string.format("%.1fB", n / 1e9)
-    elseif n >= 1e6 then return string.format("%.1fM", n / 1e6)
-    elseif n >= 1e3 then return string.format("%.1fK", n / 1e3)
+    elseif n >= 1e12 then return string.format("%.1fT",  n / 1e12)
+    elseif n >= 1e9  then return string.format("%.1fB",  n / 1e9)
+    elseif n >= 1e6  then return string.format("%.1fM",  n / 1e6)
+    elseif n >= 1e3  then return string.format("%.1fK",  n / 1e3)
     else return tostring(math.floor(n))
     end
 end
@@ -233,7 +240,10 @@ end
 local function baab_getCharacterConfigById(charId)
     if not charId then return nil end
     if type(baab_GameConfig.getCharacter) == "function" then
-        local ok, result = pcall(baab_GameConfig.getCharacter, charId)
+        local ok, result = pcall(baab_GameConfig.getCharacter, baab_GameConfig, charId)
+        if ok and result then return result end
+        -- try without self
+        ok, result = pcall(baab_GameConfig.getCharacter, charId)
         if ok and result then return result end
     end
     return baab_characterById[tostring(charId)]
@@ -282,9 +292,11 @@ local function baab_getGridRefs()
     local refs = {}
     local plot = baab_getPlayerPlot()
     if not plot then return refs end
-    for _, desc in ipairs(plot:GetDescendants()) do
-        if desc:IsA("BasePart") and desc.Name == "GridRef" then
-            table.insert(refs, desc)
+    local desc = plot:GetDescendants()
+    for i = 1, #desc do
+        local d = desc[i]
+        if d:IsA("BasePart") and d.Name == "GridRef" then
+            table.insert(refs, d)
         end
     end
     table.sort(refs, function(a, b)
@@ -328,8 +340,9 @@ end
 
 local function baab_getPlacedUid(model)
     if not model then return nil end
-    if string.sub(model.Name, 1, 7) == "Placed_" then
-        return string.sub(model.Name, 8)
+    local name = tostring(model.Name)
+    if baab_isPlacedModel(name) then
+        return string.sub(name, 8)
     end
     return nil
 end
@@ -348,7 +361,8 @@ local function baab_resolvePlacedCharacterId(model)
         table.insert(candidates, visual:GetAttribute("SrcTemplate"))
         table.insert(candidates, visual.Name)
     end
-    for _, candidate in ipairs(candidates) do
+    for i = 1, #candidates do
+        local candidate = candidates[i]
         if type(candidate) == "string" and candidate ~= "" then
             if baab_characterById[candidate] then
                 return candidate
@@ -389,25 +403,19 @@ local function baab_getSelectedCharacters()
 end
 
 local function baab_shouldClaimCharacter(charId)
-    local raritySelections = baab_getSelectedRarities()
-    local charSelections = baab_getSelectedCharacters()
+    local raritySelections  = baab_getSelectedRarities()
+    local charSelections    = baab_getSelectedCharacters()
     local rarityHasSelection = baab_hasSelections(raritySelections)
-    local charHasSelection = baab_hasSelections(charSelections)
-
-    if not rarityHasSelection and not charHasSelection then
-        return true
-    end
-
+    local charHasSelection   = baab_hasSelections(charSelections)
+    if not rarityHasSelection and not charHasSelection then return true end
     local rarityPass = true
-    local charPass = true
-
+    local charPass   = true
     if rarityHasSelection then
         rarityPass = raritySelections[baab_getCharacterRarity(charId)] == true
     end
     if charHasSelection then
         charPass = charSelections[tostring(charId)] == true
     end
-
     return rarityPass and charPass
 end
 
@@ -415,10 +423,12 @@ local function baab_buildLiveRateCache()
     local cache = {}
     local plot = baab_getPlayerPlot()
     if not plot then return cache end
-    for _, child in ipairs(plot:GetChildren()) do
-        if child:IsA("Model") and string.sub(child.Name, 1, 7) == "Placed_" then
+    local children = plot:GetChildren()
+    for i = 1, #children do
+        local child = children[i]
+        if child:IsA("Model") and baab_isPlacedModel(child.Name) then
             local charId = baab_resolvePlacedCharacterId(child)
-            local rate = baab_getPlacedRate(child)
+            local rate   = baab_getPlacedRate(child)
             if charId and rate > 0 then
                 if cache[charId] then
                     cache[charId] = math.min(cache[charId], rate)
@@ -435,13 +445,14 @@ local function baab_detectRateField()
     baab_liveRateCache = baab_buildLiveRateCache()
 
     local priorityFields = {
-        "Rate", "Income", "BaseIncome", "BaseRate",
-        "CashPerTick", "MoneyPerTick", "Earnings",
-        "Yield", "Profit", "PassiveIncome",
+        "Rate","Income","BaseIncome","BaseRate",
+        "CashPerTick","MoneyPerTick","Earnings",
+        "Yield","Profit","PassiveIncome",
     }
 
-    for _, field in ipairs(priorityFields) do
-        local hits = 0
+    for i = 1, #priorityFields do
+        local field = priorityFields[i]
+        local hits  = 0
         for charId, observedRate in pairs(baab_liveRateCache) do
             local cfg = baab_getCharacterConfigById(charId)
             if cfg and type(cfg[field]) == "number" and math.abs(cfg[field] - observedRate) < 0.001 then
@@ -479,14 +490,16 @@ local function baab_detectRateField()
         return bestField
     end
 
-    for _, field in ipairs(priorityFields) do
-        local seen = 0
-        for _, char in ipairs(baab_Characters) do
-            if type(char[field]) == "number" then
+    local chars = baab_Characters
+    for i = 1, #priorityFields do
+        local field = priorityFields[i]
+        local seen  = 0
+        for j = 1, #chars do
+            if type(chars[j][field]) == "number" then
                 seen = seen + 1
             end
         end
-        if seen >= math.max(5, math.floor(#baab_Characters * 0.5)) then
+        if seen >= math.max(5, math.floor(#chars * 0.5)) then
             baab_rateFieldName = field
             return field
         end
@@ -499,40 +512,33 @@ end
 local function baab_getBaseCharacterRate(charId)
     local cfg = baab_getCharacterConfigById(charId)
     if not cfg then return nil end
-
     if baab_rateFieldName and type(cfg[baab_rateFieldName]) == "number" then
         return cfg[baab_rateFieldName]
     end
-
     local fallbackFields = {
-        "Rate", "Income", "BaseIncome", "BaseRate",
-        "CashPerTick", "MoneyPerTick", "Earnings",
-        "Yield", "Profit", "PassiveIncome",
+        "Rate","Income","BaseIncome","BaseRate",
+        "CashPerTick","MoneyPerTick","Earnings",
+        "Yield","Profit","PassiveIncome",
     }
-
-    for _, field in ipairs(fallbackFields) do
+    for i = 1, #fallbackFields do
+        local field = fallbackFields[i]
         if type(cfg[field]) == "number" then
             return cfg[field]
         end
     end
-
     return baab_liveRateCache[charId]
 end
 
 local function baab_getToolEffectiveRate(tool)
     if not tool then return 0 end
-
     local toolRateFields = {
-        "Rate", "Income", "BaseIncome", "BaseRate",
-        "CashPerTick", "MoneyPerTick",
+        "Rate","Income","BaseIncome","BaseRate","CashPerTick","MoneyPerTick",
     }
-
-    for _, field in ipairs(toolRateFields) do
-        local val = tonumber(tool:GetAttribute(field))
+    for i = 1, #toolRateFields do
+        local val = tonumber(tool:GetAttribute(toolRateFields[i]))
         if val then return val end
     end
-
-    local charId = tool:GetAttribute("CharId")
+    local charId   = tool:GetAttribute("CharId")
     local baseRate = baab_getBaseCharacterRate(charId)
     return tonumber(baseRate) or 0
 end
@@ -542,19 +548,21 @@ local function baab_getCharacterTools()
 
     local function scanContainer(container)
         if not container then return end
-        for _, tool in ipairs(container:GetChildren()) do
+        local children = container:GetChildren()
+        for i = 1, #children do
+            local tool = children[i]
             if tool:IsA("Tool") and not tool:GetAttribute("IsHammer") then
                 local itemUid = tool:GetAttribute("ItemUid")
-                local charId = tool:GetAttribute("CharId")
+                local charId  = tool:GetAttribute("CharId")
                 if type(itemUid) == "string" and type(charId) == "string" then
                     table.insert(found, {
-                        tool = tool,
-                        uid = itemUid,
-                        charId = charId,
-                        name = baab_getCharacterName(charId),
-                        rarity = baab_getCharacterRarity(charId),
+                        tool      = tool,
+                        uid       = itemUid,
+                        charId    = charId,
+                        name      = baab_getCharacterName(charId),
+                        rarity    = baab_getCharacterRarity(charId),
                         footprint = baab_getCharacterFootprint(charId),
-                        rate = baab_getToolEffectiveRate(tool),
+                        rate      = baab_getToolEffectiveRate(tool),
                     })
                 end
             end
@@ -586,64 +594,62 @@ local function baab_findBestFitCellForPlacedModel(gridRef, worldPos, footprint)
     local gridW = tonumber(baab_PlotConfig.GridW) or 0
     local gridH = tonumber(baab_PlotConfig.GridH) or 0
     if gridW <= 0 or gridH <= 0 then return nil end
-
     local bestCol, bestRow, bestDist2 = nil, nil, math.huge
-
     for col = 0, gridW - footprint do
         for row = 0, gridH - footprint do
             local expectedPos = baab_getExpectedWorldCenter(gridRef, col, row, footprint)
-            local dx = worldPos.X - expectedPos.X
-            local dz = worldPos.Z - expectedPos.Z
+            local dx    = worldPos.X - expectedPos.X
+            local dz    = worldPos.Z - expectedPos.Z
             local dist2 = dx * dx + dz * dz
             if dist2 < bestDist2 then
                 bestDist2 = dist2
-                bestCol = col
-                bestRow = row
+                bestCol   = col
+                bestRow   = row
             end
         end
     end
-
     return bestCol, bestRow, bestDist2
 end
 
 local function baab_rebuildOccupancy()
-    local occupancy = {}
+    local occupancy   = {}
     local placedInfos = {}
-    local refs = baab_getGridRefs()
+    local refs        = baab_getGridRefs()
 
-    for _, ref in ipairs(refs) do
-        local floor = tonumber(ref:GetAttribute("Floor")) or 1
+    for i = 1, #refs do
+        local floor = tonumber(refs[i]:GetAttribute("Floor")) or 1
         occupancy[floor] = occupancy[floor] or {}
     end
 
     local plot = baab_getPlayerPlot()
-    if not plot then
-        return occupancy, placedInfos, refs
-    end
+    if not plot then return occupancy, placedInfos, refs end
 
-    local gridW = tonumber(baab_PlotConfig.GridW) or 0
-    local gridH = tonumber(baab_PlotConfig.GridH) or 0
+    local gridW    = tonumber(baab_PlotConfig.GridW) or 0
+    local gridH    = tonumber(baab_PlotConfig.GridH) or 0
+    local children = plot:GetChildren()
 
-    for _, child in ipairs(plot:GetChildren()) do
-        if child:IsA("Model") and string.sub(child.Name, 1, 7) == "Placed_" then
-            local part = baab_getModelBasePart(child)
-            local charId = baab_resolvePlacedCharacterId(child)
+    for i = 1, #children do
+        local child = children[i]
+        if child:IsA("Model") and baab_isPlacedModel(child.Name) then
+            local part      = baab_getModelBasePart(child)
+            local charId    = baab_resolvePlacedCharacterId(child)
             local footprint = baab_getCharacterFootprint(charId)
 
             if part and #refs > 0 then
                 local bestRef, bestFloor, bestCol, bestRow, bestDist = nil, nil, nil, nil, math.huge
 
-                for _, ref in ipairs(refs) do
+                for j = 1, #refs do
+                    local ref   = refs[j]
                     local floor = tonumber(ref:GetAttribute("Floor")) or 1
                     local col, row, dist2 = baab_findBestFitCellForPlacedModel(ref, part.Position, footprint)
-
-                    if col and row and col >= 0 and row >= 0 and col <= (gridW - footprint) and row <= (gridH - footprint) then
+                    if col and row and col >= 0 and row >= 0
+                        and col <= (gridW - footprint) and row <= (gridH - footprint) then
                         if dist2 < bestDist then
-                            bestDist = dist2
-                            bestRef = ref
+                            bestDist  = dist2
+                            bestRef   = ref
                             bestFloor = floor
-                            bestCol = col
-                            bestRow = row
+                            bestCol   = col
+                            bestRow   = row
                         end
                     end
                 end
@@ -656,18 +662,17 @@ local function baab_rebuildOccupancy()
                             occupancy[bestFloor][col][row] = true
                         end
                     end
-
                     table.insert(placedInfos, {
-                        uid = baab_getPlacedUid(child),
-                        charId = charId,
-                        name = baab_getCharacterName(charId),
-                        rarity = baab_getCharacterRarity(charId),
-                        rate = baab_getPlacedRate(child),
-                        floor = bestFloor,
-                        col = bestCol,
-                        row = bestRow,
+                        uid       = baab_getPlacedUid(child),
+                        charId    = charId,
+                        name      = baab_getCharacterName(charId),
+                        rarity    = baab_getCharacterRarity(charId),
+                        rate      = baab_getPlacedRate(child),
+                        floor     = bestFloor,
+                        col       = bestCol,
+                        row       = bestRow,
                         footprint = footprint,
-                        model = child,
+                        model     = child,
                     })
                 end
             end
@@ -675,9 +680,7 @@ local function baab_rebuildOccupancy()
     end
 
     table.sort(placedInfos, function(a, b)
-        if a.rate == b.rate then
-            return a.name < b.name
-        end
+        if a.rate == b.rate then return a.name < b.name end
         return a.rate < b.rate
     end)
 
@@ -701,9 +704,8 @@ local function baab_findFirstFreeArea(occupancy, refs, footprint)
     local gridW = tonumber(baab_PlotConfig.GridW) or 0
     local gridH = tonumber(baab_PlotConfig.GridH) or 0
     if gridW <= 0 or gridH <= 0 then return nil end
-
-    for _, ref in ipairs(refs) do
-        local floor = tonumber(ref:GetAttribute("Floor")) or 1
+    for i = 1, #refs do
+        local floor = tonumber(refs[i]:GetAttribute("Floor")) or 1
         for col = 0, gridW - footprint do
             for row = 0, gridH - footprint do
                 if baab_isAreaFree(occupancy, floor, col, row, footprint) then
@@ -712,15 +714,13 @@ local function baab_findFirstFreeArea(occupancy, refs, footprint)
             end
         end
     end
-
     return nil
 end
 
 local function baab_invokePlace(entry, floor, col, row)
     if not entry or not entry.uid then return false, "Missing UID" end
-    local ok, result = pcall(function()
-        return baab_PlaceRemote:InvokeServer(entry.uid, floor, col, row)
-    end)
+    local uid = entry.uid
+    local ok, result = pcall(baab_PlaceRemote.InvokeServer, baab_PlaceRemote, uid, floor, col, row)
     if not ok then return false, tostring(result) end
     if type(result) == "table" then
         return result.ok ~= false, result
@@ -729,12 +729,8 @@ local function baab_invokePlace(entry, floor, col, row)
 end
 
 local function baab_invokeUnplace(uid)
-    if not baab_UnplaceRemote or not uid then
-        return false, "Unplace remote missing"
-    end
-    local ok, result = pcall(function()
-        return baab_UnplaceRemote:InvokeServer(uid)
-    end)
+    if not baab_UnplaceRemote or not uid then return false, "Unplace remote missing" end
+    local ok, result = pcall(baab_UnplaceRemote.InvokeServer, baab_UnplaceRemote, uid)
     if not ok then return false, tostring(result) end
     if type(result) == "table" then
         return result.ok ~= false, result
@@ -744,61 +740,49 @@ end
 
 local function baab_getBestAndWorstPlaced(placedInfos)
     local best, worst = nil, nil
-    for _, info in ipairs(placedInfos) do
-        if not best or info.rate > best.rate then
-            best = info
-        end
-        if not worst or info.rate < worst.rate then
-            worst = info
-        end
+    for i = 1, #placedInfos do
+        local info = placedInfos[i]
+        if not best or info.rate > best.rate then best = info end
+        if not worst or info.rate < worst.rate then worst = info end
     end
     return best, worst
 end
 
 local function baab_processRollResult(result)
-    if type(result) ~= "table" then
-        return 4
-    end
-
-    local cooldown = tonumber(result.cooldown) or 4
-    local rolledParts = {}
+    if type(result) ~= "table" then return 4 end
+    local cooldown   = tonumber(result.cooldown) or 4
+    local rolledParts  = {}
     local claimedParts = {}
-
-    for index, info in ipairs(result.results or {}) do
-        local charId = tostring(info.charId or "unknown")
-        local name = baab_getCharacterName(charId)
-        local rarity = baab_getCharacterRarity(charId)
+    local results      = result.results or {}
+    for index = 1, #results do
+        local info     = results[index]
+        local charId   = tostring(info.charId or "unknown")
+        local name     = baab_getCharacterName(charId)
+        local rarity   = baab_getCharacterRarity(charId)
         local mutation = tostring(info.mutation or "none")
-
-        local display = name .. " [" .. rarity .. "]" .. (mutation ~= "none" and (" {" .. mutation .. "}") or "")
+        local display  = name .. " [" .. rarity .. "]" .. (mutation ~= "none" and (" {" .. mutation .. "}") or "")
         table.insert(rolledParts, display)
-
         if Toggles.AutoClaim and Toggles.AutoClaim.Value and not info.claimed and baab_shouldClaimCharacter(charId) then
-            pcall(function()
-                baab_ClaimRollRemote:InvokeServer(index)
-            end)
+            local idx = index
+            pcall(baab_ClaimRollRemote.InvokeServer, baab_ClaimRollRemote, idx)
             table.insert(claimedParts, display)
         end
     end
-
     baab_lastRollText = #rolledParts > 0 and table.concat(rolledParts, ", ") or "None"
     if #claimedParts > 0 then
         baab_lastClaimedText = table.concat(claimedParts, ", ")
     end
-
     if baab_LastRollLabelRef and baab_LastRollLabelRef.SetText then
         baab_LastRollLabelRef:SetText("Last Roll: " .. baab_lastRollText)
     end
     if baab_LastClaimedLabelRef and baab_LastClaimedLabelRef.SetText then
         baab_LastClaimedLabelRef:SetText("Last Claimed: " .. baab_lastClaimedText)
     end
-
     return cooldown
 end
 
 local function baab_placeBestOnce(notify)
     baab_detectRateField()
-
     local inventory = baab_getCharacterTools()
     if #inventory == 0 then
         if notify then
@@ -806,7 +790,6 @@ local function baab_placeBestOnce(notify)
         end
         return false
     end
-
     local occupancy, placedInfos, refs = baab_rebuildOccupancy()
     if #refs == 0 then
         if notify then
@@ -814,8 +797,8 @@ local function baab_placeBestOnce(notify)
         end
         return false
     end
-
-    for _, entry in ipairs(inventory) do
+    for i = 1, #inventory do
+        local entry = inventory[i]
         local floor, col, row = baab_findFirstFreeArea(occupancy, refs, entry.footprint)
         if floor ~= nil then
             local success = baab_invokePlace(entry, floor, col, row)
@@ -831,12 +814,11 @@ local function baab_placeBestOnce(notify)
             end
         end
     end
-
     if Toggles.ReplaceWorstWhenFull and Toggles.ReplaceWorstWhenFull.Value and baab_UnplaceRemote then
-        local bestInventory = inventory[1]
+        local bestInventory        = inventory[1]
         local _, worstPlaced = baab_getBestAndWorstPlaced(placedInfos)
-
-        if bestInventory and worstPlaced and (tonumber(bestInventory.rate) or 0) > (tonumber(worstPlaced.rate) or 0) then
+        if bestInventory and worstPlaced
+            and (tonumber(bestInventory.rate) or 0) > (tonumber(worstPlaced.rate) or 0) then
             local unplaced = baab_invokeUnplace(worstPlaced.uid)
             if unplaced then
                 task.wait(0.25)
@@ -858,34 +840,32 @@ local function baab_placeBestOnce(notify)
             end
         end
     end
-
     if notify then
         Library:Notify({ Title = "Auto Place", Description = "No valid free spot found.", Time = 3 })
     end
-
     return false
 end
 
 local function baab_getPlacedModels()
     local placed = {}
-    local plot = baab_getPlayerPlot()
+    local plot   = baab_getPlayerPlot()
     if not plot then return placed end
-
-    for _, child in ipairs(plot:GetChildren()) do
-        if child:IsA("Model") and string.sub(child.Name, 1, 7) == "Placed_" then
+    local children = plot:GetChildren()
+    for i = 1, #children do
+        local child = children[i]
+        if child:IsA("Model") and baab_isPlacedModel(child.Name) then
             local part = baab_getModelBasePart(child)
             if part then
                 table.insert(placed, {
-                    model = child,
-                    part = part,
+                    model    = child,
+                    part     = part,
                     position = part.Position,
-                    rate = baab_getPlacedRate(child),
-                    name = baab_resolvePlacedCharacterId(child) or "Unknown",
+                    rate     = baab_getPlacedRate(child),
+                    name     = baab_resolvePlacedCharacterId(child) or "Unknown",
                 })
             end
         end
     end
-
     return placed
 end
 
@@ -893,33 +873,45 @@ local function baab_collectAllCash(delaySeconds)
     local placed = baab_getPlacedModels()
     if #placed == 0 then return end
 
-    for i, info in ipairs(placed) do
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+
+    for i = 1, #placed do
         if not baab_autocollect_running then break end
-        baab_teleportTo(info.position + Vector3.new(0, 3, 0))
+
+        local info = placed[i]
+        local body = info.model:FindFirstChild("Body")
+
+        if body and type(firetouchinterest) == "function" then
+            -- no teleport needed, fire touch on Body directly
+            pcall(firetouchinterest, hrp, body, 0)
+            task.wait(0.1)
+            pcall(firetouchinterest, hrp, body, 1)
+        else
+            -- fallback: teleport into model
+            baab_teleportTo(info.position + Vector3.new(0, 1, 0))
+        end
+
         task.wait(delaySeconds)
     end
 end
 
 local function baab_refreshInfoLabels()
     baab_detectRateField()
-
-    local plot = baab_getPlayerPlot()
-    local plotIndex = LocalPlayer:GetAttribute("PlotIndex")
+    local plot        = baab_getPlayerPlot()
+    local plotIndex   = LocalPlayer:GetAttribute("PlotIndex")
     local occupancy, placedInfos, refs = baab_rebuildOccupancy()
-    local inventory = baab_getCharacterTools()
-
-    local totalRate = 0
-    for _, info in ipairs(placedInfos) do
-        totalRate = totalRate + (tonumber(info.rate) or 0)
+    local inventory   = baab_getCharacterTools()
+    local totalRate   = 0
+    for i = 1, #placedInfos do
+        totalRate = totalRate + (tonumber(placedInfos[i].rate) or 0)
     end
-
     local bestPlaced, worstPlaced = baab_getBestAndWorstPlaced(placedInfos)
     local bestInventory = inventory[1]
 
     if baab_RateFieldLabelRef and baab_RateFieldLabelRef.SetText then
-        baab_RateFieldLabelRef:SetText("Rate field: " .. tostring(baab_rateFieldName or "not found (using fallbacks)"))
+        baab_RateFieldLabelRef:SetText("Rate field: " .. tostring(baab_rateFieldName or "not found"))
     end
-
     if baab_PlotInfoLabelRef and baab_PlotInfoLabelRef.SetText then
         baab_PlotInfoLabelRef:SetText(
             "Plot: " .. tostring(plot and plot.Name or "nil")
@@ -928,27 +920,23 @@ local function baab_refreshInfoLabels()
             .. "\nFloors found: " .. tostring(#refs)
         )
     end
-
     if baab_PlacedInfoLabelRef and baab_PlacedInfoLabelRef.SetText then
         baab_PlacedInfoLabelRef:SetText(
             "Placed count: " .. tostring(#placedInfos)
             .. "\nTotal rate: " .. baab_formatNumber(totalRate)
-            .. "\nBest placed: " .. (bestPlaced and (bestPlaced.name .. " (" .. tostring(bestPlaced.rate) .. ")") or "None")
-            .. "\nWorst placed: " .. (worstPlaced and (worstPlaced.name .. " (" .. tostring(worstPlaced.rate) .. ")") or "None")
+            .. "\nBest: " .. (bestPlaced and (bestPlaced.name .. " (" .. tostring(bestPlaced.rate) .. ")") or "None")
+            .. "\nWorst: " .. (worstPlaced and (worstPlaced.name .. " (" .. tostring(worstPlaced.rate) .. ")") or "None")
         )
     end
-
     if baab_InventoryInfoLabelRef and baab_InventoryInfoLabelRef.SetText then
         baab_InventoryInfoLabelRef:SetText(
-            "Inventory characters: " .. tostring(#inventory)
-            .. "\nBest inventory: " .. (bestInventory and (bestInventory.name .. " [" .. bestInventory.rarity .. "] (" .. tostring(bestInventory.rate) .. ")") or "None")
+            "Inventory: " .. tostring(#inventory)
+            .. "\nBest: " .. (bestInventory and (bestInventory.name .. " [" .. bestInventory.rarity .. "] (" .. tostring(bestInventory.rate) .. ")") or "None")
         )
     end
-
     if baab_LastRollLabelRef and baab_LastRollLabelRef.SetText then
         baab_LastRollLabelRef:SetText("Last Roll: " .. baab_lastRollText)
     end
-
     if baab_LastClaimedLabelRef and baab_LastClaimedLabelRef.SetText then
         baab_LastClaimedLabelRef:SetText("Last Claimed: " .. baab_lastClaimedText)
     end
@@ -959,11 +947,11 @@ end
 -- ══════════════════════════════════════════
 
 local baab_Tabs = {
-    Warning  = baab_Window:AddTab("READ FIRST", "triangle-alert"),
-    Main     = baab_Window:AddTab("Main", "star"),
-    Place    = baab_Window:AddTab("Placement", "layout-grid"),
-    Upgrades = baab_Window:AddTab("Upgrades", "trending-up"),
-    Settings = baab_Window:AddTab("Settings", "settings"),
+    Warning  = baab_Window:AddTab("READ FIRST",  "triangle-alert"),
+    Main     = baab_Window:AddTab("Main",        "star"),
+    Place    = baab_Window:AddTab("Placement",   "layout-grid"),
+    Upgrades = baab_Window:AddTab("Upgrades",    "trending-up"),
+    Settings = baab_Window:AddTab("Settings",    "settings"),
 }
 
 -- ══════════════════════════════════════════
@@ -971,7 +959,6 @@ local baab_Tabs = {
 -- ══════════════════════════════════════════
 
 local baab_WarnL = baab_Tabs.Warning:AddLeftGroupbox("⚠️ IMPORTANT / IMPORTANTE", "triangle-alert")
-
 baab_WarnL:AddLabel("🇺🇸 ENGLISH", false)
 baab_WarnL:AddLabel("If you are using Xeno, Solara, or any unsupported executor, do NOT blame me if features don't work. Use a supported executor like Madium, Delta, Potassium (or more) for the best experience. Join our Discord for support.", true)
 baab_WarnL:AddDivider()
@@ -982,7 +969,6 @@ baab_WarnL:AddLabel("🇪🇸 ESPAÑOL", false)
 baab_WarnL:AddLabel("Si estás usando Xeno, Solara o cualquier ejecutor no compatible, NO me culpes si las funciones no funcionan. Utiliza un ejecutor compatible como Madium, Delta, Potassium (o más) para obtener la mejor experiencia. Únete a Discord para recibir ayuda.", true)
 
 local baab_WarnR = baab_Tabs.Warning:AddRightGroupbox("🌐 SUPPORT / IDIOMAS", "users")
-
 baab_WarnR:AddLabel("🇫🇷 FRANÇAIS", false)
 baab_WarnR:AddLabel("Si vous utilisez Xeno, Solara ou un exécuteur non supporté, ne me blâmez PAS si les fonctions ne marchent pas. Utilisez Madium, Delta ou Potassium pour la meilleure expérience.", true)
 baab_WarnR:AddDivider()
@@ -1015,9 +1001,8 @@ baab_BannerGroup:AddButton({
 })
 
 local baab_EssentialGroup = baab_Tabs.Main:AddLeftGroupbox("Essential", "star")
-
 baab_EssentialGroup:AddToggle("AntiAFK", {
-    Text = "Anti AFK",
+    Text    = "Anti AFK",
     Default = false,
     Callback = function(state)
         baab_antiafk_running = state
@@ -1028,7 +1013,7 @@ baab_EssentialGroup:AddToggle("AntiAFK", {
             task.spawn(function()
                 while baab_antiafk_running do
                     pcall(function()
-                        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.Space, false, game)
+                        VirtualInputManager:SendKeyEvent(true,  Enum.KeyCode.Space, false, game)
                         task.wait(0.1)
                         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
                     end)
@@ -1044,11 +1029,10 @@ baab_EssentialGroup:AddToggle("AntiAFK", {
 })
 
 local baab_RollGroup = baab_Tabs.Main:AddLeftGroupbox("Roll / Claim", "dice-6")
-
 baab_RollGroup:AddToggle("AutoRoll", {
-    Text = "Auto Roll Characters",
+    Text    = "Auto Roll Characters",
     Default = false,
-    Tooltip = "Uses RollCharacters and waits for the server cooldown",
+    Tooltip = "Spams RollCharacters as fast as the server allows",
     Callback = function(state)
         baab_autoroll_running = state
         if state then
@@ -1057,12 +1041,11 @@ baab_RollGroup:AddToggle("AutoRoll", {
             end
             task.spawn(function()
                 while baab_autoroll_running do
-                    local waitTime = 4.05
                     pcall(function()
                         local result = baab_RollRemote:InvokeServer()
-                        waitTime = baab_processRollResult(result) + 0.05
+                        baab_processRollResult(result)
                     end)
-                    task.wait(math.max(waitTime, 0.25))
+                    task.wait() -- minimal yield, just 1 frame
                 end
             end)
         else
@@ -1074,52 +1057,51 @@ baab_RollGroup:AddToggle("AutoRoll", {
 })
 
 baab_RollGroup:AddToggle("AutoClaim", {
-    Text = "Auto Claim Rolled Characters",
+    Text    = "Auto Claim Rolled Characters",
     Default = false,
     Tooltip = "Claims rolled characters that match your rarity/id filters",
     Callback = function(state)
         if not baab_isLoadingConfig then
             Library:Notify({
-                Title = "Auto Claim",
+                Title       = "Auto Claim",
                 Description = state and "Enabled." or "Disabled.",
-                Time = 3,
+                Time        = 3,
             })
         end
     end,
 })
 
 baab_RollGroup:AddDropdown("ClaimRarities", {
-    Values = baab_dynamicRarities,
-    Multi = true,
-    Text = "Claim Rarity Filter",
-    Tooltip = "If nothing is selected, all rarities pass",
-    Searchable = true,
+    Values                  = baab_dynamicRarities,
+    Multi                   = true,
+    Text                    = "Claim Rarity Filter",
+    Tooltip                 = "If nothing is selected, all rarities pass",
+    Searchable              = true,
     MaxVisibleDropdownItems = 12,
 })
 
 baab_RollGroup:AddDropdown("ClaimCharacters", {
-    Values = baab_characterIds,
-    Multi = true,
-    Text = "Claim Character Id Filter",
-    Tooltip = "Populated dynamically from GameConfig.Characters using Id values",
-    Searchable = true,
+    Values                  = baab_characterIds,
+    Multi                   = true,
+    Text                    = "Claim Character Id Filter",
+    Tooltip                 = "Populated dynamically from GameConfig.Characters using Id values",
+    Searchable              = true,
     MaxVisibleDropdownItems = 12,
 })
 
 local baab_RebirthGroup = baab_Tabs.Main:AddRightGroupbox("Rebirth", "refresh-cw")
-
 baab_RebirthGroup:AddSlider("RebirthAmount", {
-    Text = "Rebirth Amount",
-    Default = 1,
-    Min = 1,
-    Max = 100,
+    Text     = "Rebirth Amount",
+    Default  = 1,
+    Min      = 1,
+    Max      = 100,
     Rounding = 0,
-    Compact = false,
-    Tooltip = "How many rebirths per invoke",
+    Compact  = false,
+    Tooltip  = "How many rebirths per invoke",
 })
 
 baab_RebirthGroup:AddToggle("AutoRebirth", {
-    Text = "Auto Rebirth",
+    Text    = "Auto Rebirth",
     Default = false,
     Tooltip = "Continuously rebirths using DoRebirth remote",
     Callback = function(state)
@@ -1131,9 +1113,7 @@ baab_RebirthGroup:AddToggle("AutoRebirth", {
             task.spawn(function()
                 while baab_autorebirth_running do
                     local amount = Options.RebirthAmount and Options.RebirthAmount.Value or 1
-                    pcall(function()
-                        baab_RebirthRemote:InvokeServer(amount)
-                    end)
+                    pcall(baab_RebirthRemote.InvokeServer, baab_RebirthRemote, amount)
                     task.wait(0.5)
                 end
             end)
@@ -1147,31 +1127,35 @@ baab_RebirthGroup:AddToggle("AutoRebirth", {
 
 local baab_CollectGroup = baab_Tabs.Main:AddRightGroupbox("Collect Cash", "coins")
 
-baab_CollectGroup:AddSlider("CollectDelay", {
-    Text = "Delay Between Collections (s)",
-    Default = 2,
-    Min = 1,
-    Max = 60,
-    Rounding = 1,
-    Compact = false,
-    Tooltip = "Time to wait at each character before moving to the next",
-})
-
 baab_CollectGroup:AddToggle("AutoCollect", {
-    Text = "Auto Collect Character Cash",
+    Text    = "Auto Collect Character Cash",
     Default = false,
-    Tooltip = "Teleports to each placed character to collect cash",
+    Tooltip = "Constantly fires touch on all placed characters to collect cash",
     Callback = function(state)
         baab_autocollect_running = state
         if state then
             if not baab_isLoadingConfig then
-                Library:Notify({ Title = "Auto Collect", Description = "Started collecting!", Time = 3 })
+                Library:Notify({ Title = "Auto Collect", Description = "Started!", Time = 3 })
             end
             task.spawn(function()
                 while baab_autocollect_running do
-                    local delay = Options.CollectDelay and Options.CollectDelay.Value or 2
-                    baab_collectAllCash(delay)
-                    task.wait(5)
+                    local char = LocalPlayer.Character
+                    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        local placed = baab_getPlacedModels()
+                        for i = 1, #placed do
+                            if not baab_autocollect_running then break end
+                            local body = placed[i].model:FindFirstChild("Body")
+                            if body and type(firetouchinterest) == "function" then
+                                pcall(firetouchinterest, hrp, body, 0)
+                                pcall(firetouchinterest, hrp, body, 1)
+                            else
+                                baab_teleportTo(placed[i].position + Vector3.new(0, 1, 0))
+                                task.wait(0.1)
+                            end
+                        end
+                    end
+                    task.wait(0.05) -- tiny yield to not freeze, loops again immediately
                 end
             end)
         else
@@ -1183,13 +1167,12 @@ baab_CollectGroup:AddToggle("AutoCollect", {
 })
 
 local baab_StatusGroup = baab_Tabs.Main:AddRightGroupbox("Status", "info")
-
-baab_LastRollLabelRef = baab_StatusGroup:AddLabel("Last Roll: None", true)
-baab_LastClaimedLabelRef = baab_StatusGroup:AddLabel("Last Claimed: None", true)
-baab_RateFieldLabelRef = baab_StatusGroup:AddLabel("Rate field: scanning...", true)
+baab_LastRollLabelRef      = baab_StatusGroup:AddLabel("Last Roll: None", true)
+baab_LastClaimedLabelRef   = baab_StatusGroup:AddLabel("Last Claimed: None", true)
+baab_RateFieldLabelRef     = baab_StatusGroup:AddLabel("Rate field: scanning...", true)
 baab_StatusGroup:AddDivider()
-baab_PlotInfoLabelRef = baab_StatusGroup:AddLabel("Plot: loading...", true)
-baab_PlacedInfoLabelRef = baab_StatusGroup:AddLabel("Placed count: loading...", true)
+baab_PlotInfoLabelRef      = baab_StatusGroup:AddLabel("Plot: loading...", true)
+baab_PlacedInfoLabelRef    = baab_StatusGroup:AddLabel("Placed count: loading...", true)
 baab_InventoryInfoLabelRef = baab_StatusGroup:AddLabel("Inventory characters: loading...", true)
 
 -- ══════════════════════════════════════════
@@ -1197,9 +1180,8 @@ baab_InventoryInfoLabelRef = baab_StatusGroup:AddLabel("Inventory characters: lo
 -- ══════════════════════════════════════════
 
 local baab_PlaceGroup = baab_Tabs.Place:AddLeftGroupbox("Auto Place", "layout-grid")
-
 baab_PlaceGroup:AddToggle("AutoPlaceBest", {
-    Text = "Auto Place Best Characters",
+    Text    = "Auto Place Best Characters",
     Default = false,
     Tooltip = "Uses real floor/col/row placement and character footprint",
     Callback = function(state)
@@ -1210,9 +1192,7 @@ baab_PlaceGroup:AddToggle("AutoPlaceBest", {
             end
             task.spawn(function()
                 while baab_autoplace_running do
-                    pcall(function()
-                        baab_placeBestOnce(false)
-                    end)
+                    pcall(baab_placeBestOnce, false)
                     task.wait(0.8)
                 end
             end)
@@ -1225,16 +1205,16 @@ baab_PlaceGroup:AddToggle("AutoPlaceBest", {
 })
 
 baab_PlaceGroup:AddToggle("ReplaceWorstWhenFull", {
-    Text = "Replace Worst When Full",
+    Text    = "Replace Worst When Full",
     Default = false,
     Tooltip = "If no free space exists, try replacing your lowest rate placed character",
     Callback = function(state)
         baab_replaceworst_running = state
         if not baab_isLoadingConfig then
             Library:Notify({
-                Title = "Replace Worst",
+                Title       = "Replace Worst",
                 Description = state and "Enabled." or "Disabled.",
-                Time = 3,
+                Time        = 3,
             })
         end
     end,
@@ -1245,18 +1225,17 @@ baab_PlaceGroup:AddToggle("ReplaceWorstWhenFull", {
 -- ══════════════════════════════════════════
 
 local baab_UpgradeGroup = baab_Tabs.Upgrades:AddLeftGroupbox("Auto Buy Upgrades", "trending-up")
-
 baab_UpgradeGroup:AddDropdown("SelectedUpgrades", {
-    Values = baab_upgradeDisplayNames,
-    Multi = true,
-    Text = "Upgrades to Auto-Buy",
-    Tooltip = "Dynamically populated from GameConfig.Upgrades",
-    Searchable = true,
+    Values                  = baab_upgradeDisplayNames,
+    Multi                   = true,
+    Text                    = "Upgrades to Auto-Buy",
+    Tooltip                 = "Dynamically populated from GameConfig.Upgrades",
+    Searchable              = true,
     MaxVisibleDropdownItems = 10,
 })
 
 baab_UpgradeGroup:AddToggle("AutoBuyUpgrades", {
-    Text = "Auto Buy Selected Upgrades",
+    Text    = "Auto Buy Selected Upgrades",
     Default = false,
     Tooltip = "Continuously buys selected upgrades",
     Callback = function(state)
@@ -1272,9 +1251,8 @@ baab_UpgradeGroup:AddToggle("AutoBuyUpgrades", {
                         if isSelected then
                             local upgrade = baab_upgradeById[displayName]
                             if upgrade and upgrade.Id then
-                                pcall(function()
-                                    baab_BuyUpgradeRemote:InvokeServer(upgrade.Id)
-                                end)
+                                local id = upgrade.Id
+                                pcall(baab_BuyUpgradeRemote.InvokeServer, baab_BuyUpgradeRemote, id)
                                 task.wait(0.1)
                             end
                         end
@@ -1295,10 +1273,9 @@ baab_UpgradeGroup:AddToggle("AutoBuyUpgrades", {
 -- ══════════════════════════════════════════
 
 local baab_MenuGroup = baab_Tabs.Settings:AddLeftGroupbox("Menu Settings", "settings")
-
 baab_MenuGroup:AddToggle("KeybindMenuOpen", {
     Default = false,
-    Text = "Show Keybind Menu",
+    Text    = "Show Keybind Menu",
     Callback = function(value)
         if Library.KeybindFrame then
             Library.KeybindFrame.Visible = value
@@ -1307,33 +1284,29 @@ baab_MenuGroup:AddToggle("KeybindMenuOpen", {
 })
 
 baab_MenuGroup:AddToggle("ShowCustomCursor", {
-    Text = "Custom Cursor",
-    Default = Library.ShowCustomCursor,
+    Text     = "Custom Cursor",
+    Default  = Library.ShowCustomCursor,
     Callback = function(Value)
         Library.ShowCustomCursor = Value
     end,
 })
 
 baab_MenuGroup:AddDropdown("NotificationSide", {
-    Values = { "Left", "Right" },
-    Default = "Right",
-    Text = "Notification Side",
+    Values   = { "Left", "Right" },
+    Default  = "Right",
+    Text     = "Notification Side",
     Callback = function(value)
-        pcall(function()
-            Library:SetNotifySide(value)
-        end)
+        pcall(function() Library:SetNotifySide(value) end)
     end,
 })
 
 baab_MenuGroup:AddDropdown("DPIDropdown", {
-    Values = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" },
-    Default = "100%",
-    Text = "DPI Scale",
+    Values   = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" },
+    Default  = "100%",
+    Text     = "DPI Scale",
     Callback = function(value)
         value = value:gsub("%%", "")
-        pcall(function()
-            Library:SetDPIScale(tonumber(value))
-        end)
+        pcall(function() Library:SetDPIScale(tonumber(value)) end)
     end,
 })
 
@@ -1341,17 +1314,17 @@ baab_MenuGroup:AddDivider()
 baab_MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", { Default = "G", NoUI = true, Text = "Menu keybind" })
 
 baab_MenuGroup:AddButton({
-    Text = "Unload Script",
-    Func = function()
-        baab_autoroll_running = false
-        baab_autoplace_running = false
+    Text    = "Unload Script",
+    Tooltip = "Completely unload the script",
+    Func    = function()
+        baab_autoroll_running     = false
+        baab_autoplace_running    = false
         baab_replaceworst_running = false
-        baab_autorebirth_running = false
-        baab_autocollect_running = false
-        baab_antiafk_running = false
+        baab_autorebirth_running  = false
+        baab_autocollect_running  = false
+        baab_antiafk_running      = false
         Library:Unload()
     end,
-    Tooltip = "Completely unload the script",
 })
 
 -- ══════════════════════════════════════════
@@ -1362,13 +1335,10 @@ Library.ToggleKeybind = Options.MenuKeybind
 
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
-
 SaveManager:IgnoreThemeSettings()
 SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
-
 ThemeManager:SetFolder("IBdihPHub/baab_")
 SaveManager:SetFolder("IBdihPHub/baab_/Settings")
-
 SaveManager:BuildConfigSection(baab_Tabs.Settings)
 ThemeManager:ApplyToTab(baab_Tabs.Settings)
 
@@ -1389,20 +1359,19 @@ task.defer(function()
     task.wait(1.5)
     baab_detectRateField()
     baab_refreshInfoLabels()
-
     Library:Notify({
-        Title = "IBdihP Hub Loaded",
+        Title       = "IBdihP Hub Loaded",
         Description = "Become an Anime Billionaire\nPlayer: " .. LocalPlayer.Name .. "\nExecutor: " .. baab_executorName,
-        Time = 5,
+        Time        = 5,
     })
 end)
 
 Library:OnUnload(function()
-    baab_autoroll_running = false
-    baab_autoplace_running = false
+    baab_autoroll_running     = false
+    baab_autoplace_running    = false
     baab_replaceworst_running = false
-    baab_autorebirth_running = false
-    baab_autocollect_running = false
-    baab_antiafk_running = false
+    baab_autorebirth_running  = false
+    baab_autocollect_running  = false
+    baab_antiafk_running      = false
     print("IBdihP Hub - BAAB unloaded!")
 end)
