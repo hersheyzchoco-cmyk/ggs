@@ -239,13 +239,18 @@ end
 
 local function baab_getCharacterConfigById(charId)
     if not charId then return nil end
+    
+    -- try raw array lookup first (most reliable)
+    local fromArray = baab_characterById[tostring(charId)]
+    if fromArray then return fromArray end
+    
+    -- fallback to getCharacter without self
     if type(baab_GameConfig.getCharacter) == "function" then
-        local ok, result = pcall(baab_GameConfig.getCharacter, baab_GameConfig, charId)
-        if ok and result then return result end
-        ok, result = pcall(baab_GameConfig.getCharacter, charId)
+        local ok, result = pcall(baab_GameConfig.getCharacter, charId)
         if ok and result then return result end
     end
-    return baab_characterById[tostring(charId)]
+    
+    return nil
 end
 
 local function baab_getCharacterConfigByNameOrId(nameOrId)
