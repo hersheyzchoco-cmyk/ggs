@@ -1,7 +1,3 @@
--- Become an Anime Billionaire Script with Obsidian UI
--- IBdihP Hub Style
--- Prefix: baab_
-
 -- ══════════════════════════════════════════
 --   SERVICES
 -- ══════════════════════════════════════════
