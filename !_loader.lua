@@ -28,6 +28,7 @@ local SCRIPTS = {
     { Name = "Chicken Farm", Icon = "🐓", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/chicken-farm.lua", GameId = 137233438285284 },
     { Name = "Clean the Squishies", Icon = "😻", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/clean-the-squishies.lua", GameId = 84016394196827 },
     { Name = "Crab Tycoon", Icon = "🦀", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/crab-tycoon.lua", GameId = 92605157087535 },
+    { Name = "Crunch my Butter", Icon = "🧈", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/crunch-my-butter.lua", GameId = 87555052900625 },
     { Name = "Digimon Era", Icon = "🦖", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/digimon-era.lua", GameId = 77192431769439 },
     { Name = "Egg Case Farm", Icon = "🥚", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/egg-case-farm.lua", GameId = 74144293690546 },
     { Name = "Grow it RNG", Icon = "🪴", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/grow-it-rng.lua", GameId = 78292727217500 },
