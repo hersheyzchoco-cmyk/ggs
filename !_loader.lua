@@ -19,6 +19,7 @@ local SCRIPTS = {
     { Name = "Anime Dungeons - Demon Train Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 127204771568038 },
     { Name = "Anime Dungeons - Frozen Forest Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 123509790592616 },
     { Name = "Anime Dungeons - Ninja Village Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 109955310601194 },
+    { Name = "Anime Dungeons - Soul Valley Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 82475659339476 },
     { Name = "Anime Dungeons - Trials", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 70972455539417 },
     { Name = "Anime Dungeons - Raids", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 122377279703567 },
     { Name = "Anime Powerscaling Card Collection", Icon = "🌟", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-powerscaling-card-collection.lua", GameId = 85580552562948 },
