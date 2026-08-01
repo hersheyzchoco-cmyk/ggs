@@ -13,7 +13,7 @@ local KEY_FILE = "IBdihPHub_SavedKey.txt"
 local BANNED_USERS = {
     -- By Username (case-insensitive)
     "PlaceholderUsername1",
-    "XxlegendsthebestxX",
+    "PlaceholderUsername2",
     "PlaceholderUsername3",
     -- Add more as needed
 }
