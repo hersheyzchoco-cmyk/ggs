@@ -9,6 +9,224 @@ local VALID_KEYS = {"ilyguys"}
 local DISCORD_LINK = "https://discord.gg/DHeCNzTypH"
 local KEY_FILE = "IBdihPHub_SavedKey.txt"
 
+-- ═══ BANNED USERS (add usernames or user IDs here) ═══
+local BANNED_USERS = {
+    -- By Username (case-insensitive)
+    "8kruo",
+    "XxlegendsthebestxX",
+    "PlaceholderUsername3",
+    -- Add more as needed
+}
+
+local BANNED_USERIDS = {
+    -- By UserId (number)
+    123456789,
+    987654321,
+    -- Add more as needed
+}
+
+local BANNED_DISPLAYNAMES = {
+    -- By Display Name (case-insensitive)
+    "PlaceholderDisplayName1",
+    "PlaceholderDisplayName2",
+    -- Add more as needed
+}
+
+local function isUserBanned()
+    local name = LocalPlayer.Name:lower()
+    local displayName = LocalPlayer.DisplayName:lower()
+    local userId = LocalPlayer.UserId
+
+    for _, banned in ipairs(BANNED_USERS) do
+        if name == banned:lower() then return true end
+    end
+    for _, bannedId in ipairs(BANNED_USERIDS) do
+        if userId == bannedId then return true end
+    end
+    for _, bannedDisplay in ipairs(BANNED_DISPLAYNAMES) do
+        if displayName == bannedDisplay:lower() then return true end
+    end
+    return false
+end
+
+-- ═══ BANNED USER SCREEN ═══
+if isUserBanned() then
+    if CoreGui:FindFirstChild("IBdihPLoader") then CoreGui.IBdihPLoader:Destroy() end
+    if CoreGui:FindFirstChild("IBdihPBanned") then CoreGui.IBdihPBanned:Destroy() end
+
+    local BanGui = Instance.new("ScreenGui")
+    BanGui.Name = "IBdihPBanned"
+    BanGui.ResetOnSpawn = false
+    BanGui.IgnoreGuiInset = true
+    BanGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    BanGui.Parent = CoreGui
+
+    -- Full black backdrop
+    local Backdrop = Instance.new("Frame")
+    Backdrop.Size = UDim2.new(1, 0, 1, 0)
+    Backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    Backdrop.BackgroundTransparency = 1
+    Backdrop.ZIndex = 1
+    Backdrop.Parent = BanGui
+
+    -- Card
+    local Card = Instance.new("Frame")
+    Card.Name = "BanCard"
+    Card.Size = UDim2.new(0, 480, 0, 0)
+    Card.Position = UDim2.new(0.5, 0, 0.5, 0)
+    Card.AnchorPoint = Vector2.new(0.5, 0.5)
+    Card.BackgroundColor3 = Color3.fromRGB(15, 10, 10)
+    Card.BackgroundTransparency = 1
+    Card.ClipsDescendants = true
+    Card.ZIndex = 2
+    Card.Parent = BanGui
+
+    local cardCorner = Instance.new("UICorner")
+    cardCorner.CornerRadius = UDim.new(0, 16)
+    cardCorner.Parent = Card
+
+    local cardStroke = Instance.new("UIStroke")
+    cardStroke.Color = Color3.fromRGB(255, 50, 50)
+    cardStroke.Thickness = 2
+    cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    cardStroke.Transparency = 1
+    cardStroke.Parent = Card
+
+    -- Red accent bar at top
+    local RedBar = Instance.new("Frame")
+    RedBar.Size = UDim2.new(1, 0, 0, 4)
+    RedBar.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
+    RedBar.BorderSizePixel = 0
+    RedBar.ZIndex = 15
+    RedBar.Parent = Card
+
+    local redBarCorner = Instance.new("UICorner")
+    redBarCorner.CornerRadius = UDim.new(0, 0)
+    redBarCorner.Parent = RedBar
+
+    local redGrad = Instance.new("UIGradient")
+    redGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 30, 30)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(200, 0, 0)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 60, 30)),
+    })
+    redGrad.Parent = RedBar
+
+    -- Pulsing red gradient animation
+    task.spawn(function()
+        local t = 0
+        while RedBar and RedBar.Parent do
+            t += 0.03
+            redGrad.Offset = Vector2.new(math.sin(t) * 0.4, 0)
+            RunService.RenderStepped:Wait()
+        end
+    end)
+
+    -- Skull emoji
+    local Skull = Instance.new("TextLabel")
+    Skull.Size = UDim2.new(1, 0, 0, 60)
+    Skull.Position = UDim2.new(0, 0, 0, 30)
+    Skull.BackgroundTransparency = 1
+    Skull.Text = "⛔"
+    Skull.TextColor3 = Color3.fromRGB(255, 255, 255)
+    Skull.TextSize = 48
+    Skull.Font = Enum.Font.GothamBold
+    Skull.ZIndex = 6
+    Skull.Parent = Card
+
+    -- "YOU ARE BANNED" title
+    local BanTitle = Instance.new("TextLabel")
+    BanTitle.Size = UDim2.new(1, -40, 0, 30)
+    BanTitle.Position = UDim2.new(0, 20, 0, 95)
+    BanTitle.BackgroundTransparency = 1
+    BanTitle.Text = "YOU ARE BANNED"
+    BanTitle.TextColor3 = Color3.fromRGB(255, 60, 60)
+    BanTitle.TextSize = 24
+    BanTitle.Font = Enum.Font.GothamBold
+    BanTitle.ZIndex = 6
+    BanTitle.Parent = Card
+
+    -- Separator line
+    local Sep = Instance.new("Frame")
+    Sep.Size = UDim2.new(0.6, 0, 0, 1)
+    Sep.Position = UDim2.new(0.2, 0, 0, 132)
+    Sep.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
+    Sep.BackgroundTransparency = 0.5
+    Sep.BorderSizePixel = 0
+    Sep.ZIndex = 6
+    Sep.Parent = Card
+
+    -- Message
+    local BanMsg = Instance.new("TextLabel")
+    BanMsg.Size = UDim2.new(1, -60, 0, 50)
+    BanMsg.Position = UDim2.new(0, 30, 0, 145)
+    BanMsg.BackgroundTransparency = 1
+    BanMsg.Text = "early christmas gift 🎄"
+    BanMsg.TextColor3 = Color3.fromRGB(220, 220, 220)
+    BanMsg.TextSize = 16
+    BanMsg.Font = Enum.Font.GothamMedium
+    BanMsg.TextWrapped = true
+    BanMsg.ZIndex = 6
+    BanMsg.Parent = Card
+
+    -- Username display
+    local BanUser = Instance.new("TextLabel")
+    BanUser.Size = UDim2.new(1, -60, 0, 20)
+    BanUser.Position = UDim2.new(0, 30, 0, 195)
+    BanUser.BackgroundTransparency = 1
+    BanUser.Text = "account: " .. LocalPlayer.Name .. " (" .. tostring(LocalPlayer.UserId) .. ")"
+    BanUser.TextColor3 = Color3.fromRGB(120, 80, 80)
+    BanUser.TextSize = 11
+    BanUser.Font = Enum.Font.GothamMedium
+    BanUser.ZIndex = 6
+    BanUser.Parent = Card
+
+    -- "Access permanently revoked" footer
+    local BanFooter = Instance.new("TextLabel")
+    BanFooter.Size = UDim2.new(1, -40, 0, 16)
+    BanFooter.Position = UDim2.new(0, 20, 1, -40)
+    BanFooter.BackgroundTransparency = 1
+    BanFooter.Text = "access permanently revoked — appeals will not be accepted"
+    BanFooter.TextColor3 = Color3.fromRGB(80, 50, 50)
+    BanFooter.TextSize = 10
+    BanFooter.Font = Enum.Font.GothamMedium
+    BanFooter.ZIndex = 6
+    BanFooter.Parent = Card
+
+    -- Animate in
+    task.wait(0.2)
+    TweenService:Create(Backdrop, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 0.3 }):Play()
+    task.wait(0.1)
+    TweenService:Create(Card, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.new(0, 480, 0, 260), BackgroundTransparency = 0 }):Play()
+    TweenService:Create(cardStroke, TweenInfo.new(0.5), { Transparency = 0 }):Play()
+    task.wait(0.8)
+
+    -- Flicker effect on title for extra drama
+    task.spawn(function()
+        while BanTitle and BanTitle.Parent do
+            TweenService:Create(BanTitle, TweenInfo.new(0.08), { TextTransparency = 0.6 }):Play()
+            task.wait(0.1)
+            TweenService:Create(BanTitle, TweenInfo.new(0.08), { TextTransparency = 0 }):Play()
+            task.wait(math.random(20, 60) / 10)
+        end
+    end)
+
+    -- Pulse the border
+    task.spawn(function()
+        while cardStroke and cardStroke.Parent do
+            TweenService:Create(cardStroke, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Color = Color3.fromRGB(180, 20, 20) }):Play()
+            task.wait(1.2)
+            TweenService:Create(cardStroke, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Color = Color3.fromRGB(255, 50, 50) }):Play()
+            task.wait(1.2)
+        end
+    end)
+
+    -- Block the entire script from continuing
+    return
+end
+
+-- ═══ Everything below only runs for non-banned users ═══
+
 local SCRIPTS = {
     { Name = "+1 Wood per Click", Icon = "🪵", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/1wood-per-click.lua", GameId = 112231208081788 },
     { Name = "1 Keyboard = 1$/s", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/1keyboard%3D1%24s.lua", GameId = 121003786627094 },
