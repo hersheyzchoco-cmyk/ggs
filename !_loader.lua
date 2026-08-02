@@ -11,7 +11,7 @@ local KEY_FILE = "IBdihPHub_SavedKey.txt"
 
 -- ═══ BANNED USERS (add usernames or user IDs here) ═══
 local BANNED_NIGGAS = {
-    "8kruo",
+    "Lost nigga",
     "PlaceholderUsername2",
     "PlaceholderUsername3",
 }
