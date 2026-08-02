@@ -10,12 +10,10 @@ local DISCORD_LINK = "https://discord.gg/DHeCNzTypH"
 local KEY_FILE = "IBdihPHub_SavedKey.txt"
 
 -- ═══ BANNED USERS (add usernames or user IDs here) ═══
-local BANNED_USERS = {
-    -- By Username (case-insensitive)
-    "PlaceholderUsername1",
+local BANNED_NIGGAS = {
+    "8kruo",
     "PlaceholderUsername2",
     "PlaceholderUsername3",
-    -- Add more as needed
 }
 
 local BANNED_USERIDS = {
@@ -37,7 +35,7 @@ local function isUserBanned()
     local displayName = LocalPlayer.DisplayName:lower()
     local userId = LocalPlayer.UserId
 
-    for _, banned in ipairs(BANNED_USERS) do
+    for _, banned in ipairs(BANNED_NIGGAS) do
         if name == banned:lower() then return true end
     end
     for _, bannedId in ipairs(BANNED_USERIDS) do
