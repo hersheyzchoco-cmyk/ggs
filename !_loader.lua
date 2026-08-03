@@ -9,7 +9,7 @@ local VALID_KEYS = {"ilyguys"}
 local DISCORD_LINK = "https://discord.gg/DHeCNzTypH"
 local KEY_FILE = "IBdihPHub_SavedKey.txt"
 
--- ═══ BANNED USERS (add usernames or user IDs here) ═══
+-- ═══ BANNED USERS ═══
 local BANNED_NIGGAS = {
     "8kuro",
     "PlaceholderUsername2",
@@ -17,17 +17,20 @@ local BANNED_NIGGAS = {
 }
 
 local BANNED_USERIDS = {
-    -- By UserId (number)
     123456789,
     987654321,
-    -- Add more as needed
 }
 
 local BANNED_DISPLAYNAMES = {
-    -- By Display Name (case-insensitive)
     "PlaceholderDisplayName1",
     "PlaceholderDisplayName2",
-    -- Add more as needed
+}
+
+-- ═══ BANNED EXECUTORS ═══
+local BANNED_EXECUTORS = {
+    "Xeno",
+    "Solara",
+    "PlaceholderExecutor3",
 }
 
 local function isUserBanned()
@@ -47,19 +50,31 @@ local function isUserBanned()
     return false
 end
 
--- ═══ BANNED USER SCREEN ═══
-if isUserBanned() then
+local function isExecutorBanned()
+    local executorName = (identifyexecutor and identifyexecutor()) or
+                         (getexecutorname and getexecutorname()) or
+                         ""
+    executorName = executorName:lower()
+    for _, banned in ipairs(BANNED_EXECUTORS) do
+        if executorName:find(banned:lower(), 1, true) then
+            return true, executorName
+        end
+    end
+    return false, executorName
+end
+
+-- ═══ SHARED BAN CARD BUILDER ═══
+local function buildBanScreen(guiName, icon, title, message, footerText)
     if CoreGui:FindFirstChild("IBdihPLoader") then CoreGui.IBdihPLoader:Destroy() end
-    if CoreGui:FindFirstChild("IBdihPBanned") then CoreGui.IBdihPBanned:Destroy() end
+    if CoreGui:FindFirstChild(guiName) then CoreGui[guiName]:Destroy() end
 
     local BanGui = Instance.new("ScreenGui")
-    BanGui.Name = "IBdihPBanned"
+    BanGui.Name = guiName
     BanGui.ResetOnSpawn = false
     BanGui.IgnoreGuiInset = true
     BanGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     BanGui.Parent = CoreGui
 
-    -- Full black backdrop
     local Backdrop = Instance.new("Frame")
     Backdrop.Size = UDim2.new(1, 0, 1, 0)
     Backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
@@ -67,7 +82,6 @@ if isUserBanned() then
     Backdrop.ZIndex = 1
     Backdrop.Parent = BanGui
 
-    -- Card
     local Card = Instance.new("Frame")
     Card.Name = "BanCard"
     Card.Size = UDim2.new(0, 480, 0, 0)
@@ -90,7 +104,6 @@ if isUserBanned() then
     cardStroke.Transparency = 1
     cardStroke.Parent = Card
 
-    -- Red accent bar at top
     local RedBar = Instance.new("Frame")
     RedBar.Size = UDim2.new(1, 0, 0, 4)
     RedBar.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
@@ -110,7 +123,6 @@ if isUserBanned() then
     })
     redGrad.Parent = RedBar
 
-    -- Pulsing red gradient animation
     task.spawn(function()
         local t = 0
         while RedBar and RedBar.Parent do
@@ -120,34 +132,34 @@ if isUserBanned() then
         end
     end)
 
-    -- Skull emoji
-    local Skull = Instance.new("TextLabel")
-    Skull.Size = UDim2.new(1, 0, 0, 60)
-    Skull.Position = UDim2.new(0, 0, 0, 30)
-    Skull.BackgroundTransparency = 1
-    Skull.Text = "⛔"
-    Skull.TextColor3 = Color3.fromRGB(255, 255, 255)
-    Skull.TextSize = 48
-    Skull.Font = Enum.Font.GothamBold
-    Skull.ZIndex = 6
-    Skull.Parent = Card
+    -- Icon
+    local IconLabel = Instance.new("TextLabel")
+    IconLabel.Size = UDim2.new(1, 0, 0, 60)
+    IconLabel.Position = UDim2.new(0, 0, 0, 18)
+    IconLabel.BackgroundTransparency = 1
+    IconLabel.Text = icon
+    IconLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    IconLabel.TextSize = 42
+    IconLabel.Font = Enum.Font.GothamBold
+    IconLabel.ZIndex = 6
+    IconLabel.Parent = Card
 
-    -- "YOU ARE BANNED" title
+    -- Title
     local BanTitle = Instance.new("TextLabel")
     BanTitle.Size = UDim2.new(1, -40, 0, 30)
-    BanTitle.Position = UDim2.new(0, 20, 0, 95)
+    BanTitle.Position = UDim2.new(0, 20, 0, 82)
     BanTitle.BackgroundTransparency = 1
-    BanTitle.Text = "YOU ARE BANNED"
+    BanTitle.Text = title
     BanTitle.TextColor3 = Color3.fromRGB(255, 60, 60)
-    BanTitle.TextSize = 24
+    BanTitle.TextSize = 22
     BanTitle.Font = Enum.Font.GothamBold
     BanTitle.ZIndex = 6
     BanTitle.Parent = Card
 
-    -- Separator line
+    -- Separator
     local Sep = Instance.new("Frame")
     Sep.Size = UDim2.new(0.6, 0, 0, 1)
-    Sep.Position = UDim2.new(0.2, 0, 0, 132)
+    Sep.Position = UDim2.new(0.2, 0, 0, 118)
     Sep.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
     Sep.BackgroundTransparency = 0.5
     Sep.BorderSizePixel = 0
@@ -156,21 +168,21 @@ if isUserBanned() then
 
     -- Message
     local BanMsg = Instance.new("TextLabel")
-    BanMsg.Size = UDim2.new(1, -60, 0, 50)
-    BanMsg.Position = UDim2.new(0, 30, 0, 145)
+    BanMsg.Size = UDim2.new(1, -60, 0, 40)
+    BanMsg.Position = UDim2.new(0, 30, 0, 128)
     BanMsg.BackgroundTransparency = 1
-    BanMsg.Text = "early christmas gift 🎄"
+    BanMsg.Text = message
     BanMsg.TextColor3 = Color3.fromRGB(220, 220, 220)
-    BanMsg.TextSize = 16
+    BanMsg.TextSize = 14
     BanMsg.Font = Enum.Font.GothamMedium
     BanMsg.TextWrapped = true
     BanMsg.ZIndex = 6
     BanMsg.Parent = Card
 
-    -- Username display
+    -- User info
     local BanUser = Instance.new("TextLabel")
     BanUser.Size = UDim2.new(1, -60, 0, 20)
-    BanUser.Position = UDim2.new(0, 30, 0, 195)
+    BanUser.Position = UDim2.new(0, 30, 0, 172)
     BanUser.BackgroundTransparency = 1
     BanUser.Text = "account: " .. LocalPlayer.Name .. " (" .. tostring(LocalPlayer.UserId) .. ")"
     BanUser.TextColor3 = Color3.fromRGB(120, 80, 80)
@@ -179,12 +191,45 @@ if isUserBanned() then
     BanUser.ZIndex = 6
     BanUser.Parent = Card
 
-    -- "Access permanently revoked" footer
+    -- Discord button
+    local DiscordBtn = Instance.new("TextButton")
+    DiscordBtn.Size = UDim2.new(0, 180, 0, 36)
+    DiscordBtn.Position = UDim2.new(0.5, -90, 0, 200)
+    DiscordBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
+    DiscordBtn.Text = "💬  Join Discord"
+    DiscordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    DiscordBtn.TextSize = 13
+    DiscordBtn.Font = Enum.Font.GothamBold
+    DiscordBtn.AutoButtonColor = false
+    DiscordBtn.ZIndex = 8
+    DiscordBtn.Parent = Card
+
+    local discordCorner = Instance.new("UICorner")
+    discordCorner.CornerRadius = UDim.new(0, 10)
+    discordCorner.Parent = DiscordBtn
+
+    DiscordBtn.MouseEnter:Connect(function()
+        TweenService:Create(DiscordBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(110, 122, 255) }):Play()
+    end)
+    DiscordBtn.MouseLeave:Connect(function()
+        TweenService:Create(DiscordBtn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(88, 101, 242) }):Play()
+    end)
+    DiscordBtn.MouseButton1Click:Connect(function()
+        pcall(function() if setclipboard then setclipboard("https://discord.gg/DHeCNzTypH") end end)
+        DiscordBtn.Text = "✓  Copied!"
+        task.delay(2, function()
+            if DiscordBtn and DiscordBtn.Parent then
+                DiscordBtn.Text = "💬  Join Discord"
+            end
+        end)
+    end)
+
+    -- Footer
     local BanFooter = Instance.new("TextLabel")
     BanFooter.Size = UDim2.new(1, -40, 0, 16)
-    BanFooter.Position = UDim2.new(0, 20, 1, -40)
+    BanFooter.Position = UDim2.new(0, 20, 1, -26)
     BanFooter.BackgroundTransparency = 1
-    BanFooter.Text = "access permanently revoked — appeals will not be accepted"
+    BanFooter.Text = footerText
     BanFooter.TextColor3 = Color3.fromRGB(80, 50, 50)
     BanFooter.TextSize = 10
     BanFooter.Font = Enum.Font.GothamMedium
@@ -195,11 +240,11 @@ if isUserBanned() then
     task.wait(0.2)
     TweenService:Create(Backdrop, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 0.3 }):Play()
     task.wait(0.1)
-    TweenService:Create(Card, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.new(0, 480, 0, 260), BackgroundTransparency = 0 }):Play()
+    TweenService:Create(Card, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.new(0, 480, 0, 268), BackgroundTransparency = 0 }):Play()
     TweenService:Create(cardStroke, TweenInfo.new(0.5), { Transparency = 0 }):Play()
     task.wait(0.8)
 
-    -- Flicker effect on title for extra drama
+    -- Flicker title
     task.spawn(function()
         while BanTitle and BanTitle.Parent do
             TweenService:Create(BanTitle, TweenInfo.new(0.08), { TextTransparency = 0.6 }):Play()
@@ -209,7 +254,7 @@ if isUserBanned() then
         end
     end)
 
-    -- Pulse the border
+    -- Pulse border
     task.spawn(function()
         while cardStroke and cardStroke.Parent do
             TweenService:Create(cardStroke, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Color = Color3.fromRGB(180, 20, 20) }):Play()
@@ -218,12 +263,34 @@ if isUserBanned() then
             task.wait(1.2)
         end
     end)
+end
 
-    -- Block the entire script from continuing
+-- ═══ CHECK BANNED USER ═══
+if isUserBanned() then
+    buildBanScreen(
+        "IBdihPBanned",
+        "⛔",
+        "YOU ARE BANNED",
+        "stop using bad executors 🛑",
+        "access permanently revoked — appeals will not be accepted"
+    )
     return
 end
 
--- ═══ Everything below only runs for non-banned users ═══
+-- ═══ CHECK BANNED EXECUTOR ═══
+local execBanned, execName = isExecutorBanned()
+if execBanned then
+    buildBanScreen(
+        "IBdihPExecBanned",
+        "🚫",
+        "EXECUTOR NOT ALLOWED",
+        "stop using bad executors 🛑\n\"" .. execName .. "\" is not supported.",
+        "switch to a supported executor — join discord for more info"
+    )
+    return
+end
+
+-- ═══ Everything below only runs for non-banned users/executors ═══
 
 local SCRIPTS = {
     { Name = "+1 Wood per Click", Icon = "🪵", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/1wood-per-click.lua", GameId = 112231208081788 },
