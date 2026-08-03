@@ -15,15 +15,9 @@ local BANNED_NIGGAS = {
     "PlaceholderUsername3",
 }
 
-local BANNED_DISPLAYNAMES = {
-    "PlaceholderDisplayName1",
-    "PlaceholderDisplayName2",
-}
-
--- ═══ BANNED EXECUTORS ═══
 local BANNED_EXECUTORS = {
     "Xeno",
-    "Solara",
+    "PlaceholderExecutor2",
     "PlaceholderExecutor3",
 }
 
