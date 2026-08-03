@@ -16,7 +16,7 @@ local BANNED_NIGGAS = {
 }
 
 local BANNED_EXECUTORS = {
-    "Xeno",
+    "PlaceholderExecutor1",
     "PlaceholderExecutor2",
     "PlaceholderExecutor3",
 }
