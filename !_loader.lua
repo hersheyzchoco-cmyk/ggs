@@ -10,7 +10,7 @@ local DISCORD_LINK = "https://discord.gg/DHeCNzTypH"
 local KEY_FILE = "IBdihPHub_SavedKey.txt"
 
 local BANNED_NIGGAS = {
-    "8kuro",
+    "8kruo",
     "PlaceholderUsername2",
     "PlaceholderUsername3",
 }
