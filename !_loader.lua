@@ -295,6 +295,7 @@ local SCRIPTS = {
     { Name = "Become an Anime Billionaire", Icon = "💸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/become-an-anime-billionaire.lua", GameId = 96891089305948 },
     { Name = "Bomb Fishing", Icon = "🎣", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/bomb-fishing.lua", GameId = 118677256126351 },
     { Name = "Build a Base and Steal", Icon = "🏯", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/build-a-base-and-steal.lua", GameId = 132016691802922 },
+    { Name = "Build a Base and Steal", Icon = "🏯", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/build-a-base-and-steal.lua", GameId = 82441325527385 },
     { Name = "Build a Keyboard", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/build-a-keyboard.lua", GameId = 91679585668032 },
     { Name = "Catch and Tame", Icon = "🐒", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/catch-and-tame.lua", GameId = 96645548064314 },
     { Name = "Chicken Farm", Icon = "🐓", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/chicken-farm.lua", GameId = 137233438285284 },
