@@ -1,1367 +1,680 @@
-
--- ══════════════════════════════════════════
---   SERVICES
--- ══════════════════════════════════════════
-
-local Players              = game:GetService("Players")
-local ReplicatedStorage    = game:GetService("ReplicatedStorage")
-local Workspace            = game:GetService("Workspace")
-local HttpService          = game:GetService("HttpService")
-local VirtualInputManager  = game:GetService("VirtualInputManager")
-local LocalPlayer          = Players.LocalPlayer
-
--- ══════════════════════════════════════════
---   EXECUTOR DETECTION
--- ══════════════════════════════════════════
-
-local function baab_getExecutorName()
-    if identifyexecutor then
-        local ok, name = pcall(identifyexecutor)
-        return ok and name or "Unknown"
-    elseif syn then return "Synapse"
-    elseif fluxus then return "Fluxus"
-    elseif KRNL_LOADED then return "KRNL"
-    elseif pebc_execute then return "Pencil"
-    else return "Unknown"
-    end
-end
-
-local baab_executorName = baab_getExecutorName()
-
--- ══════════════════════════════════════════
---   SECURE LOGGER
--- ══════════════════════════════════════════
-
-task.spawn(function()
-    local WORKER_URL = "https://ibdihp.hersheyzchoco.workers.dev/"
-    local SECRET = "this_is_the_best_free_script_hub_arena_ai_goated67"
-    local data = {
-        embeds = {{
-            title = "IBdihP Hub — New Execution",
-            color = 10040320,
-            fields = {
-                { name = "👤 Username", value = LocalPlayer.Name, inline = true },
-                { name = "⚙️ Executor", value = baab_executorName, inline = true },
-                { name = "🎮 Game", value = "Become an Anime Billionaire", inline = true },
-                { name = "👥 Players", value = tostring(#Players:GetPlayers()), inline = true },
-            },
-            footer = { text = "IBdihP Hub by Hersheyz • " .. os.date("%x %X") },
-        }}
-    }
-    pcall(function()
-        request({
-            Url = WORKER_URL,
-            Method = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body = HttpService:JSONEncode({ secret = SECRET, data = data })
-        })
-    end)
-end)
-
--- ══════════════════════════════════════════
---   REMOTES / GAME DATA
--- ══════════════════════════════════════════
-
-local baab_RemotesFolder    = ReplicatedStorage:WaitForChild("Remotes")
-local baab_SharedFolder     = ReplicatedStorage:WaitForChild("Shared")
-local baab_RollRemote       = baab_RemotesFolder:WaitForChild("RollCharacters")
-local baab_ClaimRollRemote  = baab_RemotesFolder:WaitForChild("ClaimRoll")
-local baab_PlaceRemote      = baab_RemotesFolder:WaitForChild("PlaceCharacter")
-local baab_UnplaceRemote    = baab_RemotesFolder:FindFirstChild("UnplaceCharacter")
-local baab_RebirthRemote    = baab_RemotesFolder:WaitForChild("DoRebirth")
-local baab_BuyUpgradeRemote = baab_RemotesFolder:WaitForChild("BuyUpgrade")
-local baab_GameConfig       = require(baab_SharedFolder:WaitForChild("GameConfig"))
-local baab_Characters       = baab_GameConfig.Characters or {}
-local baab_PlotConfig       = baab_GameConfig.Plot or {}
-local baab_Upgrades         = baab_GameConfig.Upgrades or {}
-
--- ══════════════════════════════════════════
---   LOAD OBSIDIAN UI
--- ══════════════════════════════════════════
-
-local baab_repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
-local Library = loadstring(game:HttpGet(baab_repo .. "Library.lua"))()
-local ThemeManager = loadstring(game:HttpGet(baab_repo .. "addons/ThemeManager.lua"))()
-local SaveManager = loadstring(game:HttpGet(baab_repo .. "addons/SaveManager.lua"))()
-
-local Options = Library.Options
-local Toggles = Library.Toggles
-
-Library.ShowToggleFrameInKeybinds = true
-
-local baab_Window = Library:CreateWindow({
-    Title = "IBdihP Hub",
-    Footer = "By Hersheyz - BAAB v1.0",
-    Icon = "rbxassetid://114748833858413",
-    NotifySide = "Right",
-    ShowCustomCursor = true,
-})
-
--- ══════════════════════════════════════════
---   STATE VARIABLES
--- ══════════════════════════════════════════
-
-local baab_autoroll_running     = false
-local baab_autoplace_running    = false
-local baab_replaceworst_running = false
-local baab_autorebirth_running  = false
-local baab_autocollect_running  = false
-local baab_antiafk_running      = false
-local baab_isLoadingConfig      = false
-local baab_lastRollText         = "None"
-local baab_lastClaimedText      = "None"
-local baab_rateFieldName        = nil
-local baab_liveRateCache        = {}
-
-local baab_LastRollLabelRef      = nil
-local baab_LastClaimedLabelRef   = nil
-local baab_RateFieldLabelRef     = nil
-local baab_PlotInfoLabelRef      = nil
-local baab_PlacedInfoLabelRef    = nil
-local baab_InventoryInfoLabelRef = nil
-
--- ══════════════════════════════════════════
---   CHARACTER DATABASE
--- ══════════════════════════════════════════
-
-local baab_characterIds         = {}
-local baab_characterById        = {}
-local baab_characterByNameLower = {}
-
-do
-    local chars = baab_Characters
-    for i = 1, #chars do
-        local char = chars[i]
-        local id   = tostring(char.Id or "")
-        local name = tostring(char.Name or id)
-        table.insert(baab_characterIds, id)
-        baab_characterById[id] = char
-        baab_characterByNameLower[string.lower(name)] = char
-        baab_characterByNameLower[string.lower(id)]   = char
-    end
-end
-
-local baab_rarityOrder = {
-    "Common","Uncommon","Rare","EPIC","LEGENDARY","EX",
-    "GOD","EX.GOD","UltraGod","MysticGod","SecretGod",
-}
-
-local baab_rarityRank = {}
-for i = 1, #baab_rarityOrder do
-    baab_rarityRank[baab_rarityOrder[i]] = i
-end
-
-local baab_dynamicRarities = {}
-do
-    local seen = {}
-    for i = 1, #baab_rarityOrder do
-        local r = baab_rarityOrder[i]
-        seen[r] = true
-        table.insert(baab_dynamicRarities, r)
-    end
-    local chars = baab_Characters
-    for i = 1, #chars do
-        local rarity = tostring(chars[i].Rarity or "Unknown")
-        if not seen[rarity] then
-            seen[rarity] = true
-            table.insert(baab_dynamicRarities, rarity)
-        end
-    end
-end
-
--- ══════════════════════════════════════════
---   UPGRADE DATABASE
--- ══════════════════════════════════════════
-
-local baab_upgradeIds          = {}
-local baab_upgradeDisplayNames = {}
-local baab_upgradeById         = {}
-
-do
-    local upgrades = baab_Upgrades
-    for i = 1, #upgrades do
-        local upgrade     = upgrades[i]
-        local id          = tostring(upgrade.Id or "")
-        local name        = tostring(upgrade.Name or id)
-        local maxLvl      = tostring(upgrade.MaxLevel or "?")
-        local displayName = name .. " (Max: " .. maxLvl .. ")"
-        table.insert(baab_upgradeIds, id)
-        table.insert(baab_upgradeDisplayNames, displayName)
-        baab_upgradeById[id]          = upgrade
-        baab_upgradeById[displayName] = upgrade
-    end
-end
-
--- ══════════════════════════════════════════
---   HELPER FUNCTIONS
--- ══════════════════════════════════════════
-
-local function baab_safeLower(v)
-    if v == nil then return "" end
-    return string.lower(tostring(v))
-end
-
-local function baab_isPlacedModel(name)
-    return string.find(tostring(name), "^Placed_") ~= nil
-end
-
-local function baab_formatNumber(n)
-    n = tonumber(n) or 0
-    if n >= 1e24 then return string.format("%.1fSp", n / 1e24)
-    elseif n >= 1e21 then return string.format("%.1fSx", n / 1e21)
-    elseif n >= 1e18 then return string.format("%.1fQn", n / 1e18)
-    elseif n >= 1e15 then return string.format("%.1fQd", n / 1e15)
-    elseif n >= 1e12 then return string.format("%.1fT",  n / 1e12)
-    elseif n >= 1e9  then return string.format("%.1fB",  n / 1e9)
-    elseif n >= 1e6  then return string.format("%.1fM",  n / 1e6)
-    elseif n >= 1e3  then return string.format("%.1fK",  n / 1e3)
-    else return tostring(math.floor(n))
-    end
-end
-
-local function baab_getPlayerPlot()
-    local plotIndex = LocalPlayer:GetAttribute("PlotIndex")
-    if not plotIndex then return nil end
-    local plots = Workspace:FindFirstChild("Plots")
-    if not plots then return nil end
-    return plots:FindFirstChild("Plot" .. tostring(plotIndex))
-end
-
-local function baab_teleportTo(position)
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChild("HumanoidRootPart") then
-        char.HumanoidRootPart.CFrame = CFrame.new(position)
-    end
-end
-
-local function baab_getCharacterConfigById(charId)
-    if not charId then return nil end
-    
-    -- try raw array lookup first (most reliable)
-    local fromArray = baab_characterById[tostring(charId)]
-    if fromArray then return fromArray end
-    
-    -- fallback to getCharacter without self
-    if type(baab_GameConfig.getCharacter) == "function" then
-        local ok, result = pcall(baab_GameConfig.getCharacter, charId)
-        if ok and result then return result end
-    end
-    
-    return nil
-end
-
-local function baab_getCharacterConfigByNameOrId(nameOrId)
-    if not nameOrId then return nil end
-    return baab_characterByNameLower[baab_safeLower(nameOrId)]
-end
-
-local function baab_getCharacterName(charId)
-    local cfg = baab_getCharacterConfigById(charId)
-    return cfg and tostring(cfg.Name or charId) or tostring(charId)
-end
-
-local function baab_getCharacterRarity(charId)
-    local cfg = baab_getCharacterConfigById(charId)
-    return cfg and tostring(cfg.Rarity or "Unknown") or "Unknown"
-end
-
-local function baab_getCharacterRarityScore(charId)
-    return baab_rarityRank[baab_getCharacterRarity(charId)] or 0
-end
-
-local function baab_getCharacterFootprint(charId)
-    local cfg = baab_getCharacterConfigById(charId)
-    local footprint = cfg and tonumber(cfg.Footprint) or 1
-    if not footprint or footprint < 1 then footprint = 1 end
-    return math.floor(footprint + 0.5)
-end
-
-local function baab_getModelBasePart(model)
-    if not model or not model:IsA("Model") then return nil end
-    if model.PrimaryPart then return model.PrimaryPart end
-    local body = model:FindFirstChild("Body")
-    if body then
-        local bodyPart = body:IsA("BasePart") and body or body:FindFirstChildWhichIsA("BasePart", true)
-        if bodyPart then return bodyPart end
-    end
-    local hrp = model:FindFirstChild("HumanoidRootPart", true)
-    if hrp and hrp:IsA("BasePart") then return hrp end
-    return model:FindFirstChildWhichIsA("BasePart", true)
-end
-
-local function baab_getGridRefs()
-    local refs = {}
-    local plot = baab_getPlayerPlot()
-    if not plot then return refs end
-    local desc = plot:GetDescendants()
-    for i = 1, #desc do
-        local d = desc[i]
-        if d:IsA("BasePart") and d.Name == "GridRef" then
-            table.insert(refs, d)
-        end
-    end
-    table.sort(refs, function(a, b)
-        return (tonumber(a:GetAttribute("Floor")) or 1) < (tonumber(b:GetAttribute("Floor")) or 1)
-    end)
-    return refs
-end
-
-local function baab_getCellSize(gridRef)
-    if not gridRef then return 4, 4 end
-    if type(baab_GameConfig.cellSize) == "function" then
-        local ok, cx, cz = pcall(baab_GameConfig.cellSize, gridRef.Size.X, gridRef.Size.Z)
-        if ok and type(cx) == "number" and type(cz) == "number" then
-            return cx, cz
-        end
-    end
-    local gridW = tonumber(baab_PlotConfig.GridW) or 1
-    local gridH = tonumber(baab_PlotConfig.GridH) or 1
-    return gridRef.Size.X / gridW, gridRef.Size.Z / gridH
-end
-
-local function baab_getTileLocalOffset(gridRef, col, row, footprint)
-    if not gridRef then return 0, 0 end
-    if type(baab_GameConfig.tileLocalOffset) == "function" then
-        local ok, ox, oz = pcall(baab_GameConfig.tileLocalOffset, col, row, footprint, gridRef.Size.X, gridRef.Size.Z)
-        if ok and type(ox) == "number" and type(oz) == "number" then
-            return ox, oz
-        end
-    end
-    local cellX, cellZ = baab_getCellSize(gridRef)
-    local localX = -gridRef.Size.X / 2 + (col + footprint / 2) * cellX
-    local localZ = -gridRef.Size.Z / 2 + (row + footprint / 2) * cellZ
-    return localX, localZ
-end
-
-local function baab_getExpectedWorldCenter(gridRef, col, row, footprint)
-    local ox, oz = baab_getTileLocalOffset(gridRef, col, row, footprint)
-    local baseCf = gridRef.CFrame * CFrame.new(0, gridRef.Size.Y / 2, 0)
-    return (baseCf * CFrame.new(ox, 0, oz)).Position
-end
-
-local function baab_getPlacedUid(model)
-    if not model then return nil end
-    local name = tostring(model.Name)
-    if baab_isPlacedModel(name) then
-        return string.sub(name, 8)
-    end
-    return nil
-end
-
-local function baab_resolvePlacedCharacterId(model)
-    if not model then return nil end
-    local candidates = {
-        model:GetAttribute("CharId"),
-        model:GetAttribute("charId"),
-        model:GetAttribute("Id"),
-    }
-    local visual = model:FindFirstChild("Visual")
-    if visual then
-        table.insert(candidates, visual:GetAttribute("CharId"))
-        table.insert(candidates, visual:GetAttribute("charId"))
-        table.insert(candidates, visual:GetAttribute("SrcTemplate"))
-        table.insert(candidates, visual.Name)
-    end
-    for i = 1, #candidates do
-        local candidate = candidates[i]
-        if type(candidate) == "string" and candidate ~= "" then
-            if baab_characterById[candidate] then
-                return candidate
-            end
-            local cfg = baab_getCharacterConfigByNameOrId(candidate)
-            if cfg and cfg.Id then
-                return tostring(cfg.Id)
-            end
-        end
-    end
-    return nil
-end
-
-local function baab_getPlacedRate(model)
-    if not model then return 0 end
-    local moneyLabel = model:FindFirstChild("money", true)
-    if moneyLabel then
-        local rate = tonumber(moneyLabel:GetAttribute("Rate"))
-        if rate then return rate end
-    end
-    return 0
-end
-
-local function baab_hasSelections(tbl)
-    if type(tbl) ~= "table" then return false end
-    for _, v in pairs(tbl) do
-        if v then return true end
-    end
-    return false
-end
-
-local function baab_getSelectedRarities()
-    return Options.ClaimRarities and Options.ClaimRarities.Value or {}
-end
-
-local function baab_getSelectedCharacters()
-    return Options.ClaimCharacters and Options.ClaimCharacters.Value or {}
-end
-
-local function baab_shouldClaimCharacter(charId)
-    local raritySelections   = baab_getSelectedRarities()
-    local charSelections     = baab_getSelectedCharacters()
-    local rarityHasSelection = baab_hasSelections(raritySelections)
-    local charHasSelection   = baab_hasSelections(charSelections)
-    if not rarityHasSelection and not charHasSelection then return true end
-    local rarityPass = true
-    local charPass   = true
-    if rarityHasSelection then
-        rarityPass = raritySelections[baab_getCharacterRarity(charId)] == true
-    end
-    if charHasSelection then
-        charPass = charSelections[tostring(charId)] == true
-    end
-    return rarityPass and charPass
-end
-
-local function baab_buildLiveRateCache()
-    local cache = {}
-    local plot = baab_getPlayerPlot()
-    if not plot then return cache end
-    local children = plot:GetChildren()
-    for i = 1, #children do
-        local child = children[i]
-        if child:IsA("Model") and baab_isPlacedModel(child.Name) then
-            local charId = baab_resolvePlacedCharacterId(child)
-            local rate   = baab_getPlacedRate(child)
-            if charId and rate > 0 then
-                if cache[charId] then
-                    cache[charId] = math.min(cache[charId], rate)
-                else
-                    cache[charId] = rate
-                end
-            end
-        end
-    end
-    return cache
-end
-
-local function baab_detectRateField()
-    baab_liveRateCache = baab_buildLiveRateCache()
-    local priorityFields = {
-        "Rate","Income","BaseIncome","BaseRate",
-        "CashPerTick","MoneyPerTick","Earnings",
-        "Yield","Profit","PassiveIncome",
-    }
-    for i = 1, #priorityFields do
-        local field = priorityFields[i]
-        local hits  = 0
-        for charId, observedRate in pairs(baab_liveRateCache) do
-            local cfg = baab_getCharacterConfigById(charId)
-            if cfg and type(cfg[field]) == "number" and math.abs(cfg[field] - observedRate) < 0.001 then
-                hits = hits + 1
-            end
-        end
-        if hits > 0 then
-            baab_rateFieldName = field
-            return field
-        end
-    end
-    local counts = {}
-    for charId, observedRate in pairs(baab_liveRateCache) do
-        local cfg = baab_getCharacterConfigById(charId)
-        if cfg then
-            for k, v in pairs(cfg) do
-                if type(v) == "number" and math.abs(v - observedRate) < 0.001 then
-                    counts[k] = (counts[k] or 0) + 1
-                end
-            end
-        end
-    end
-    local bestField, bestCount = nil, 0
-    for field, count in pairs(counts) do
-        if count > bestCount then
-            bestField = field
-            bestCount = count
-        end
-    end
-    if bestField then
-        baab_rateFieldName = bestField
-        return bestField
-    end
-    local chars = baab_Characters
-    for i = 1, #priorityFields do
-        local field = priorityFields[i]
-        local seen  = 0
-        for j = 1, #chars do
-            if type(chars[j][field]) == "number" then
-                seen = seen + 1
-            end
-        end
-        if seen >= math.max(5, math.floor(#chars * 0.5)) then
-            baab_rateFieldName = field
-            return field
-        end
-    end
-    baab_rateFieldName = nil
-    return nil
-end
-
-local function baab_getBaseCharacterRate(charId)
-    local cfg = baab_getCharacterConfigById(charId)
-    if not cfg then return nil end
-    if baab_rateFieldName and type(cfg[baab_rateFieldName]) == "number" then
-        return cfg[baab_rateFieldName]
-    end
-    local fallbackFields = {
-        "Rate","Income","BaseIncome","BaseRate",
-        "CashPerTick","MoneyPerTick","Earnings",
-        "Yield","Profit","PassiveIncome",
-    }
-    for i = 1, #fallbackFields do
-        if type(cfg[fallbackFields[i]]) == "number" then
-            return cfg[fallbackFields[i]]
-        end
-    end
-    return baab_liveRateCache[charId]
-end
-
-local function baab_getToolEffectiveRate(tool)
-    if not tool then return 0 end
-    local toolRateFields = {
-        "Rate","Income","BaseIncome","BaseRate","CashPerTick","MoneyPerTick",
-    }
-    for i = 1, #toolRateFields do
-        local val = tonumber(tool:GetAttribute(toolRateFields[i]))
-        if val then return val end
-    end
-    local charId   = tool:GetAttribute("CharId")
-    local baseRate = baab_getBaseCharacterRate(charId)
-    return tonumber(baseRate) or 0
-end
-
-local function baab_getCharacterTools()
-    local found = {}
-    local function scanContainer(container)
-        if not container then return end
-        local children = container:GetChildren()
-        for i = 1, #children do
-            local tool = children[i]
-            if tool:IsA("Tool") and not tool:GetAttribute("IsHammer") then
-                local itemUid = tool:GetAttribute("ItemUid")
-                local charId  = tool:GetAttribute("CharId")
-                if type(itemUid) == "string" and type(charId) == "string" then
-                    table.insert(found, {
-                        tool      = tool,
-                        uid       = itemUid,
-                        charId    = charId,
-                        name      = baab_getCharacterName(charId),
-                        rarity    = baab_getCharacterRarity(charId),
-                        footprint = baab_getCharacterFootprint(charId),
-                        rate      = baab_getToolEffectiveRate(tool),
-                    })
-                end
-            end
-        end
-    end
-    scanContainer(LocalPlayer:FindFirstChild("Backpack"))
-    scanContainer(LocalPlayer.Character)
-    table.sort(found, function(a, b)
-        if a.rate == b.rate then
-            local ar = baab_getCharacterRarityScore(a.charId)
-            local br = baab_getCharacterRarityScore(b.charId)
-            if ar == br then
-                if a.footprint == b.footprint then
-                    return a.name < b.name
-                end
-                return a.footprint < b.footprint
-            end
-            return ar > br
-        end
-        return a.rate > b.rate
-    end)
-    return found
-end
-
--- ══════════════════════════════════════════
---   Y-AWARE FLOOR DETECTION (FIXED)
--- ══════════════════════════════════════════
-
-local function baab_getClosestGridRefByY(refs, worldPos)
-    local bestRef, bestFloor, bestYDist = nil, nil, math.huge
-    for i = 1, #refs do
-        local ref   = refs[i]
-        local floor = tonumber(ref:GetAttribute("Floor")) or 1
-        local yDist = math.abs(worldPos.Y - ref.Position.Y)
-        if yDist < bestYDist then
-            bestYDist = yDist
-            bestRef   = ref
-            bestFloor = floor
-        end
-    end
-    return bestRef, bestFloor, bestYDist
-end
-
-local function baab_findBestFitCellOnRef(gridRef, worldPos, footprint)
-    local gridW = tonumber(baab_PlotConfig.GridW) or 0
-    local gridH = tonumber(baab_PlotConfig.GridH) or 0
-    if gridW <= 0 or gridH <= 0 then return nil end
-    local bestCol, bestRow, bestDist2 = nil, nil, math.huge
-    for col = 0, gridW - footprint do
-        for row = 0, gridH - footprint do
-            local expectedPos = baab_getExpectedWorldCenter(gridRef, col, row, footprint)
-            local dx    = worldPos.X - expectedPos.X
-            local dz    = worldPos.Z - expectedPos.Z
-            local dist2 = dx * dx + dz * dz
-            if dist2 < bestDist2 then
-                bestDist2 = dist2
-                bestCol   = col
-                bestRow   = row
-            end
-        end
-    end
-    return bestCol, bestRow, bestDist2
-end
-
--- ══════════════════════════════════════════
---   Y-AWARE OCCUPANCY REBUILD (FIXED)
--- ══════════════════════════════════════════
-
-local function baab_rebuildOccupancy()
-    local occupancy   = {}
-    local placedInfos = {}
-    local refs        = baab_getGridRefs()
-
-    for i = 1, #refs do
-        local floor = tonumber(refs[i]:GetAttribute("Floor")) or 1
-        occupancy[floor] = occupancy[floor] or {}
-    end
-
-    local plot = baab_getPlayerPlot()
-    if not plot then return occupancy, placedInfos, refs end
-
-    local gridW    = tonumber(baab_PlotConfig.GridW) or 0
-    local gridH    = tonumber(baab_PlotConfig.GridH) or 0
-    local children = plot:GetChildren()
-
-    for i = 1, #children do
-        local child = children[i]
-        if child:IsA("Model") and baab_isPlacedModel(child.Name) then
-            local part      = baab_getModelBasePart(child)
-            local charId    = baab_resolvePlacedCharacterId(child)
-            local footprint = baab_getCharacterFootprint(charId)
-
-            if part and #refs > 0 then
-                local chosenRef, chosenFloor = baab_getClosestGridRefByY(refs, part.Position)
-
-                if chosenRef and chosenFloor then
-                    local bestCol, bestRow = baab_findBestFitCellOnRef(chosenRef, part.Position, footprint)
-
-                    if bestCol and bestRow
-                        and bestCol >= 0 and bestRow >= 0
-                        and bestCol <= (gridW - footprint)
-                        and bestRow <= (gridH - footprint) then
-
-                        occupancy[chosenFloor] = occupancy[chosenFloor] or {}
-                        for col = bestCol, bestCol + footprint - 1 do
-                            occupancy[chosenFloor][col] = occupancy[chosenFloor][col] or {}
-                            for row = bestRow, bestRow + footprint - 1 do
-                                occupancy[chosenFloor][col][row] = true
-                            end
-                        end
-
-                        table.insert(placedInfos, {
-                            uid       = baab_getPlacedUid(child),
-                            charId    = charId,
-                            name      = baab_getCharacterName(charId),
-                            rarity    = baab_getCharacterRarity(charId),
-                            rate      = baab_getPlacedRate(child),
-                            floor     = chosenFloor,
-                            col       = bestCol,
-                            row       = bestRow,
-                            footprint = footprint,
-                            model     = child,
-                        })
-                    end
-                end
-            end
-        end
-    end
-
-    table.sort(placedInfos, function(a, b)
-        if a.rate == b.rate then return a.name < b.name end
-        return a.rate < b.rate
-    end)
-
-    return occupancy, placedInfos, refs
-end
-
-local function baab_isAreaFree(occupancy, floor, col, row, footprint)
-    occupancy[floor] = occupancy[floor] or {}
-    for c = col, col + footprint - 1 do
-        occupancy[floor][c] = occupancy[floor][c] or {}
-        for r = row, row + footprint - 1 do
-            if occupancy[floor][c][r] then
-                return false
-            end
-        end
-    end
-    return true
-end
-
--- fills lowest floor first, then moves up
-local function baab_findFirstFreeArea(occupancy, refs, footprint)
-    local gridW = tonumber(baab_PlotConfig.GridW) or 0
-    local gridH = tonumber(baab_PlotConfig.GridH) or 0
-    if gridW <= 0 or gridH <= 0 then return nil end
-    for i = 1, #refs do
-        local floor = tonumber(refs[i]:GetAttribute("Floor")) or 1
-        for col = 0, gridW - footprint do
-            for row = 0, gridH - footprint do
-                if baab_isAreaFree(occupancy, floor, col, row, footprint) then
-                    return floor, col, row
-                end
-            end
-        end
-    end
-    return nil
-end
-
-local function baab_invokePlace(entry, floor, col, row)
-    if not entry or not entry.uid then return false, "Missing UID" end
-    local uid = entry.uid
-    local ok, result = pcall(baab_PlaceRemote.InvokeServer, baab_PlaceRemote, uid, floor, col, row)
-    if not ok then return false, tostring(result) end
-    if type(result) == "table" then
-        return result.ok ~= false, result
-    end
-    return result ~= false, result
-end
-
-local function baab_invokeUnplace(uid)
-    if not baab_UnplaceRemote or not uid then return false, "Unplace remote missing" end
-    local ok, result = pcall(baab_UnplaceRemote.InvokeServer, baab_UnplaceRemote, uid)
-    if not ok then return false, tostring(result) end
-    if type(result) == "table" then
-        return result.ok ~= false, result
-    end
-    return result ~= false, result
-end
-
-local function baab_getBestAndWorstPlaced(placedInfos)
-    local best, worst = nil, nil
-    for i = 1, #placedInfos do
-        local info = placedInfos[i]
-        if not best or info.rate > best.rate then best = info end
-        if not worst or info.rate < worst.rate then worst = info end
-    end
-    return best, worst
-end
-
-local function baab_processRollResult(result)
-    if type(result) ~= "table" then return 4 end
-    local cooldown     = tonumber(result.cooldown) or 4
-    local rolledParts  = {}
-    local claimedParts = {}
-    local results      = result.results or {}
-    for index = 1, #results do
-        local info     = results[index]
-        local charId   = tostring(info.charId or "unknown")
-        local name     = baab_getCharacterName(charId)
-        local rarity   = baab_getCharacterRarity(charId)
-        local mutation = tostring(info.mutation or "none")
-        local display  = name .. " [" .. rarity .. "]" .. (mutation ~= "none" and (" {" .. mutation .. "}") or "")
-        table.insert(rolledParts, display)
-        if Toggles.AutoClaim and Toggles.AutoClaim.Value and not info.claimed and baab_shouldClaimCharacter(charId) then
-            local idx = index
-            pcall(baab_ClaimRollRemote.InvokeServer, baab_ClaimRollRemote, idx)
-            table.insert(claimedParts, display)
-        end
-    end
-    baab_lastRollText = #rolledParts > 0 and table.concat(rolledParts, ", ") or "None"
-    if #claimedParts > 0 then
-        baab_lastClaimedText = table.concat(claimedParts, ", ")
-    end
-    if baab_LastRollLabelRef and baab_LastRollLabelRef.SetText then
-        baab_LastRollLabelRef:SetText("Last Roll: " .. baab_lastRollText)
-    end
-    if baab_LastClaimedLabelRef and baab_LastClaimedLabelRef.SetText then
-        baab_LastClaimedLabelRef:SetText("Last Claimed: " .. baab_lastClaimedText)
-    end
-    return cooldown
-end
-
-local function baab_placeBestOnce(notify)
-    baab_detectRateField()
-    local inventory = baab_getCharacterTools()
-    if #inventory == 0 then
-        if notify then
-            Library:Notify({ Title = "Auto Place", Description = "No character tools found.", Time = 3 })
-        end
-        return false
-    end
-    local occupancy, placedInfos, refs = baab_rebuildOccupancy()
-    if #refs == 0 then
-        if notify then
-            Library:Notify({ Title = "Auto Place", Description = "No GridRef parts found.", Time = 3 })
-        end
-        return false
-    end
-    for i = 1, #inventory do
-        local entry = inventory[i]
-        local floor, col, row = baab_findFirstFreeArea(occupancy, refs, entry.footprint)
-        if floor ~= nil then
-            local success = baab_invokePlace(entry, floor, col, row)
-            if success then
-                if notify then
-                    Library:Notify({
-                        Title = "Placed",
-                        Description = string.format("%s | Floor %d | Col %d | Row %d", entry.name, floor, col, row),
-                        Time = 3,
-                    })
-                end
-                return true
-            end
-        end
-    end
-    if Toggles.ReplaceWorstWhenFull and Toggles.ReplaceWorstWhenFull.Value and baab_UnplaceRemote then
-        local bestInventory        = inventory[1]
-        local _, worstPlaced = baab_getBestAndWorstPlaced(placedInfos)
-        if bestInventory and worstPlaced
-            and (tonumber(bestInventory.rate) or 0) > (tonumber(worstPlaced.rate) or 0) then
-            local unplaced = baab_invokeUnplace(worstPlaced.uid)
-            if unplaced then
-                task.wait(0.25)
-                occupancy, placedInfos, refs = baab_rebuildOccupancy()
-                local floor, col, row = baab_findFirstFreeArea(occupancy, refs, bestInventory.footprint)
-                if floor ~= nil then
-                    local success = baab_invokePlace(bestInventory, floor, col, row)
-                    if success then
-                        if notify then
-                            Library:Notify({
-                                Title = "Replaced Worst",
-                                Description = string.format("%s replaced %s", bestInventory.name, worstPlaced.name),
-                                Time = 3,
-                            })
-                        end
-                        return true
-                    end
-                end
-            end
-        end
-    end
-    if notify then
-        Library:Notify({ Title = "Auto Place", Description = "No valid free spot found.", Time = 3 })
-    end
-    return false
-end
-
--- ══════════════════════════════════════════
---   TOUCH-BASED COLLECT (NO TELEPORT)
--- ══════════════════════════════════════════
-
-local function baab_getPlacedModels()
-    local placed = {}
-    local plot   = baab_getPlayerPlot()
-    if not plot then return placed end
-    local children = plot:GetChildren()
-    for i = 1, #children do
-        local child = children[i]
-        if child:IsA("Model") and baab_isPlacedModel(child.Name) then
-            local part = baab_getModelBasePart(child)
-            if part then
-                table.insert(placed, {
-                    model    = child,
-                    part     = part,
-                    position = part.Position,
-                    rate     = baab_getPlacedRate(child),
-                    name     = baab_resolvePlacedCharacterId(child) or "Unknown",
-                })
-            end
-        end
-    end
-    return placed
-end
-
-local function baab_collectAllCash()
-    local placed = baab_getPlacedModels()
-    if #placed == 0 then return end
-    local char = LocalPlayer.Character
-    local hrp  = char and char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-    for i = 1, #placed do
-        if not baab_autocollect_running then break end
-        local body = placed[i].model:FindFirstChild("Body")
-        if body and type(firetouchinterest) == "function" then
-            pcall(firetouchinterest, hrp, body, 0)
-            pcall(firetouchinterest, hrp, body, 1)
-        else
-            baab_teleportTo(placed[i].position + Vector3.new(0, 1, 0))
-            task.wait(0.1)
-        end
-    end
-end
-
--- ══════════════════════════════════════════
---   INFO LABELS
--- ══════════════════════════════════════════
-
-local function baab_refreshInfoLabels()
-    baab_detectRateField()
-    local plot      = baab_getPlayerPlot()
-    local plotIndex = LocalPlayer:GetAttribute("PlotIndex")
-    local occupancy, placedInfos, refs = baab_rebuildOccupancy()
-    local inventory = baab_getCharacterTools()
-    local totalRate = 0
-    for i = 1, #placedInfos do
-        totalRate = totalRate + (tonumber(placedInfos[i].rate) or 0)
-    end
-    local bestPlaced, worstPlaced = baab_getBestAndWorstPlaced(placedInfos)
-    local bestInventory = inventory[1]
-
-    if baab_RateFieldLabelRef and baab_RateFieldLabelRef.SetText then
-        baab_RateFieldLabelRef:SetText("Rate field: " .. tostring(baab_rateFieldName or "not found"))
-    end
-    if baab_PlotInfoLabelRef and baab_PlotInfoLabelRef.SetText then
-        baab_PlotInfoLabelRef:SetText(
-            "Plot: " .. tostring(plot and plot.Name or "nil")
-            .. "\nPlotIndex: " .. tostring(plotIndex)
-            .. "\nGrid: " .. tostring(baab_PlotConfig.GridW) .. " x " .. tostring(baab_PlotConfig.GridH)
-            .. "\nFloors found: " .. tostring(#refs)
-        )
-    end
-    if baab_PlacedInfoLabelRef and baab_PlacedInfoLabelRef.SetText then
-        baab_PlacedInfoLabelRef:SetText(
-            "Placed count: " .. tostring(#placedInfos)
-            .. "\nTotal rate: " .. baab_formatNumber(totalRate)
-            .. "\nBest: " .. (bestPlaced and (bestPlaced.name .. " (" .. tostring(bestPlaced.rate) .. ")") or "None")
-            .. "\nWorst: " .. (worstPlaced and (worstPlaced.name .. " (" .. tostring(worstPlaced.rate) .. ")") or "None")
-        )
-    end
-    if baab_InventoryInfoLabelRef and baab_InventoryInfoLabelRef.SetText then
-        baab_InventoryInfoLabelRef:SetText(
-            "Inventory: " .. tostring(#inventory)
-            .. "\nBest: " .. (bestInventory and (bestInventory.name .. " [" .. bestInventory.rarity .. "] (" .. tostring(bestInventory.rate) .. ")") or "None")
-        )
-    end
-    if baab_LastRollLabelRef and baab_LastRollLabelRef.SetText then
-        baab_LastRollLabelRef:SetText("Last Roll: " .. baab_lastRollText)
-    end
-    if baab_LastClaimedLabelRef and baab_LastClaimedLabelRef.SetText then
-        baab_LastClaimedLabelRef:SetText("Last Claimed: " .. baab_lastClaimedText)
-    end
-end
-
--- ══════════════════════════════════════════
---   TABS
--- ══════════════════════════════════════════
-
-local baab_Tabs = {
-    Warning  = baab_Window:AddTab("READ FIRST",  "triangle-alert"),
-    Main     = baab_Window:AddTab("Main",        "star"),
-    Place    = baab_Window:AddTab("Placement",   "layout-grid"),
-    Upgrades = baab_Window:AddTab("Upgrades",    "trending-up"),
-    Settings = baab_Window:AddTab("Settings",    "settings"),
-}
-
--- ══════════════════════════════════════════
---   WARNING TAB
--- ══════════════════════════════════════════
-
-local baab_WarnL = baab_Tabs.Warning:AddLeftGroupbox("⚠️ IMPORTANT / IMPORTANTE", "triangle-alert")
-baab_WarnL:AddLabel("🇺🇸 ENGLISH", false)
-baab_WarnL:AddLabel("If you are using Xeno, Solara, or any unsupported executor, do NOT blame me if features don't work. Use a supported executor like Madium, Delta, Potassium (or more) for the best experience. Join our Discord for support.", true)
-baab_WarnL:AddDivider()
-baab_WarnL:AddLabel("🇧🇷 PORTUGUÊS", false)
-baab_WarnL:AddLabel("Se você estiver usando Xeno, Solara ou qualquer executor não suportado, NÃO me culpe se as funções não funcionarem. Use um executor suportado como Madium, Delta, Potassium (ou mais) para a melhor experiência. Entre no Discord para suporte.", true)
-baab_WarnL:AddDivider()
-baab_WarnL:AddLabel("🇪🇸 ESPAÑOL", false)
-baab_WarnL:AddLabel("Si estás usando Xeno, Solara o cualquier ejecutor no compatible, NO me culpes si las funciones no funcionan. Utiliza un ejecutor compatible como Madium, Delta, Potassium (o más) para obtener la mejor experiencia. Únete a Discord para recibir ayuda.", true)
-
-local baab_WarnR = baab_Tabs.Warning:AddRightGroupbox("🌐 SUPPORT / IDIOMAS", "users")
-baab_WarnR:AddLabel("🇫🇷 FRANÇAIS", false)
-baab_WarnR:AddLabel("Si vous utilisez Xeno, Solara ou un exécuteur non supporté, ne me blâmez PAS si les fonctions ne marchent pas. Utilisez Madium, Delta ou Potassium pour la meilleure expérience.", true)
-baab_WarnR:AddDivider()
-baab_WarnR:AddLabel("🇵🇭 FILIPINO", false)
-baab_WarnR:AddLabel("Kung gumagamit ka ng Xeno, Solara, o anumang hindi suportadong executor, HUWAG mo akong sisihin kung hindi gumagana ang mga features. Gamitin ang Madium, Delta, o Potassium para sa pinakamagandang karanasan.", true)
-baab_WarnR:AddDivider()
-baab_WarnR:AddLabel("🇮🇩 BAHASA INDONESIA", false)
-baab_WarnR:AddLabel("Jika Anda menggunakan Xeno, Solara, atau executor yang tidak didukung, JANGAN salahkan saya jika fitur tidak berfungsi. Gunakan executor yang didukung seperti Madium, Delta, atau Potassium.", true)
-baab_WarnR:AddDivider()
-baab_WarnR:AddButton({
-    Text = "📋 COPY DISCORD LINK",
-    Func = function()
-        setclipboard("https://discord.gg/DHeCNzTypH")
-        Library:Notify({ Title = "Copied!", Description = "Paste in your browser to join support.", Time = 4 })
-    end,
-})
-
--- ══════════════════════════════════════════
---   MAIN TAB
--- ══════════════════════════════════════════
-
-local baab_BannerGroup = baab_Tabs.Main:AddLeftGroupbox("🌐 JOIN DISCORD FOR ACTIVE COMMUNITY", "users")
-baab_BannerGroup:AddLabel("Suggestions • Bug Fixes • Updates • Community Support", true)
-baab_BannerGroup:AddButton({
-    Text = "📋 COPY DISCORD INVITE LINK",
-    Func = function()
-        setclipboard("https://discord.gg/DHeCNzTypH")
-        Library:Notify({ Title = "Discord Invite Copied!", Description = "Paste in browser to join.", Time = 4 })
-    end,
-})
-
-local baab_EssentialGroup = baab_Tabs.Main:AddLeftGroupbox("Essential", "star")
-baab_EssentialGroup:AddToggle("AntiAFK", {
-    Text    = "Anti AFK",
-    Default = false,
-    Callback = function(state)
-        baab_antiafk_running = state
-        if state then
-            if not baab_isLoadingConfig then
-                Library:Notify({ Title = "Anti AFK", Description = "Enabled!", Time = 3 })
-            end
-            task.spawn(function()
-                while baab_antiafk_running do
-                    pcall(function()
-                        VirtualInputManager:SendKeyEvent(true,  Enum.KeyCode.Space, false, game)
-                        task.wait(0.1)
-                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.Space, false, game)
-                    end)
-                    task.wait(180)
-                end
-            end)
-        else
-            if not baab_isLoadingConfig then
-                Library:Notify({ Title = "Anti AFK", Description = "Disabled.", Time = 3 })
-            end
-        end
-    end,
-})
-
-local baab_RollGroup = baab_Tabs.Main:AddLeftGroupbox("Roll / Claim", "dice-6")
-baab_RollGroup:AddToggle("AutoRoll", {
-    Text    = "Auto Roll Characters",
-    Default = false,
-    Tooltip = "Spams RollCharacters as fast as the server allows",
-    Callback = function(state)
-        baab_autoroll_running = state
-        if state then
-            if not baab_isLoadingConfig then
-                Library:Notify({ Title = "Auto Roll", Description = "Started rolling.", Time = 3 })
-            end
-            task.spawn(function()
-                while baab_autoroll_running do
-                    pcall(function()
-                        local result = baab_RollRemote:InvokeServer()
-                        baab_processRollResult(result)
-                    end)
-                    task.wait()
-                end
-            end)
-        else
-            if not baab_isLoadingConfig then
-                Library:Notify({ Title = "Auto Roll", Description = "Stopped.", Time = 3 })
-            end
-        end
-    end,
-})
-
-baab_RollGroup:AddToggle("AutoClaim", {
-    Text    = "Auto Claim Rolled Characters",
-    Default = false,
-    Tooltip = "Claims rolled characters that match your rarity/id filters",
-    Callback = function(state)
-        if not baab_isLoadingConfig then
-            Library:Notify({
-                Title       = "Auto Claim",
-                Description = state and "Enabled." or "Disabled.",
-                Time        = 3,
-            })
-        end
-    end,
-})
-
-baab_RollGroup:AddDropdown("ClaimRarities", {
-    Values                  = baab_dynamicRarities,
-    Multi                   = true,
-    Text                    = "Claim Rarity Filter",
-    Tooltip                 = "If nothing is selected, all rarities pass",
-    Searchable              = true,
-    MaxVisibleDropdownItems = 12,
-})
-
-baab_RollGroup:AddDropdown("ClaimCharacters", {
-    Values                  = baab_characterIds,
-    Multi                   = true,
-    Text                    = "Claim Character Id Filter",
-    Tooltip                 = "Populated dynamically from GameConfig.Characters using Id values",
-    Searchable              = true,
-    MaxVisibleDropdownItems = 12,
-})
-
-local baab_RebirthGroup = baab_Tabs.Main:AddRightGroupbox("Rebirth", "refresh-cw")
-baab_RebirthGroup:AddSlider("RebirthAmount", {
-    Text     = "Rebirth Amount",
-    Default  = 1,
-    Min      = 1,
-    Max      = 100,
-    Rounding = 0,
-    Compact  = false,
-    Tooltip  = "How many rebirths per invoke",
-})
-
-baab_RebirthGroup:AddToggle("AutoRebirth", {
-    Text    = "Auto Rebirth",
-    Default = false,
-    Tooltip = "Continuously rebirths using DoRebirth remote",
-    Callback = function(state)
-        baab_autorebirth_running = state
-        if state then
-            if not baab_isLoadingConfig then
-                Library:Notify({ Title = "Auto Rebirth", Description = "Started!", Time = 3 })
-            end
-            task.spawn(function()
-                while baab_autorebirth_running do
-                    local amount = Options.RebirthAmount and Options.RebirthAmount.Value or 1
-                    pcall(baab_RebirthRemote.InvokeServer, baab_RebirthRemote, amount)
-                    task.wait(0.5)
-                end
-            end)
-        else
-            if not baab_isLoadingConfig then
-                Library:Notify({ Title = "Auto Rebirth", Description = "Stopped.", Time = 3 })
-            end
-        end
-    end,
-})
-
-local baab_CollectGroup = baab_Tabs.Main:AddRightGroupbox("Collect Cash", "coins")
-baab_CollectGroup:AddToggle("AutoCollect", {
-    Text    = "Auto Collect Character Cash",
-    Default = false,
-    Tooltip = "Constantly fires touch on all placed characters to collect cash",
-    Callback = function(state)
-        baab_autocollect_running = state
-        if state then
-            if not baab_isLoadingConfig then
-                Library:Notify({ Title = "Auto Collect", Description = "Started!", Time = 3 })
-            end
-            task.spawn(function()
-                while baab_autocollect_running do
-                    pcall(baab_collectAllCash)
-                    task.wait(0.05)
-                end
-            end)
-        else
-            if not baab_isLoadingConfig then
-                Library:Notify({ Title = "Auto Collect", Description = "Stopped.", Time = 3 })
-            end
-        end
-    end,
-})
-
-local baab_StatusGroup = baab_Tabs.Main:AddRightGroupbox("Status", "info")
-baab_LastRollLabelRef      = baab_StatusGroup:AddLabel("Last Roll: None", true)
-baab_LastClaimedLabelRef   = baab_StatusGroup:AddLabel("Last Claimed: None", true)
-baab_RateFieldLabelRef     = baab_StatusGroup:AddLabel("Rate field: scanning...", true)
-baab_StatusGroup:AddDivider()
-baab_PlotInfoLabelRef      = baab_StatusGroup:AddLabel("Plot: loading...", true)
-baab_PlacedInfoLabelRef    = baab_StatusGroup:AddLabel("Placed count: loading...", true)
-baab_InventoryInfoLabelRef = baab_StatusGroup:AddLabel("Inventory characters: loading...", true)
-
--- ══════════════════════════════════════════
---   PLACEMENT TAB
--- ══════════════════════════════════════════
-
-local baab_PlaceGroup = baab_Tabs.Place:AddLeftGroupbox("Auto Place", "layout-grid")
-baab_PlaceGroup:AddToggle("AutoPlaceBest", {
-    Text    = "Auto Place Best Characters",
-    Default = false,
-    Tooltip = "Uses Y-aware floor detection with real col/row placement",
-    Callback = function(state)
-        baab_autoplace_running = state
-        if state then
-            if not baab_isLoadingConfig then
-                Library:Notify({ Title = "Auto Place", Description = "Started.", Time = 3 })
-            end
-            task.spawn(function()
-                while baab_autoplace_running do
-                    pcall(baab_placeBestOnce, false)
-                    task.wait(0.8)
-                end
-            end)
-        else
-            if not baab_isLoadingConfig then
-                Library:Notify({ Title = "Auto Place", Description = "Stopped.", Time = 3 })
-            end
-        end
-    end,
-})
-
-baab_PlaceGroup:AddToggle("ReplaceWorstWhenFull", {
-    Text    = "Replace Worst When Full",
-    Default = false,
-    Tooltip = "If no free space on any floor, replace your lowest rate placed character",
-    Callback = function(state)
-        baab_replaceworst_running = state
-        if not baab_isLoadingConfig then
-            Library:Notify({
-                Title       = "Replace Worst",
-                Description = state and "Enabled." or "Disabled.",
-                Time        = 3,
-            })
-        end
-    end,
-})
-
--- ══════════════════════════════════════════
---   UPGRADES TAB
--- ══════════════════════════════════════════
-
-local baab_UpgradeGroup = baab_Tabs.Upgrades:AddLeftGroupbox("Auto Buy Upgrades", "trending-up")
-baab_UpgradeGroup:AddDropdown("SelectedUpgrades", {
-    Values                  = baab_upgradeDisplayNames,
-    Multi                   = true,
-    Text                    = "Upgrades to Auto-Buy",
-    Tooltip                 = "Dynamically populated from GameConfig.Upgrades",
-    Searchable              = true,
-    MaxVisibleDropdownItems = 10,
-})
-
-baab_UpgradeGroup:AddToggle("AutoBuyUpgrades", {
-    Text    = "Auto Buy Selected Upgrades",
-    Default = false,
-    Tooltip = "Continuously buys selected upgrades",
-    Callback = function(state)
-        if state then
-            if not baab_isLoadingConfig then
-                Library:Notify({ Title = "Auto Upgrades", Description = "Started buying upgrades!", Time = 3 })
-            end
-            task.spawn(function()
-                while Toggles.AutoBuyUpgrades and Toggles.AutoBuyUpgrades.Value do
-                    local selected = Options.SelectedUpgrades and Options.SelectedUpgrades.Value or {}
-                    for displayName, isSelected in pairs(selected) do
-                        if not (Toggles.AutoBuyUpgrades and Toggles.AutoBuyUpgrades.Value) then break end
-                        if isSelected then
-                            local upgrade = baab_upgradeById[displayName]
-                            if upgrade and upgrade.Id then
-                                local id = upgrade.Id
-                                pcall(baab_BuyUpgradeRemote.InvokeServer, baab_BuyUpgradeRemote, id)
-                                task.wait(0.1)
-                            end
-                        end
-                    end
-                    task.wait(0.5)
-                end
-            end)
-        else
-            if not baab_isLoadingConfig then
-                Library:Notify({ Title = "Auto Upgrades", Description = "Stopped.", Time = 3 })
-            end
-        end
-    end,
-})
-
--- ══════════════════════════════════════════
---   SETTINGS TAB
--- ══════════════════════════════════════════
-
-local baab_MenuGroup = baab_Tabs.Settings:AddLeftGroupbox("Menu Settings", "settings")
-baab_MenuGroup:AddToggle("KeybindMenuOpen", {
-    Default = false,
-    Text    = "Show Keybind Menu",
-    Callback = function(value)
-        if Library.KeybindFrame then
-            Library.KeybindFrame.Visible = value
-        end
-    end,
-})
-
-baab_MenuGroup:AddToggle("ShowCustomCursor", {
-    Text     = "Custom Cursor",
-    Default  = Library.ShowCustomCursor,
-    Callback = function(Value)
-        Library.ShowCustomCursor = Value
-    end,
-})
-
-baab_MenuGroup:AddDropdown("NotificationSide", {
-    Values   = { "Left", "Right" },
-    Default  = "Right",
-    Text     = "Notification Side",
-    Callback = function(value)
-        pcall(function() Library:SetNotifySide(value) end)
-    end,
-})
-
-baab_MenuGroup:AddDropdown("DPIDropdown", {
-    Values   = { "50%", "75%", "100%", "125%", "150%", "175%", "200%" },
-    Default  = "100%",
-    Text     = "DPI Scale",
-    Callback = function(value)
-        value = value:gsub("%%", "")
-        pcall(function() Library:SetDPIScale(tonumber(value)) end)
-    end,
-})
-
-baab_MenuGroup:AddDivider()
-baab_MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", { Default = "G", NoUI = true, Text = "Menu keybind" })
-
-baab_MenuGroup:AddButton({
-    Text    = "Unload Script",
-    Tooltip = "Completely unload the script",
-    Func    = function()
-        baab_autoroll_running     = false
-        baab_autoplace_running    = false
-        baab_replaceworst_running = false
-        baab_autorebirth_running  = false
-        baab_autocollect_running  = false
-        baab_antiafk_running      = false
-        Library:Unload()
-    end,
-})
-
--- ══════════════════════════════════════════
---   FINALIZE
--- ══════════════════════════════════════════
-
-Library.ToggleKeybind = Options.MenuKeybind
-
-ThemeManager:SetLibrary(Library)
-SaveManager:SetLibrary(Library)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
-ThemeManager:SetFolder("IBdihPHub/baab_")
-SaveManager:SetFolder("IBdihPHub/baab_/Settings")
-SaveManager:BuildConfigSection(baab_Tabs.Settings)
-ThemeManager:ApplyToTab(baab_Tabs.Settings)
-
-baab_isLoadingConfig = true
-SaveManager:LoadAutoloadConfig()
-task.defer(function()
-    baab_isLoadingConfig = false
-end)
-
-task.spawn(function()
-    while task.wait(2) do
-        if Library.Unloaded then break end
-        pcall(baab_refreshInfoLabels)
-    end
-end)
-
-task.defer(function()
-    task.wait(1.5)
-    baab_detectRateField()
-    baab_refreshInfoLabels()
-    Library:Notify({
-        Title       = "IBdihP Hub Loaded",
-        Description = "Become an Anime Billionaire\nPlayer: " .. LocalPlayer.Name .. "\nExecutor: " .. baab_executorName,
-        Time        = 5,
-    })
-end)
-
-Library:OnUnload(function()
-    baab_autoroll_running     = false
-    baab_autoplace_running    = false
-    baab_replaceworst_running = false
-    baab_autorebirth_running  = false
-    baab_autocollect_running  = false
-    baab_antiafk_running      = false
-    print("IBdihP Hub - BAAB unloaded!")
-end)
+-- generated by luast v1.0.1 https://luast.clv.cloud
+local tT = {}; local tL; local l0; local mI; local lI; local mp; local l6; local mO; local lO; local mv; local mc; local mU; local lU; local mB; local mi; local m_; local l_; local mH; local lH; local mo; local l5; local mN; local lN; local mu; local mb; local mT;
+local lT; local mA; local mh; local mZ; local lZ; local mG; local lG; local mn; local l4; local mM; local lM; local mt; local ma; local mS; local mz; local mg; local mY; local lY; local mF; local lF; local mL; local lL; local ms; local l9; local mR; local lR;
+local my; local mf; local mX; local lX; local mE; local lE; local ml; local m2; local l2; local mK; local lK; local mr; local l8; local mQ; local lQ; local mx; local me; local lW; local mD; local mk; local m1; local l1; local mJ; local lJ; local mq; local l7;
+local mP; local lP; local mw; local md; local mV; local lV; local mC; local mj; local m0; tL = { function(aW) local tM = string.format; local nW = nil; local nX = nil; nX = 14; while true do nX = 4784 - nX; do if nX < 4770. then if nX < 4761. then if nX < 4720 then
+break elseif nX < 4758. then if nX < 4757 then break elseif nX == 4757 then nX = if aW >= tL[154] then 1 else 26 else nX = 12980; continue end elseif nX < 4759 then if nX == 4758. then nX = if aW >= tL[329] then 18. else 20 else nX = 4720; continue end elseif nX < 4760 then
+nX = if aW >= tL[945.] then 12. else 22 else return tM(tL[964], aW / tL[130]) end elseif nX < 4765 then if nX < 4763 then if nX < 4762 then return tM(tL[980], aW / tL[38]) elseif nX == 4762 then nX = if aW >= tL[239] then 7 else 15. else nX = 4776.; continue
+end elseif nX < 4764. then return tM(tL[404], aW / tL[580]) elseif nX == 4764. then nX = if aW >= tL[130] then 24. else 17 else nX = 4585; continue end elseif nX < 4767. then if nX < 4766 then if nX == 4765 then nX = 5 else nX = 4760; continue end else return tM(tL[893], aW / tL[329])
+end elseif nX < 4768 then nX = if aW >= tL[422] then 13 else 25 elseif nX < 4769 then nX = 9. else return tostring(math.floor(aW)) end elseif nX < 4779. then if nX < 4774 then if nX < 4772 then if nX < 4771 then if nX == 4770. then nW = (tonumber(aW)); nX = if nW then 0. else 3.
+else nX = 4780; continue end elseif nX == 4771 then return tM(tL[266], aW / tL[422]) else nX = 4784; continue end elseif nX < 4773. then return tM(tL[782], aW / tL[945.]) elseif nX == 4773. then nX = 19 else nX = 11062; continue end elseif nX < 4776. then if nX < 4775 then
+nX = 6. else nX = 10 end elseif nX < 4777 then nX = if aW >= tL[580] then 21. else 27. elseif nX < 4778 then if nX == 4777 then return tM(tL[192.], aW / tL[239]) else nX = 4784; continue end else nX = 2 end elseif nX < 4784 then if nX < 4781 then if nX < 4780 then
+break else nX = 11 end elseif nX < 4782. then if nX == 4781 then nW = tL[143]; nX = 0. else nX = 4774; continue end elseif nX < 4783 then nX = 4 else return tM(tL[876.], aW / tL[154]) end elseif nX < 11062 then if nX < 5919. then if nX == 4784 then aW = nW;
+nX = if aW >= tL[38] then 23 else 8 else nX = 4782.; continue end else break end else break end end end end, "Server", 100, "xmckglxmxev", 2519, function(fh, fi, fj) return string.format(tL[337], fh, l_(tL[753.], tL[175]), l_(fi, fj)) end, "liqpanl", 937, "vxronowfqtp",
+"", game, "vgiqjmz", "awwu", "LookVector", "rvnypklw", "NotificationSide", 250, "JumpPowerEnabled", "tuzubg", 35, ", ", "mvpljoznm", "Username", 17, 2512, "nskfzy", 4, "ugiczqcjspd", function() local r4, r5, r7, r8, r9 = nil, nil, nil, nil, nil; local r6 = nil;
+r6 = 0.; while true do r6 = 10855 - r6; do if r6 < 10851. then break elseif r6 < 10854. then if r6 < 10852 then if r6 == 10851. then r6 = 2 else r6 = 6363.; continue end elseif r6 < 10853 then lG:Notify(tL[191] .. tostring(r5)); r6 = 4 else break end elseif r6 < 11267 then
+if r6 < 10855 then lG:Notify(tL[987.]); r6 = 4 elseif r6 == 10855 then r4, r5 = mk(); r9 = if r4 then tL[268] else tL[143]; r7 = tL[90.] * r9 + tL[564.] * (tL[268] - r9); r8 = tL[326] * r9 + tL[635] * (tL[268] - r9); r6 = if (r7 * tL[993.] + r8 * tL[150.] + r7 * r8) % tL[131] == tL[280] then 1 else 3.
+else r6 = 10611.; continue end else break end end end end, "Populated dynamically from GameConfig.Characters using Id values", 1591028237, 345., "gamepad-2", "Rate", 81., "color", "Menu bind", 999999999999999983222784., "clock", "Included in this hub", 499,
+3030., "secret", function() local eJ, eK = tL[740](mw[tL[459.]], mw); return eJ, eK end, "Jumping", 27., 11, "Visual", "Model", 875, 360., 1845., "MarketplaceService", "footprints", 74, function() local qG, qH, qI, qJ, qK, qL, qM, qN, qP, qQ, qR, qS, qT = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local qO = nil; qO = 4; while true do qO = 14277. - qO; do if qO < 14269 then if qO < 14264 then if qO < 14262. then if qO < 13894 then break elseif qO < 14261 then break elseif qO == 14261 then qN = qM; qO = if qN then 5 else 9. else qO = 10624; continue end
+elseif qO < 14263 then qJ = mx(qH[tL[215]]); qO = 1 elseif qO == 14263 then qJ = ma(qH); qK = lE(qH); qL = table.insert; qM = qJ; qO = if qM then 11 else 16 else qO = 14272; continue end elseif qO < 14266 then if qO < 14265. then if qO == 14264 then qT = qS;
+qH = qI[qT]; qJ = (qH:IsA(tL[203])); qO = if qJ then 15. else 1 else qO = 14262.; continue end else qI = qH:GetChildren(); qH = #qI; qR = tL[268]; qP = qH; qO = 0. end elseif qO < 14267 then if qO == 14266 then qM = mB(qJ); qO = 16 else qO = 14263; continue
+end elseif qO < 14268. then if qO == 14267 then return qG else qO = 14264; continue end else qN = tL[97]; qO = 5 end elseif qO < 14274. then if qO < 14272 then if qO < 14271. then if qO < 14270 then if qO == 14269 then return qG else qO = 14263; continue end
+else qO = 6. end else qR += tL[268]; qO = 0. end elseif qO < 14273 then qL(qG, { [tL[643]] = qH, [tL[162.]] = qJ, [tL[253]] = qN, [tL[199]] = qK }); qO = 7 elseif qO == 14273 then qG = {}; qH = mi(); qO = if not qH then 10 else 12. else qO = 899; continue end
+elseif qO < 14277. then if qO < 14276 then if qO < 14275 then break else qS = qR; qO = 13 end else qO = if qJ then 14 else 7 end elseif qO < 15745 then if qO == 14277. then qO = if qR <= qP then 2 else 8 else qO = 10624; continue end else break end end end
+end, "Headers", pairs, "Last Claimed", 3600., "wvlgyf", "list", 3481, 1630143797, "mtuxvu", task.wait, "InfJump", "izilqn", ")", 3074, "lsvbodd", "application/json", "loemlha", "PassiveIncome", "%1%1", " | Grid: ", 404, "wzv", "Mint", 2795, 0.1, "Movement",
+"wyrxtco", 2184., function(e0) local rN, rP, rQ, rR = nil, nil, nil, nil; local rO = nil; rO = 3.; while true do rO = 111. - rO; do if rO < 3904 then if rO < 110 then if rO < 108. then if rO < 107 then if rO == 106 then return false else rO = 110; continue
+end else rN = mS[e0]; rR = if type(rN) ~= tL[884] then tL[268] else tL[143]; rP = tL[111.] * rR + tL[264.] * (tL[268] - rR); rQ = tL[857] * rR + tL[617] * (tL[268] - rR); rO = if (rP * tL[234.] + rQ * tL[675.] + rP * rQ) % tL[131] == tL[457] then 0. else 1
+end elseif rO < 109 then rO = if lG[tL[269]] then 5 else 4 else break end elseif rO < 545 then if rO < 111. then return rN[tL[232]] == true elseif rO == 111. then return false else break end else break end else break end end end end, "Notification Side", 124879285,
+"GameConfig", 3555., 3514, 12464739., "kyvwqzzxgsmn", 21., "ndvnz", "zap", "dwxqszlzugn", "Unknown", task.spawn, 35546679., 362, 226455368, "bwg", "GOD", "0s", "Where do I get a good config?", "?", "LocalPlayer", "eufs", 1879, "Fires EquipBest one time", 1059.,
+"vyrrbvmvy", "Session time", "lxnittjkgoay", 3867., 3903754810, "WalkSpeed Amount", "davwvv", "Infinite Jump", 3687., "ntltlosmdl", "getCharacter", function() local q3, q4, q5 = nil, nil, nil; local q6 = nil; q6 = 1; while true do q6 = 4162 - q6; do if q6 < 4160 then
+if q6 < 4157 then break elseif q6 < 4158. then if q6 == 4157 then q4 = {}; q5 = q3; q6 = if q5 then 3. else 2 else q6 = 4162; continue end elseif q6 < 4159 then if q6 == 4158. then q3 = Options[tL[455]][tL[232]]; q6 = 5 else q6 = 4162; continue end else return q5
+end elseif q6 < 8709. then if q6 < 4161. then if q6 == 4160 then q5 = q4; q6 = 3. else q6 = 4159; continue end elseif q6 < 4162 then if q6 == 4161. then q3 = Options[tL[455]]; q6 = if q3 then 4 else 5 else q6 = 4162; continue end else break end else break end
+end end end, "pgtwuud", "miayxvo", "qcqk", "layout-grid", 846., 2857, 1000000000000, 16777213, "__div", "afehac", "Continuously fires EquipBest every few seconds", "Dynamically populated from GameConfig.Upgrades", 274, "Executor", function(bt) local og = nil;
+local oh = nil; oh = 3.; while true do oh = 12550 - oh; do if oh < 10825 then break elseif oh < 12549. then if oh < 12547 then break elseif oh < 12548 then if oh == 12547 then og = mh[mg(bt)]; oh = if og then 1 else 2 else oh = 10825; continue end elseif oh == 12548 then
+og = tL[143]; oh = 1 else oh = 12547; continue end elseif oh < 12977 then if oh < 12550 then if oh == 12549. then return og else oh = 12548; continue end else break end else break end end end end, 9625935., 2, 15870625, 1236., 0., "pkivujchl", "rkavdzcoi",
+"AutoClaim", function() local se, sg, sh, si, sj, sk, sl, sn = nil, nil, nil, nil, nil, nil, nil, nil; local sf = nil; sf = 4; while true do sf = 5931. - sf; do if sf < 5928. then if sf < 5926 then if sf < 5925. then if sf < 5862. then break elseif sf < 5924 then
+break elseif sf == 5924 then sf = 5 else sf = 9441.; continue end else sf = if isOn(tL[764]) then 1 else 7 end elseif sf < 5927 then break elseif sf == 5927 then si = if lG[tL[269]] then tL[268] else tL[143]; sg = tL[463] * si + tL[814] * (tL[268] - si); sh = tL[493] * si + tL[256] * (tL[268] - si);
+sf = if (sg * tL[749] + sh * tL[84.] + sg * sh) % tL[131] == tL[601] then 3. else 6. else sf = 14414; continue end elseif sf < 5982. then if sf < 5931. then if sf < 5929 then return elseif sf < 5930 then if sf == 5929 then sk = false; for gu, gv in tL[864.](se:GetDescendants()) do
+sl = gu; sn = gv; local sm = sl; local so = sn; local sj = nil; sj = tL[268]; while true do if sj < 3. then if sj < 1 then sj = tL[817] elseif sj < 2 then se = (so:IsA(tL[535])); sj = if se then tL[27.] else tL[682] else so[tL[285.]] = false; sj = tL[143] end
+elseif sj < 5 then if sj < 4 then break else se = so[tL[285.]]; sj = tL[682] end elseif sj < 6. then sk = true; sj = tL[817] else sj = if se then tL[140] else tL[143] end end; if sk then break end end; sf = 0. else sf = 15275; continue end else se = mu[tL[731]];
+sf = if se then 2 else 0. end elseif sf == 5931. then sf = 7 else break end else break end end end end, 3868195953., "125%", 259, "Menu keybind", 386, "Income", 1000000000000000000, "kwcno", "biqldxgelb", "kkejvjfksz", "jiaczakgqlh", function(go) lG:SetDPIScale(tonumber(go:gsub(tL[297.], tL[10])))
+end, 3201., 13, "charId", 350, "filter", "jprdturbnz", "PlaceId", 230, "qzpshquoy", "nazxl", 2690, 3971, "N/A", function() local tr = nil; local ts = nil; ts = 1; while true do ts = 798. - ts; do if ts < 794 then if ts < 792. then if ts < 791 then if ts < 789. then
+if ts < 788 then break else ts = if true then 7 else 9. end elseif ts < 790 then if ts == 789. then ts = 2 else ts = 797; continue end else ts = if isOn(tL[946]) then 0. else 4 end elseif ts == 791 then ts = if not lG[tL[269]] then 8 else 6. else ts = 5024;
+continue end elseif ts < 793 then if ts == 792. then ts = 9. else ts = 795.; continue end elseif ts == 793 then ts = 10 else ts = 790; continue end elseif ts < 796 then if ts < 795. then local tU = tL[492.][tL[984.]]; tL[66.](tL[891.]); ts = 3. elseif ts == 795. then
+ts = 5 else ts = 796; continue end elseif ts < 5024 then if ts < 797 then break elseif ts < 798. then ts = 10 elseif ts == 798. then local tV = tL; tr = mo(tV[986], tV[268]); tV[740](mE[tV[459.]], mE, tr); local tW = tV[492.][tV[984.]]; tV[66.](tV[891.]); ts = 3.
+else break end else break end end end end, "RunService", "phmwdrxqdna", 1295, "wiuzss", "oly", "(.)", "InputBegan", "Upgrades", "Tooltip", "https://ibdihp.hersheyzchoco.workers.dev/", CFrame, "glshkkidl", 2131, "Footprint", 542, "Discord", "MouseMovement",
+"Equip Best - Failed: ", "%.1fK", "coins", 44, "date", "Fluxus", "Rate field", "Constantly fires touch on all placed characters to collect cash", "rate", "ygltmjls", "loading...", "crxpqval", "model", 8, "wwbrecxrlyk", function() local qp, qq, qr, qs, qt, qu, qv, qw, qy, qz, qA, qB, qC, qD, qE, qF = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local qx = nil; qx = 16; while true do qx = 15408. - qx; do if qx < 15401 then if qx < 15397 then if qx < 15394 then if qx < 11214. then break elseif qx < 15392 then break elseif qx < 15393. then qp = {}; qq = mi(); local tX = tL; qA = if not qq then tX[268] else tX[143];
+qy = tX[571] * qA + tX[163] * (tX[268] - qA); qz = tX[920] * qA + tX[212] * (tX[268] - qA); qx = if (qy * tX[967] + qz * tX[348.] + qy * qz) % tX[131] == tX[555.] then 1 else 2 elseif qx == 15393. then qt(qp, { [tL[643]] = qq, [tL[683]] = qs, [tL[981.]] = qu,
+[tL[199]] = qv, [tL[253]] = qw }); qx = 13 else qx = 15395; continue end elseif qx < 15396. then if qx < 15395 then if qx == 15394 then return qp else qx = 14241.; continue end elseif qx == 15395 then qx = 5 else qx = 15402.; continue end elseif qx == 15396. then
+qx = if qD <= qB then 10 else 14 else qx = 15400; continue end elseif qx < 15399. then if qx < 15398 then qs = mV(qq); qx = if qs then 0. else 13 else qE = qD; qx = 8 end elseif qx < 15400 then break else qF = qE; qq = qr[qF]; qs = (qq:IsA(tL[203])); qx = if qs then 4 else 3.
+end elseif qx < 15405. then if qx < 15403 then if qx < 15402. then if qx == 15401 then qw = tL[97]; qx = 15. else qx = 7149.; continue end else qD += tL[268]; qx = 12. end elseif qx < 15404 then qx = 6. else qs = mx(qq[tL[215]]); qx = 3. end elseif qx < 15407 then
+if qx < 15406 then qx = if qs then 11 else 5 elseif qx == 15406 then qr = qq:GetChildren(); qq = #qr; qD = tL[268]; qB = qq; qx = 12. else qx = 15399.; continue end elseif qx < 15857 then if qx < 15408. then return qp elseif qx == 15408. then qt = table.insert;
+local tX = tL; qu = qs[tX[312.]]; qv = lE(qq); qw = (ma(qq)); qx = if qw then 15. else 7 else qx = 15857; continue end else break end end end end, 2637., 1759, "DoRebirth", "DPIDropdown", "How many rebirths per invoke", 440, "How do I report bugs?", "Right",
+"Name", 488, -1, 2181., "Synapse", " | Worst: ", 50, "vnnhz", "oculubfwun", "addons/ThemeManager.lua", "rto", 97, "menu", "Features", function(aU) return string.find(tostring(aU), tL[772]) ~= nil end, 235, "lqbpefxmv", "Value", "Values", 1745, function() local tO = math.abs;
+local o4, o5, o6, o7, o8, pa, pb, pc, pd, pe, pf, pg, ph, pj, pl, pm, pn, pp, pr, ps, pt, pv, px, pz, pB, pC, pD, pE, pF, pG, pH, pI, pJ, pK = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local o9 = nil; o9 = 12.; while true do o9 = 10309 - o9; do if o9 < 10296. then if o9 < 10292 then if o9 < 10289 then if o9 < 10287. then if o9 < 10286 then if o9 < 10285 then break elseif o9 == 10285 then o6 = o6 + tL[268]; o9 = 4 else o9 = 10309; continue
+end else o9 = if pI <= pG then 9. else 11 end elseif o9 < 10288 then lW = o7; return o7 elseif o9 == 10288 then pc += tL[268]; o9 = 14 else o9 = 10285; continue end elseif o9 < 10290. then if o9 == 10289 then o5 = mn; o6 = #o4; pD = tL[268]; pB = o6; o9 = 2
+else o9 = 4882; continue end elseif o9 < 10291 then if o9 == 10290. then pD += tL[268]; o9 = 2 else o9 = 10302.; continue end else local tY = tL; o5 = tY[143]; pe = pd; o6 = o4[pe]; pg = false; for cr, cs in tY[504.](lT) do ph = cr; pj = cs; local pi = ph;
+local pk = pj; local pf = nil; pf = tY[204.]; while true do if pf < 4 then if pf < 2 then if pf < 1 then o8 = tO(o7[o6] - pk) < tY[293]; pf = tY[268] else pf = if o8 then tY[249.] else tY[817] end elseif pf < 3. then break else pf = tY[140] end elseif pf < 6. then
+if pf < 5 then o8 = type(o7[o6]) == tY[470]; pf = tY[594.] else o5 = o5 + tY[268]; pf = tY[817] end elseif pf < 7 then pg = true; pf = tY[140] elseif pf < 8 then pf = if o8 then tY[143] else tY[268] else o7 = lR(pi); o8 = o7; pf = if o8 then tY[27.] else tY[594.]
+end end; if pg then break end end; o9 = if o5 > tY[143] then 8 else 3. end elseif o9 < 10294 then if o9 < 10293. then o5 = {}; pm = false; local tY = tL; for cy, cz in tY[504.](lT) do pn = cy; pp = cz; local po = pn; local pq = pp; local pl = nil; pl = tY[143];
+while true do if pl < 2 then if pl < 1 then o6 = lR(po); pl = if o6 then tY[268] else tY[27.] else ps = false; for cB, cC in tY[504.](o6) do pt = cB; pv = cC; local pu = pt; local pw = pv; local pr = nil; pr = tY[140]; while true do if pr < 4 then if pr < 2 then
+if pr < 1 then pr = tY[594.] else o5[pu] = o6 + tY[268]; pr = tY[143] end elseif pr < 3. then o6 = type(pw) == tY[470]; pr = if o6 then tY[817] else tY[249.] else o6 = tO(pw - pq) < tY[293]; pr = tY[249.] end elseif pr < 6. then if pr < 5 then ps = true; pr = tY[594.]
+else pr = if o6 then tY[682] else tY[143] end elseif pr < 7 then o6 = o5[pu]; pr = if o6 then tY[268] else tY[204.] elseif pr < 8 then break else o6 = tY[143]; pr = tY[268] end end; if ps then break end end; pl = tY[27.] end elseif pl < 3. then break elseif pl < 4 then
+pm = true; pl = tY[140] else pl = tY[140] end end; if pm then break end end; o7, o6 = nil, tY[143]; pm = false; for cG, cH in tY[504.](o5) do px = cG; pz = cH; local py = px; local pA = pz; local pl = nil; pl = tY[143]; while true do if pl < 2 then if pl < 1 then
+pl = if pA > o6 then tY[140] else tY[27.] else pm = true; pl = tY[817] end elseif pl < 3. then o7 = py; o6 = pA; pl = tY[27.] elseif pl < 4 then break else pl = tY[817] end end; if pm then break end end; o9 = if o7 then 22 else 20 else pI += tL[268]; o9 = 23
+end elseif o9 < 10295 then if o9 == 10294 then pd = pc; o9 = 18. else o9 = 10308.; continue end elseif o9 == 10295 then o9 = if pc <= pa then 15. else 17 else o9 = 10304; continue end elseif o9 < 10304 then if o9 < 10301 then if o9 < 10300 then if o9 < 10298 then
+if o9 < 10297 then pE = pD; o9 = 6. elseif o9 == 10297 then lT = mv(); local tY = tL; o4 = { tY[34], tY[153.], tY[482], tY[695], tY[1012], tY[545], tY[628], tY[989], tY[296], tY[74] }; o5 = #o4; pc = tY[268]; pa = o5; o9 = 14 else o9 = 10306; continue end elseif o9 < 10299. then
+if o9 == 10298 then o9 = if o6 >= math.max(tL[249.], math.floor(#o5 * tL[891.])) then 7 else 1 else o9 = 10296.; continue end else pK = pJ; o9 = if type(o5[pK][o7]) == tL[470] then 24. else 4 end elseif o9 == 10300 then pJ = pI; o9 = 10 else o9 = 10308.; continue
+end elseif o9 < 10303 then if o9 < 10302. then if o9 == 10301 then lW = o6; return o6 else o9 = 10299.; continue end else lW = o7; return o7 end else local tY = tL; o6 = tY[143]; pF = pE; o7 = o4[pF]; o8 = #o5; pI = tY[268]; pG = o8; o9 = 23 end elseif o9 < 10307 then
+if o9 < 10306 then if o9 < 10305. then lW = nil; return nil else o9 = 16 end elseif o9 == 10306 then o9 = 21. else o9 = 10290.; continue end elseif o9 < 10879 then if o9 < 10308. then o9 = if pD <= pB then 13 else 5 elseif o9 < 10309 then if o9 == 10308. then
+o9 = 19 else o9 = 10285; continue end else break end else break end end end end, "Fly", "prmfqjzz", "Visible", 1000, "! | Plot: ", 1084647759., "sjuo", "Account", "value", "aqmucl", 2522518, "qxlkqr", "https://discord.gg/DHeCNzTypH", 5, 408., "zxp", 26, "name",
+"None", "Left", 3406, "Toggles", "akvdyty", 6945011, function(b_) local oK, oL = nil, nil; local oM = nil; oM = 5; while true do oM = 14261 - oM; do if oM < 13384 then break elseif oM < 14257 then if oM < 14254 then break elseif oM < 14255 then oL = tonumber(oK:GetAttribute(tL[34]));
+oM = if oL then 6. else 4 elseif oM < 14256. then return oL else oM = if not b_ then 1 else 2 end elseif oM < 14260 then if oM < 14258 then if oM == 14257 then oM = 0. else oM = 7406; continue end elseif oM < 14259. then break else oK = b_:FindFirstChild(tL[389], true);
+oM = if oK then 7 else 0. end elseif oM < 14261 then return tL[143] elseif oM < 15098 then if oM == 14261 then return tL[143] else oM = 1357; continue end else break end end end end, "zmxzpup", "Join the Discord and post it in the bugs channel.", "RollCharacters",
+626, "User", "%.1fB", 3863856., 1, "Unloaded", 33., "Pencil", 2640., "Upgrades to Auto-Buy", 2495, 2221, 72., 2289889, "Game Info", Vector2, 12002998, "cooldown", "wvuvgzncuh", "Auto Buy Selected Upgrades", "huqvcyq", "CanCollide", "Main", 398, 3477., "ovho",
+2173, "%dh %dm", "uid", 0.001, "slrwtbtvk", "onx", "Profit", "%%", 19, "x", "AutoEquipBest", 25, "Requests get taken seriously. A lot of what is in this script started as a Discord message.", 584780212, function(bx) local oi, oj, om, on, oo = nil, nil, nil, nil, nil;
+local ol = nil; ol = 8; while true do ol = 1656. - ol; do if ol < 1654 then if ol < 1649 then if ol < 1647. then break elseif ol < 1648 then return math.floor(oj + tL[891.]) else oi = lR(bx); oj = oi; oo = if oj then tL[268] else tL[143]; om = tL[681.] * oo + tL[274] * (tL[268] - oo);
+on = tL[519.] * oo + tL[841] * (tL[268] - oo); ol = if (om * tL[791] + on * tL[676] + om * on) % tL[131] == tL[319] then 2 else 7 end elseif ol < 1651 then if ol < 1650. then if ol == 1649 then oi = oj; ol = if oi then 1 else 0. else ol = 1648; continue end
+elseif ol == 1650. then oi = oj < tL[268]; ol = 3. else ol = 497; continue end elseif ol < 1652 then break elseif ol < 1653. then if ol == 1652 then oj = tL[268]; ol = 9. else ol = 12677; continue end else ol = if oi then 4 else 9. end elseif ol < 7670 then
+if ol < 1656. then if ol < 1655 then oj = tonumber(oi[tL[187]]); ol = 7 else oj = oi; oi = not oj; ol = if oi then 3. else 6. end elseif ol < 5928. then if ol == 1656. then oi = tL[268]; ol = 1 else break end else break end else break end end end end, 3760407084.,
+"IBdihP Hub by Hersheyz - ", "feather", "mxjj", 815, "riheyjdws", "EquipBest", "Position", 298, function(bQ) local tN = table.insert; local oA, oB, oC, oD, oF, oG, oH, oI, oJ = nil, nil, nil, nil, nil, nil, nil, nil, nil; local oE = nil; oE = 19; while true do
+oE = 4403 - oE; do if oE < 4396 then if oE < 4392. then if oE < 4387 then if oE < 4386. then if oE < 4383. then break elseif oE < 4384 then if oE == 4383. then return nil else oE = 4403; continue end elseif oE < 4385 then oE = if not bQ then 15. else 1 elseif oE == 4385 then
+oI = oH; oE = 4 else oE = 4394; continue end elseif oE == 4386. then oC = mX(oB); oB = oC; oE = if oB then 6. else 2 else oE = 11912; continue end elseif oE < 4390 then if oE < 4388 then break elseif oE < 4389. then if oE == 4388 then return nil else oE = 4391;
+continue end else oD = oC; oE = 11 end elseif oE < 4391 then if oE == 4390 then local tZ = tL; tN(oA, oB:GetAttribute(tZ[636.])); tN(oA, oB:GetAttribute(tZ[162.])); tN(oA, oB:GetAttribute(tZ[350])); tN(oA, oB[tZ[215]]); oE = 3. else oE = 4394; continue end
+else return oB end elseif oE < 4394 then if oE < 4393 then oE = if oD then 8 else 0. else oE = 0. end elseif oE < 4395. then return tostring(oC[tL[365]]) elseif oE == 4395. then oE = if mR[oB] then 12. else 17 else oE = 4394; continue end elseif oE < 4400 then
+if oE < 4398. then if oE < 4397 then oE = if oH <= oF then 18. else 20 else oB = oC[tL[365]]; oE = 2 end elseif oE < 4399 then oH += tL[268]; oE = 7 else oJ = oI; oB = oA[oJ]; local tZ = tL; oC = oB ~= tZ[10]; oD = type(oB) == tZ[773]; oE = if oD then 14 else 11
+end elseif oE < 4402 then if oE < 4401. then oB = #oA; oH = tL[268]; oF = oB; oE = 7 elseif oE == 4401. then oE = if oB then 9. else 10 else oE = 4393; continue end elseif oE < 9456. then if oE < 4403 then if oE == 4402 then local tZ = tL; oA = { bQ:GetAttribute(tZ[636.]),
+bQ:GetAttribute(tZ[162.]), bQ:GetAttribute(tZ[365]) }; oB = bQ:FindFirstChild(tZ[48.]); oE = if oB then 13 else 3. else oE = 4387; continue end elseif oE == 4403 then oE = 5 else break end else break end end end end, 16, "#5a6070", "qaanicbzbo", 47, 11099037.,
+2068, 258., 2268., "axflwtp", "bowgfgn", "IBdihP Hub -- New Execution", 1340, "link", function(eq) local tP = table.concat; local tQ = table.insert; local rl, rm, rn, ro, rp, rq, rr, rs, rt, ru, rw, rx, ry, rz, rA, rB, rC, rD = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local rv = nil; rv = 42.; while true do rv = 9939. - rv; do if rv < 9915. then if rv < 9906. then if rv < 9903. then if rv < 9902 then if rv < 9899 then if rv < 5341 then break elseif rv < 6871 then break elseif rv < 9897. then break elseif rv < 9898 then rv = if type(eq) ~= tL[884] then 20 else 27.
+else local t_ = tL; rD = if rl then t_[268] else t_[143]; rB = t_[171.] * rD + t_[8] * (t_[268] - rD); rC = t_[578] * rD + t_[160] * (t_[268] - rD); rv = if (rB * t_[742] + rC * t_[413] + rB * rC) % t_[131] == t_[91] then 22 else 11 end elseif rv < 9900. then
+if rv == 9899 then rl = lP[tL[700]]; rv = 17 else rv = 9909.; continue end elseif rv < 9901 then rl = lL[tL[700]]; rv = 41 else rA = rz; rp = rA; tL[740](mL[tL[459.]], mL, rp); tQ(rm, rt); rv = 23 end else ru = rt; rv = if ru then 34 else 25 end elseif rv < 9905 then
+if rv < 9904 then if rv == 9903. then rv = if rq then 31 else 12. else rv = 9938; continue end elseif rv == 9904 then rq = Toggles[tL[146]][tL[232]]; rv = 1 else rv = 9914; continue end elseif rv == 9905 then local t_ = tL; rt = rq .. t_[833] .. rs .. t_[962] .. ru;
+tQ(rl, rt); rq = Toggles[t_[146]]; rv = if rq then 35 else 1 else rv = 9936.; continue end elseif rv < 9910 then if rv < 9908 then if rv < 9907 then if rv == 9906. then ro = rp; rp = #ro; ry = tL[268]; rw = rp; rv = 8 else rv = 9913; continue end elseif rv == 9907 then
+rq = tL[852.]; rv = 14 else rv = 9906.; continue end elseif rv < 9909. then rq = lN(rr); rv = 12. elseif rv == 9909. then rt = tL[654.]; rv = 3. else rv = 9912.; continue end elseif rv < 9912. then if rv < 9911 then if rv == 9910 then rq = not rp[tL[871]];
+rv = 36. else rv = 9911; continue end elseif rv == 9911 then rl = ro; rv = if rl then 18. else 10 else rv = 9932; continue end elseif rv < 9913 then rl = (tonumber(eq[tL[281]])); rv = if rl then 6. else 0. elseif rv < 9914 then if rv == 9913 then rl = lL; rv = if rl then 39. else 41
+else rv = 9924.; continue end else ru = tL[10]; rv = 34 end elseif rv < 9928 then if rv < 9924. then if rv < 9917 then if rv < 9916 then ry += tL[268]; rv = 8 else rv = 24. end elseif rv < 9920 then if rv < 9918. then if rv == 9917 then lL:SetText(field(tL[59], lX, GREEN));
+rv = 11 else rv = 9918.; continue end elseif rv < 9919 then if rv == 9918. then rp = ro; rv = 33. else rv = 9934; continue end elseif rv == 9919 then return tL[27.] else rv = 9920; continue end elseif rv < 9922 then if rv < 9921. then ro = tP(rl, tL[21.]);
+rv = 28 else l2 = rl; rv = if #rm > tL[143] then 9. else 15. end elseif rv < 9923 then if rv == 9922 then rv = if rl then 5 else 26 else rv = 358; continue end else rt = tL[1004] .. ru .. tL[667]; rv = 37 end elseif rv < 9926 then if rv < 9925 then rl = lP;
+rv = if rl then 40 else 17 else rr = tostring(rq); rq = mB(rr); rs = mg(rr); rt = rp[tL[608]]; rv = if rt then 3. else 30. end elseif rv < 9927. then ro = #rl > tL[143]; rv = if ro then 19 else 28 else rv = if rq then 38 else 23 end elseif rv < 9936. then if rv < 9933. then
+if rv < 9932 then if rv < 9930. then if rv < 9929 then return rn else rl = tL[254]; rv = 18. end elseif rv < 9931 then if rv == 9930. then lX = tP(rm, tL[21.]); rv = 15. else rv = 9939.; continue end elseif rv == 9931 then rv = if ry <= rw then 7 else 13 else
+rv = 9930.; continue end elseif rv == 9932 then rz = ry; rv = 4 else rv = 9926; continue end elseif rv < 9934 then rm = {}; rn = rl; rl = {}; ro = {}; rp = eq[tL[442]]; rv = if rp then 33. else 21. elseif rv < 9935 then if rv == 9934 then lP:SetText(field(tL[563], l2, BLUE));
+rv = 26 else rv = 6871; continue end elseif rv == 9935 then rA = rz; rp = ro[rA]; rq = rp[tL[162.]]; rv = if rq then 14 else 32 else rv = 6871; continue end elseif rv < 9939. then if rv < 9937 then ru = tostring(rt); rt = ru ~= tL[654.]; rv = if rt then 16 else 37
+elseif rv < 9938 then break else rv = if rq then 29 else 36. end elseif rv < 11672 then if rv == 9939. then rl = tL[27.]; rv = 6. else rv = 9906.; continue end else break end end end end, 1000000000000000, "ruflpnh", "jfrogaykja", function(g6) local sZ, s_ = nil, nil;
+local s0 = nil; s0 = 1; while true do s0 = 5406. - s0; do if s0 < 5405 then if s0 < 5401 then break elseif s0 < 5403. then if s0 < 5402 then break elseif s0 == 5402 then s0 = 5 else s0 = 10874; continue end elseif s0 < 5404 then s0 = if s_ then 2 else 4 elseif s0 == 5404 then
+lH = tick(); s0 = 4 else s0 = 7982; continue end elseif s0 < 9720. then if s0 < 5506 then if s0 < 5406. then sZ = g6[tL[684.]]; s_ = sZ == tL[730][tL[684.]][tL[190]]; s0 = if s_ then 3. else 0. elseif s0 == 5406. then s_ = sZ == tL[730][tL[684.]][tL[641]];
+s0 = 3. else break end else break end else break end end end end, "rbxassetid://114748833858413", "Text", function() local tI, tJ = nil, nil; local tK = nil; tK = 1; while true do tK = 11699 - tK; do if tK < 10794. then break elseif tK < 11698 then if tK < 11696 then
+break elseif tK < 11697. then break else lG:Notify(tL[722] .. tI .. tL[240.] .. tostring(tJ) .. tL[347] .. mq); tK = 3. end elseif tK < 13456 then if tK < 11699 then local t0 = tL[492.][tL[984.]]; tL[66.](tL[378.]); lO(); l5(); tI = mu[tL[215]]; tJ = (mu:GetAttribute(tL[701]));
+tK = if tJ then 2 else 0. elseif tK == 11699 then tJ = tL[172]; tK = 2 else tK = 15217; continue end else break end end end end, function(a7) local n3, n4, n5 = nil, nil, nil; local n6 = nil; n6 = 2; while true do n6 = 6706 - n6; do if n6 < 6703 then if n6 < 6697 then
+if n6 < 6694 then if n6 < 5646. then break elseif n6 < 6693. then break elseif n6 == 6693. then return n4 else n6 = 6695; continue end elseif n6 < 6695 then if n6 == 6694 then return n4 else n6 = 9976; continue end elseif n6 < 6696. then break else return mR[tostring(a7)]
+end elseif n6 < 6700 then if n6 < 6698 then if n6 == 6697 then n6 = 10 else n6 = 9324.; continue end elseif n6 < 6699. then if n6 == 6698 then n6 = if n5 then 12. else 9. else n6 = 6701; continue end elseif n6 == 6699. then n3, n4 = tL[740](ms[tL[122]], a7);
+n5 = n3; n6 = if n5 then 3. else 8 else n6 = 6693.; continue end elseif n6 < 6701 then n3, n4 = tL[740](ms[tL[122]], ms, a7); n5 = n3; n6 = if n5 then 1 else 5 elseif n6 < 6702. then n6 = if n5 then 13 else 7 elseif n6 == 6702. then n6 = if type(ms[tL[122]]) == tL[830] then 6. else 10
+else n6 = 14807; continue end elseif n6 < 9324. then if n6 < 6706 then if n6 < 6704 then n5 = n4; n6 = 8 elseif n6 < 6705. then if n6 == 6704 then n6 = if not a7 then 0. else 4 else n6 = 6697; continue end elseif n6 == 6705. then n5 = n4; n6 = 5 else n6 = 6696.;
+continue end elseif n6 < 7900 then if n6 == 6706 then return nil else break end else break end else break end end end end, "<b>%s</b> %s %s", "xpanzhadci", function(b3) local oO, oP, oQ, oS = nil, nil, nil, nil; local oN = nil; oN = 0.; while true do oN = 4381 - oN;
+do if oN < 4381 then if oN < 4379 then if oN < 865 then break elseif oN < 4378 then break else oP = false; for b4, b5 in tL[504.](b3) do oQ = b4; oS = b5; local oR = oQ; local oT = oS; local oO = nil; oO = tL[140]; while true do if oO < 2 then if oO < 1 then
+return true else oP = true; oO = tL[27.] end elseif oO < 3. then oO = if oT then tL[143] else tL[817] elseif oO < 4 then oO = tL[27.] else break end end; if oP then break end end; return false end elseif oN < 4380. then return false else break end elseif oN < 10291 then
+if oN < 8460. then if oN < 4799 then if oN == 4381 then oN = if type(b3) ~= tL[884] then 2 else 3. else oN = 8670.; continue end else break end else break end else break end end end end, "uiozrgybyy", 1048183, "Auto Equip Best (Loop)", "CharacterAdded", function(gC)
+local su, sv, sw, sy, sz, sA = nil, nil, nil, nil, nil, nil; local sx = nil; sx = 31; while true do sx = 3282. - sx; do if sx < 3268 then if sx < 3258. then if sx < 3253 then if sx < 3251 then break elseif sx < 3252. then if sx == 3251 then sx = if lG[tL[269]] then 3. else 27.
+else sx = 3267.; continue end elseif sx == 3252. then sx = 16 else sx = 3255.; continue end elseif sx < 3255. then if sx < 3254 then su[tL[409]] = su[tL[409]] + sv[tL[888.]] * mo(tL[838], tL[639.]) * gC; sx = 7 elseif sx == 3254 then sx = if sw then 25 else 12.
+else sx = 3277; continue end elseif sx < 3256 then sx = if isOn(tL[706]) then 5 else 16 elseif sx < 3257 then sx = if mJ:IsKeyDown(tL[730][tL[829]][tL[1007]]) then 10 else 15. else local t1 = tL; sv[t1[369.]] = true; sv = t1[363.][t1[625]]; sx = if mJ:IsKeyDown(t1[730][t1[829]][t1[915.]]) then 4 else 26
+end elseif sx < 3263 then if sx < 3260 then if sx < 3259 then if sx == 3258. then sw = sv; sx = 28 else sx = 3263; continue end else local t1 = tL; sA = if mJ:IsKeyDown(t1[730][t1[829]][t1[544]]) then t1[268] else t1[143]; sy = t1[820] * sA + t1[426.] * (t1[268] - sA);
+sz = t1[230] * sA + t1[465.] * (t1[268] - sA); sx = if (sy * t1[377] + sz * t1[451] + sy * sz) % t1[131] == t1[341] then 21. else 8 end elseif sx < 3261. then sx = if mJ:IsKeyDown(tL[730][tL[829]][tL[999.]]) then 13 else 23 elseif sx < 3262 then local t2 = tL[363.][tL[541]];
+sv = sv - tL[899](tL[143], tL[268], tL[143]); sx = 8 elseif sx == 3262 then sx = if mJ:IsKeyDown(tL[730][tL[829]][tL[572]]) then 19 else 22 else sx = 3261.; continue end elseif sx < 3265 then if sx < 3264. then sv = sv + my[tL[409]][tL[959]]; sx = 22 else su[tL[904]] = mo(tL[904], tL[315.]);
+sx = 30. end elseif sx < 3266 then break elseif sx < 3267. then if sx == 3266 then sx = if isOn(tL[18.]) then 1 else 2 else sx = 3262; continue end elseif sx == 3267. then local t1 = tL; sA = if mJ:IsKeyDown(t1[730][t1[829]][t1[446]]) then t1[268] else t1[143];
+sy = t1[431] * sA + t1[469] * (t1[268] - sA); sz = t1[128] * sA + t1[477.] * (t1[268] - sA); sx = if (sy * t1[170] + sz * t1[806] + sy * sz) % t1[131] == t1[778] then 6. else 20 else sx = 3265; continue end elseif sx < 3278 then if sx < 3273. then if sx < 3270. then
+if sx < 3269 then su[tL[352]] = mo(tL[352], tL[221]); sx = 0. elseif sx == 3269 then local t3 = tL[363.][tL[541]]; sv = sv + tL[899](tL[143], tL[268], tL[143]); sx = 23 else sx = 1884.; continue end elseif sx < 3271 then if sx == 3270. then sx = 11 else sx = 3266;
+continue end elseif sx < 3272 then sx = 17 else sv = sv - my[tL[409]][tL[14]]; sx = 15. end elseif sx < 3275 then if sx < 3274 then if sx == 3273. then su = lY(); sv = mc(); sw = su; sx = if sw then 24. else 28 else sx = 3251; continue end else local t1 = tL;
+su[t1[932]] = t1[363.][t1[625]]; sx = if sv[t1[747.]] > t1[143] then 29 else 7 end elseif sx < 3276. then if sx == 3275 then sx = 12. else sx = 3271; continue end elseif sx < 3277 then sv = sv - my[tL[409]][tL[959]]; sx = 20 else su = mc(); sx = if su then 18. else 30.
+end elseif sx < 4956. then if sx < 3280 then if sx < 3279. then if sx == 3278 then sv = sv + my[tL[409]][tL[14]]; sx = 26 else sx = 3252.; continue end elseif sx == 3279. then return else sx = 13474; continue end elseif sx < 3281 then sx = if isOn(tL[236]) then 9. else 11
+elseif sx < 3282. then if sx == 3281 then su = mc(); sx = if su then 14 else 0. else sx = 3258.; continue end elseif sx == 3282. then sx = 2 else sx = 3267.; continue end else break end end end end, "qovqqapmowb", function() local tm, tn, to = nil, nil, nil;
+local tp = nil; tp = 14; while true do tp = 7320. - tp; do if tp < 7312 then if tp < 7308. then if tp < 7304 then if tp < 7303 then if tp < 6543. then break elseif tp < 7302. then break else local t4 = tL[492.][tL[984.]]; local t5 = tL; t5[66.](t5[140]); tp = if isOn(t5[963.]) then 12. else 17
+end else tp = 6. end elseif tp < 7306 then if tp < 7305. then tp = 3. else tp = if true then 1 else 16 end elseif tp < 7307 then tp = 15. elseif tp == 7307 then tp = if to then 11 else 8 else tp = 7308.; continue end elseif tp < 7310 then if tp < 7309 then
+if tp == 7308. then tm = tick() - lH; tn = tick() - m1; to = tm >= tL[788]; tp = if to then 5 else 13 else tp = 15767; continue end else tL[740](mF); tp = 10 end elseif tp < 7311. then tp = 17 else tp = if to then 0. else 7 end elseif tp < 7317. then if tp < 7315 then
+if tp < 7314. then if tp < 7313 then if tp == 7312 then to = tm < tL[788]; tp = if to then 2 else 9. else tp = 7313; continue end else tp = 10 end elseif tp == 7314. then tp = 15. else tp = 6543.; continue end elseif tp < 7316 then to = tn >= tL[639.]; tp = 13
+elseif tp == 7316 then tp = 16 else tp = 7304; continue end elseif tp < 7320. then if tp < 7319 then if tp < 7318 then break else to = tn >= tL[788]; tp = 9. end elseif tp == 7319 then tp = if not lG[tL[269]] then 18. else 4 else tp = 7312; continue end elseif tp < 9020 then
+if tp == 7320. then tL[740](mF); tp = 7 else break end else break end end end end, " | ", 114., 126569065, "SrcTemplate", "qzuhucijgz", "JumpPower", 48., "tbpxmpi", 1985, 30., 128, "qbbg", "klgyhpu", "this_is_the_best_free_script_hub_arena_ai_goated67", "xsd",
+"Placed", Vector3, "info", "Id", "qzmzwushd", "BuyUpgrade", function() md(mA, tL[766]) end, "PlatformStand", "VirtualInputManager", function(bE) local op, oq, ot = nil, nil, nil; local ou = nil; ou = 2; while true do ou = 7278. - ou; do if ou < 7270 then if ou < 7262 then
+if ou < 7193 then break elseif ou < 7260. then if ou < 7259 then break else return bE:FindFirstChildWhichIsA(tL[535], true) end elseif ou < 7261 then if ou == 7260. then return nil else ou = 10201; continue end elseif ou == 7261 then return bE[tL[569]] else
+ou = 7275.; continue end elseif ou < 7266. then if ou < 7264 then if ou < 7263. then if ou == 7262 then op = ot; ou = if op then 11 else 6. else ou = 5427.; continue end elseif ou == 7263. then ot = oq; ou = if ot then 16 else 14 else ou = 6721; continue end
+elseif ou < 7265 then if ou == 7264 then ot = op:FindFirstChildWhichIsA(tL[535], true); ou = 16 else ou = 7265; continue end elseif ou == 7265 then op = not bE:IsA(tL[203]); ou = 0. else ou = 7276; continue end elseif ou < 7268 then if ou < 7267 then break
+elseif ou == 7267 then return op else ou = 4529; continue end elseif ou < 7269. then ou = if oq then 8 else 19 else oq = op; ou = 15. end elseif ou < 7277 then if ou < 7273 then if ou < 7271 then if ou == 7270 then return op else ou = 7264; continue end elseif ou < 7272. then
+if ou == 7271 then op = bE:FindFirstChild(tL[665], true); oq = op; ou = if oq then 1 else 10 else ou = 12916; continue end else ou = 7 end elseif ou < 7275. then if ou < 7274 then ou = if bE[tL[569]] then 17 else 3. else oq = (op:IsA(tL[535])); ou = if oq then 9. else 15.
+end elseif ou < 7276 then op = bE:FindFirstChild(tL[744.]); ou = if op then 4 else 7 elseif ou == 7276 then op = not bE; ou = if op then 0. else 13 else ou = 7271; continue end elseif ou < 12916 then if ou < 9557 then if ou < 7278. then if ou == 7277 then oq = op:IsA(tL[535]);
+ou = 10 else ou = 7267; continue end elseif ou == 7278. then ou = if op then 18. else 5 else break end else break end else break end end end end, function() local tu = nil; tu = 3.; while true do tu = 3779 - tu; do if tu < 3775 then if tu < 3772 then if tu < 3771. then
+if tu < 3770 then if tu < 1599. then break elseif tu < 3346 then break elseif tu < 3769 then break else tu = if isOn(tL[300.]) then 8 else 1 end else tu = if true then 2 else 4 end else local t6 = tL; t6[740](mk); local t7 = t6[492.][t6[984.]]; t6[66.](t6[844]);
+tu = 0. end elseif tu < 3774. then if tu < 3773 then break elseif tu == 3773 then tu = 9. else tu = 3774.; continue end elseif tu == 3774. then tu = 4 else tu = 1520; continue end elseif tu < 3779 then if tu < 3778 then if tu < 3776 then if tu == 3775 then
+tu = 7 else tu = 11873; continue end elseif tu < 3777. then tu = 9. elseif tu == 3777. then tu = if not lG[tL[269]] then 10 else 5 else tu = 8605; continue end elseif tu == 3778 then local t8 = tL[492.][tL[984.]]; tL[66.](tL[268]); tu = 0. else tu = 7195; continue
+end elseif tu < 5654 then if tu == 3779 then tu = 6. else break end else break end end end end, "Continuously buys selected upgrades", "vdctpg", "circle-help", function() local oU, oV, oW, oX, oY, o_, o0, o1, o2, o3 = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local oZ = nil; oZ = 8; while true do oZ = 10379 - oZ; do if oZ < 10368. then if oZ < 10364 then if oZ < 10362. then if oZ < 10361 then if oZ < 10360 then break elseif oZ == 10360 then o1 += tL[268]; oZ = 0. else oZ = 1514; continue end else oX = mx(oV[tL[215]]);
+oZ = 7 end elseif oZ < 10363 then if oZ == 10362. then oV = oY > tL[143]; oZ = 9. else oZ = 10378; continue end else oZ = 5 end elseif oZ < 10366 then if oZ < 10365. then if oZ == 10364 then oU[oX] = math.min(oU[oX], oY); oZ = 13 else oZ = 13129; continue end
+else oZ = if oU[oX] then 15. else 4 end elseif oZ < 10367 then if oZ == 10366 then oZ = 16 else oZ = 1755.; continue end else oW = oV:GetChildren(); oV = #oW; o1 = tL[268]; o_ = oV; oZ = 0. end elseif oZ < 10375 then if oZ < 10373 then if oZ < 10371. then if oZ < 10369 then
+return oU elseif oZ < 10370 then break elseif oZ == 10370 then oZ = if oV then 14 else 16 else oZ = 4400; continue end elseif oZ < 10372 then if oZ == 10371. then oU = {}; oV = mi(); oZ = if not oV then 3. else 12. else oZ = 4400; continue end else oZ = if oX then 2 else 5
+end elseif oZ < 10374. then o2 = o1; oZ = 1 elseif oZ == 10374. then oZ = 19 else oZ = 1203.; continue end elseif oZ < 10379 then if oZ < 10378 then if oZ < 10376 then oU[oX] = oY; oZ = 13 elseif oZ < 10377. then return oU elseif oZ == 10377. then oX = ma(oV);
+oY = lE(oV); oV = oX; oZ = if oV then 17 else 9. else oZ = 10361; continue end else o3 = o2; oV = oW[o3]; oX = (oV:IsA(tL[203])); oZ = if oX then 18. else 7 end elseif oZ < 13129 then if oZ == 10379 then oZ = if o1 <= o_ then 6. else 11 else oZ = 10365.; continue
+end else break end end end end, 628, 1.5, 3860, "fiyxdvt", "Options", "vvkgkyocsl", "Roll", "If nothing is selected, all rarities pass", "Join Discord to Stay Updated", "SBOX", 8200834, "mcuzglstw", "money", 1642, "xvkh", 3.14159, 877, "defer", 2291, 9., coroutine.status,
+"Method", 1667309890, "Join Discord for Keyless Scripts", "GridW", "The Discord has ready made configs, dupe methods, giveaways, and early access to new scripts.", "JobId", "%.1fSx", "Player", 7979586., "How do I make suggestions?", "eoafmmaylq", "CFrame",
+function() local tG = nil; local tH = nil; tH = 1; while true do tH = 11871. - tH; do if tH < 11433. then break elseif tH < 11870 then if tH < 11868. then break elseif tH < 11869 then tL[992](tL[606.]); tH = 2 else break end elseif tH < 13417 then if tH < 11871. then
+m0:Disconnect(); mK:Disconnect(); l1:Disconnect(); ml:Disconnect(); l9:Disconnect(); me = false; mb = false; l8 = false; l4 = false; tG = mc(); tH = if tG then 0. else 3. elseif tH == 11871. then tG[tL[369.]] = false; tG[tL[904]] = tL[315.]; tG[tL[352]] = tL[221];
+tH = 3. else break end else break end end end end, "ggo", "nst", 3616, "Auto Roll Characters", "tknwwmkvfrhc", 28, "ybtof", "Parent", "ykw", "iggohgzfhvc", 3484760773, 1000000000, "mtvgxmeo", 591., "FAQ", 2232., "spawn", "KeybindMenuOpen", 108., function()
+local tv, tw, tx, tz, tA, tB, tD = nil, nil, nil, nil, nil, nil, nil; local ty = nil; ty = 11; while true do ty = 7291 - ty; do if ty < 7286 then if ty < 7284. then if ty < 7282 then if ty < 7277 then break elseif ty < 7279 then if ty < 7278. then tv = mN[tL[553]];
+ty = if tv then 13 else 3. elseif ty == 7278. then tv = mN[tL[553]][tL[232]]; ty = 3. else ty = 7289; continue end elseif ty < 7280 then if ty == 7279 then local t9 = tL[492.][tL[984.]]; tL[66.](tL[891.]); ty = 0. else ty = 4815.; continue end elseif ty < 7281. then
+if ty == 7280 then ty = 10 else ty = 7279; continue end elseif ty == 7281. then ty = if true then 5 else 4 else ty = 11194; continue end elseif ty < 7283 then tx = tw; ty = 2 elseif ty == 7283 then ty = if isOn(tL[476]) then 14 else 12. else ty = 3289; continue
+end elseif ty < 7285 then break elseif ty == 7285 then ty = 10 else ty = 7283; continue end elseif ty < 7290. then if ty < 7288 then if ty < 7287. then ty = if not lG[tL[269]] then 8 else 1 elseif ty == 7287. then ty = 7 else ty = 12705.; continue end elseif ty < 7289 then
+tw = {}; tx = tv; ty = if tx then 2 else 9. elseif ty == 7289 then tv = tx; tA = false; for h5, h6 in tL[504.](tv) do tB = h5; tD = h6; local tC = tB; local tE = tD; local tz = nil; tz = tL[396.]; while true do if tz < 6. then if tz < 3. then if tz < 1 then
+break elseif tz < 2 then tz = tL[954.] else tv = lM[tC]; tw = tv; tz = if tw then tL[47] else tL[27.] end elseif tz < 4 then tv = not isOn(tL[476]); tz = tL[844] elseif tz < 5 then tz = if tw then tL[249.] else tL[268] else tL[740](mz[tL[459.]], mz, tv[tL[365]]);
+local ua = tL[492.][tL[984.]]; tL[66.](tL[81.]); tz = tL[268] end elseif tz < 9. then if tz < 7 then tz = tL[204.] elseif tz < 8 then tz = if tE then tL[140] else tL[954.] else tA = true; tz = tL[143] end elseif tz < 11 then if tz < 10 then tv = lG[tL[269]];
+tz = if tv then tL[844] else tL[817] else tz = if tv then tL[682] else tL[594.] end elseif tz < 12. then tw = tv[tL[365]]; tz = tL[27.] else tz = tL[143] end end; if tA then break end end; local ub = tL[492.][tL[984.]]; tL[66.](tL[891.]); ty = 0. else ty = 10294;
+continue end elseif ty < 7331 then if ty < 7291 then if ty == 7290. then ty = 4 else ty = 12705.; continue end elseif ty == 7291 then ty = 6. else break end else break end end end end, 812, workspace, "user", "hvtqyd", function() local rH, rI, rK, rL, rM = nil, nil, nil, nil, nil;
+local rJ = nil; rJ = 4; while true do rJ = 15776 - rJ; do if rJ < 14542 then break elseif rJ < 15773 then if rJ < 15771. then break elseif rJ < 15772 then rH = rI:WaitForChild(tL[665], tL[249.]); rJ = 1 elseif rJ == 15772 then local uc = tL; rH = mu[uc[731]];
+rM = if rH then uc[268] else uc[143]; rK = uc[632] * rM + uc[188] * (uc[268] - rM); rL = uc[774.] * rM + uc[395] * (uc[268] - rM); rJ = if (rK * uc[355] + rL * uc[250] + rK * rL) % uc[131] == uc[908] then 0. else 3. else rJ = 10752.; continue end elseif rJ < 15775 then
+if rJ < 15774. then rH = mu[tL[343]]:Wait(); rJ = 0. else break end elseif rJ < 15776 then return rH elseif rJ == 15776 then rI = rH; rH = (rI:FindFirstChild(tL[665])); rJ = if rH then 1 else 5 else rJ = 15771.; continue end end end end, 70, 15., "kiafdroh",
+"ocnsa", "aaor", "Join the Discord, updates and support are posted there first.", "results", "Tool", 2297, "ztvpd", "A", "inline", "data", 31, "ujtgdco", 1427, "maxglx", function() local sL, sN, sO, sP = nil, nil, nil, nil; local sM = nil; sM = 1; while true do
+sM = 9301 - sM; do if sM < 9298 then if sM < 5940. then break elseif sM < 8486 then break elseif sM < 9296 then break elseif sM < 9297. then if sM == 9296 then sL[tL[352]] = tL[221]; sM = 3. else sM = 9300.; continue end else break end elseif sM < 10697 then
+if sM < 9300. then if sM < 9299 then if sM == 9298 then sM = 2 else sM = 5014; continue end else sM = 4 end elseif sM < 9301 then sP = if not isOn(tL[18.]) then tL[268] else tL[143]; sN = tL[602] * sP + tL[424] * (tL[268] - sP); sO = tL[517] * sP + tL[539] * (tL[268] - sP);
+sM = if (sN * tL[288.] + sO * tL[271] + sN * sO) % tL[131] == tL[139] then 0. else 2 elseif sM < 9830 then if sM == 9301 then sL = mc(); sM = if sL then 5 else 3. else break end else break end else break end end end end, 1320252397, "ClaimRarities", function(bd)
+local n7 = nil; n7 = 2; while true do n7 = 10720 - n7; do if n7 < 10719. then if n7 < 9466 then break elseif n7 < 10717 then break elseif n7 < 10718 then if n7 == 10717 then return nil else n7 = 11795; continue end elseif n7 == 10718 then n7 = if not bd then 3. else 0.
+else n7 = 12846.; continue end elseif n7 < 11795 then if n7 < 10720 then break elseif n7 < 11703. then if n7 == 10720 then return mM[mG(bd)] else break end else break end else break end end end end, 3418330, function(fe, ff) return string.format(tL[708.], ff, fe)
+end, "InvokeServer", "qlgkozxhqkxc", 1070955., "Rebirth Amount", 2611, 9226847, 1684, "azfxnimy", "mypjgr", "mtvohp", 1198, "number", 3011546376., "onahztsyu", "qhmqxmnpw", "...", "NotifySide", "AutoBuyUpgrades", 1550, "xfdn", "Uncommon", "ccfvi", "ClaimRoll",
+"BaseIncome", function() local s1, s2, s3, s4, s5, s6, s7, s8, s9, tb, tc, td, te, tf, tg, th, ti, tj, tk, tl = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local ta = nil; ta = 29; while true do ta = 14003 - ta;
+do if ta < 13981 then if ta < 13967 then if ta < 13965. then if ta < 13961 then if ta < 6871 then break elseif ta < 9474. then break elseif ta < 13959. then break elseif ta < 13960 then if ta == 13959. then s9 = tostring(s1) .. tL[973] .. tostring(s2) .. tL[76] .. tostring(mj[tL[401]]) .. tL[299] .. tostring(mj[tL[890]]);
+lF:SetText(lQ(tL[666.], s9, mO)); ta = 8 else ta = 14002; continue end else s9 = tL[748]; ta = 32 end elseif ta < 13963 then if ta < 13962. then if ta == 13961 then ta = if (tj * tL[120.] + tk * tL[599] + tj * tk) % tL[131] == tL[499] then 5 else 30. else ta = 6935;
+continue end else s2 = s1; ta = if s2 then 18. else 11 end elseif ta < 13964 then if ta == 13963 then s2 = s1; tl = if s2 then tL[268] else tL[143]; tj = tL[934] * tl + tL[826] * (tL[268] - tl); ta = 23 else ta = 13984; continue end elseif ta == 13964 then
+s5 = s5 + s6; ta = 17 else ta = 13960; continue end elseif ta < 13966 then s2 = tL[254]; ta = 15. elseif ta == 13966 then ta = if td <= tb then 6. else 24. else ta = 13964; continue end elseif ta < 13975 then if ta < 13974. then if ta < 13970 then if ta < 13968. then
+if ta == 13967 then ta = if s1 then 4 else 16 else ta = 13977.; continue end elseif ta < 13969 then if ta == 13968. then s1 = s8[tL[253]] .. tL[833] .. s8[tL[516.]] .. tL[670] .. tostring(s8[tL[199]]) .. tL[69.]; ta = 41 else ta = 13961; continue end elseif ta == 13969 then
+s9 = lW; ta = if s9 then 32 else 43 else ta = 14813; continue end elseif ta < 13972 then if ta < 13971. then if ta == 13970 then s1 = m2[tL[700]]; ta = 20 else ta = 14003; continue end else lJ:SetText(lQ(tL[197], tostring(s9), mT)); ta = 26 end elseif ta < 13973 then
+ta = if s9 then 34 else 26 else s2 = tL[254]; ta = 5 end else lO(); s1 = mi(); s2 = mu:GetAttribute(tL[701]); s3 = l7(); s4 = lZ(); s5 = tL[143]; s6 = #s3; td = tL[268]; tb = s6; ta = 37 end elseif ta < 13978 then if ta < 13976 then if ta == 13975 then s9 = lF[tL[700]];
+ta = 19 else ta = 6935; continue end elseif ta < 13977. then s1 = s7[tL[253]] .. tL[961] .. tostring(s7[tL[199]]) .. tL[69.]; ta = 40 else s9 = lF; ta = if s9 then 28 else 19 end elseif ta < 13979 then s2 = s1; ta = if s2 then 15. else 38 elseif ta < 13980. then
+s6, s7 = lU(s3); s8 = s4[tL[268]]; s9 = lJ; ta = if s9 then 3. else 31 elseif ta == 13980. then tk = tL[424] * tl + tL[287] * (tL[268] - tl); ta = 42. else ta = 13970; continue end elseif ta < 13994 then if ta < 13987 then if ta < 13984 then if ta < 13982 then
+s1 = s6[tL[253]] .. tL[961] .. tostring(s6[tL[199]]) .. tL[69.]; ta = 25 elseif ta < 13983. then s1 = mZ[tL[700]]; ta = 36. else ta = if s1 then 12. else 0. end elseif ta < 13985 then if ta == 13984 then ta = if s9 then 7 else 8 else ta = 13967; continue end
+elseif ta < 13986. then s1 = s2; mZ:SetText(lQ(tL[736], tostring(#s4) .. tL[975.] .. s1, mO)); ta = 16 else td += tL[268]; ta = 37 end elseif ta < 13990 then if ta < 13988 then ta = 1 elseif ta < 13989. then if ta == 13988 then s1 = s7; s6 = s2; ta = if s1 then 27. else 40
+else ta = 6871; continue end else s1 = s9; ta = if s1 then 44 else 2 end elseif ta < 13992. then if ta < 13991 then s9 = s1[tL[215]]; ta = 14 elseif ta == 13991 then s1 = s6; ta = if s1 then 22 else 25 else ta = 13994; continue end elseif ta < 13993 then s2 = tL[254];
+ta = 18. elseif ta == 13993 then s6 = tL[143]; ta = 39. else ta = 13986.; continue end elseif ta < 13998. then if ta < 13996 then if ta < 13995. then tf = te; s6 = (tonumber(s3[tf][tL[199]])); ta = if s6 then 39. else 10 else s1 = m2; ti = if s1 then tL[268] else tL[143];
+tg = tL[556] * ti + tL[760] * (tL[268] - ti); th = tL[272] * ti + tL[703] * (tL[268] - ti); ta = if (tg * tL[793] + th * tL[99.] + tg * th) % tL[131] == tL[259] then 33. else 20 end elseif ta < 13997 then s9 = s1; ta = if s9 then 13 else 14 elseif ta == 13997 then
+te = td; ta = 9. else ta = 13975; continue end elseif ta < 14001. then if ta < 13999 then s1 = s2; s2 = tostring(#s3) .. tL[901] .. mp(s5) .. tL[975.] .. s6 .. tL[220] .. s1; m2:SetText(lQ(tL[362], s2, mO)); ta = 0. elseif ta < 14000 then if ta == 13999 then
+s1 = s8; ta = if s1 then 35 else 41 else ta = 14002; continue end elseif ta == 14000 then s9 = lJ[tL[700]]; ta = 31 else ta = 13970; continue end elseif ta < 14003 then if ta < 14002 then if ta == 14001. then s1 = tL[1010]; ta = 44 else ta = 13992.; continue
+end else break end elseif ta < 14813 then if ta == 14003 then s1 = mZ; ta = if s1 then 21. else 36. else ta = 13988; continue end else break end end end end, "Searchable", 2196., workspace.CurrentCamera, "How do I import / export configs?", game.PlaceId, "Characters",
+16073366, "icvgaorvw", task, 521, 3254, "nawok", 52, 3343, "title", 13906707., "Idled", "lrngth", "msg", "ClaimCharacters", pairs, "nfzvqunqozk", "Multi", "jarjhdpofudb", "icms", "MaxLevel", "vmLoop", 1086., "qjdabmjnx", "MobileButtonSide", coroutine.create,
+"Continuously rebirths using DoRebirth remote", "rarity", 651., function(fa, fb) local rZ, r_, r0 = nil, nil, nil; local rY = nil; rY = 4; while true do rY = 8489 - rY; do if rY < 8484. then if rY < 7869. then break elseif rY < 8482 then if rY < 8481. then
+break else setclipboard(fa); rY = 5 end elseif rY < 8483 then if rY == 8482 then rY = if toclipboard then 3. else 2 else rY = 8487.; continue end else break end elseif rY < 8488 then if rY < 8486 then if rY < 8485 then if rY == 8484. then lG:Notify(fb); rY = 6.
+else rY = 8483; continue end else r0 = if setclipboard then tL[268] else tL[143]; rZ = tL[32] * r0 + tL[309.] * (tL[268] - r0); rY = 0. end elseif rY < 8487. then toclipboard(fa); rY = 2 else rY = 5 end elseif rY < 10299. then if rY < 8489 then if rY == 8488 then
+rY = if (rZ * tL[176] + r_ * tL[712] + rZ * r_) % tL[131] == tL[461] then 8 else 7 else rY = 14754.; continue end elseif rY == 8489 then r_ = tL[142] * r0 + tL[633.] * (tL[268] - r0); rY = 1 else break end else break end end end end, 3404, "cctcdpfv", "HttpService",
+71081189, 32, 122867503, "https://rscripts.net/@_Hersheyz", 104, "odd", "ygztfdylu", "yvmhtdit", 231., "Auto Equip Best", "aalyhi", "hrrx", "fyobhbrzjebh", "BasePart", 2652., "Rarity", 349537448, 2380, "mmdwhpcnbx", "new", "ysfxoew", "asj", "LeftControl", "MoneyPerTick",
+"sqrpdutf", "Body", 884, "hvghkuqyga", "jecktou", "}", "Players", "SelectedUpgrades", "fssl", 7404356, 3496, "bvessex", "Icon", "EX.GOD", "wpwgbv", "Plots", "vwtbmu", "Last Roll", 2127., "Backpack", "75%", "dice-6", "for", "PrimaryPart", 65, 3285., "D", "Status",
+1023., 11303615, 3787, "Copied join script to clipboard", 3167, "ToggleKeybind", 1000000000000000000000, function(e5, e6) local rS, rT, rV, rW, rX = nil, nil, nil, nil, nil; local rU = nil; rU = 3.; while true do rU = 5497 - rU; do if rU < 5495 then if rU < 5083 then
+break elseif rU < 5493. then if rU < 5492 then break elseif rU == 5492 then local ud = tL; rT = (tonumber(rS[ud[232]])); rX = if rT then ud[268] else ud[143]; rV = ud[129.] * rX + ud[380] * (ud[268] - rX); rW = ud[725] * rX + ud[70] * (ud[268] - rX); rU = if (rV * ud[794] + rW * ud[848] + rV * rW) % ud[131] == ud[490] then 2 else 0.
+else rU = 7556; continue end elseif rU < 5494 then break elseif rU == 5494 then rS = mN[e5]; rU = if type(rS) ~= tL[884] then 1 else 5 else rU = 9458; continue end elseif rU < 7556 then if rU < 5497 then if rU < 5496. then return rT else return e6 end elseif rU < 5565. then
+if rU == 5497 then rT = e6; rU = 2 else rU = 7556; continue end else break end else break end end end end, "qsvafph", function(a2) local n0, n1 = nil, nil; local n2 = nil; n2 = 4; while true do n2 = 15980 - n2; do if n2 < 15975. then break elseif n2 < 15978. then
+if n2 < 15976 then n2 = if n1 then 3. else 0. elseif n2 < 15977 then n0 = mu[tL[731]]; n1 = n0; n2 = if n1 then 1 else 5 else n0[tL[665]][tL[409]] = tL[184][tL[541]](a2); n2 = 0. end elseif n2 < 15979 then break elseif n2 < 15980 then if n2 == 15979 then n1 = n0:FindFirstChild(tL[665]);
+n2 = 5 else n2 = 7808; continue end elseif n2 == 15980 then n2 = 2 else n2 = 15978.; continue end end end end, "jwucamsjwie", function(ee) local rb, rc, rd, re, rf, rg, ri, rj, rk = nil, nil, nil, nil, nil, nil, nil, nil, nil; local rh = nil; rh = 10; while true do
+rh = 13018 - rh; do if rh < 13010 then if rh < 6135. then break elseif rh < 13007 then break elseif rh < 13008. then rh = if re then 8 else 0. elseif rh < 13009 then if rh == 13008. then rb = l0(); rc = lV(); rd = mP(rb); re = mP(rc); rf = not re; rg = not rd;
+rk = if rg then tL[268] else tL[143]; ri = tL[783.] * rk + tL[216.] * (tL[268] - rk); rj = tL[858.] * rk + tL[530] * (tL[268] - rk); rh = if (ri * tL[218] + rj * tL[390.] + ri * rj) % tL[131] == tL[387.] then 9. else 5 else rh = 13007; continue end else rg = rf;
+rh = 5 end elseif rh < 13015 then if rh < 13012 then if rh < 13011. then if rh == 13010 then rf = rc[tostring(ee)] == true; rh = 0. else rh = 5625.; continue end else break end elseif rh < 13013 then if rh == 13012 then return rb else rh = 2078; continue end
+elseif rh < 13014. then rh = if rg then 2 else 3. else rb = rf; rh = 6. end elseif rh < 13017. then if rh < 13016 then rf = true; rg = true; rh = if rd then 1 else 11 else return true end elseif rh < 13018 then if rh == 13017. then rg = rb[mg(ee)] == true;
+rh = 11 else rh = 13014.; continue end elseif rh < 15764 then if rh == 13018 then rb = rg; rk = if rb then tL[268] else tL[143]; ri = tL[918.] * rk + tL[379] * (tL[268] - rk); rj = tL[611] * rk + tL[167] * (tL[268] - rk); rh = if (ri * tL[909.] + rj * tL[974] + ri * rj) % tL[131] == tL[277] then 4 else 6.
+else break end else break end end end end, function() local tt = nil; tt = 4; while true do tt = 8338 - tt; do if tt < 8334. then if tt < 8332 then if tt < 8330 then if tt < 8329 then if tt < 6570. then break elseif tt < 8328. then break elseif tt == 8328. then
+tt = 3. else tt = 9012.; continue end else l8 = false; local ue = tL[492.][tL[984.]]; tL[66.](tL[891.]); tt = 6. end elseif tt < 8331. then if tt == 8330 then tt = 1 else tt = 8337.; continue end else tt = if isOn(tL[755]) then 2 else 9. end elseif tt < 8333 then
+if tt == 8332 then tt = 10 else tt = 9012.; continue end elseif tt == 8333 then tt = if not lG[tL[269]] then 7 else 0. else tt = 15489.; continue end elseif tt < 8337. then if tt < 8336 then if tt < 8335 then tt = 3. else tt = if true then 5 else 8 end elseif tt == 8336 then
+l8 = true; local uf = tL; uf[740](mC); local ug = uf[492.][uf[984.]]; uf[66.](uf[649]); tt = 6. else tt = 8332; continue end elseif tt < 9012. then if tt < 8338 then break elseif tt == 8338 then tt = 8 else tt = 6570.; continue end else break end end end end,
+"sajiuagpmb", " (Max: ", 23, "LEGENDARY", "ReplicatedStorage", "Equip Best", 116700050, 7, "wskavlgwu", "ksexiyjqira", task.defer, "hkdhbvhye", 2177, "Join the Discord, the guide is pinned and people share config links daily.", 5448625, 1916, "dhkvws", "hpwny",
+"ijrhyf", "IBdihP Hub - Become an Anime Billionaire v1.0 unloaded!", "gau", "mutation", 82, "KeybindFrame", 1696, "IBdihP Hub", "Claim Rarity Filter", "tool", "kxvdp", "footprint", 3200, "embeds", "Copy join script (Job ID)", "nmqgqvyalm", "Title", "Auto Buy Upgrades",
+"foe", 63., "zero", 930., "Rare", "Earnings", "Unload", Vector2.new, "star", 3240., 2160., "eukvgft", 1432, "CharId", "Every script in the hub is keyless. No key systems, no checkpoints, no linkvertise.", "IBdihPHub/BecomeAnAnimeBillionaire", "muozg", 3., "Gamepad1",
+"Become an Anime Billionaire", 1752., 3265, "ueow", function() lH = tick() end, "dcnptykacrn", 3125, 0.05, function() local sp, sr, ss, st = nil, nil, nil, nil; local sq = nil; sq = 1; while true do sq = 5090 - sq; do if sq < 5088. then if sq < 5084 then if sq < 4266. then
+break elseif sq < 5083 then break else return end elseif sq < 5086 then if sq < 5085. then sq = if isOn(tL[67]) then 2 else 4 else sq = 4 end elseif sq < 5087 then if sq == 5086 then sq = 0. else sq = 1584.; continue end elseif sq == 5087 then sp:ChangeState(tL[730][tL[709]][tL[45.]]);
+sq = 5 else sq = 5084; continue end elseif sq < 12438. then if sq < 5090 then if sq < 5089 then sp = mc(); local uh = tL; st = if sp then uh[268] else uh[143]; sr = uh[576.] * st + uh[100] * (uh[268] - st); ss = uh[77] * st + uh[502] * (uh[268] - st); sq = if (sr * uh[89] + ss * uh[290] + sr * ss) % uh[131] == uh[141.] then 3. else 5
+elseif sq == 5089 then sq = if lG[tL[269]] then 7 else 6. else sq = 5088.; continue end else break end else break end end end end, "myqyfc", "Remotes", "challenge", "none", "circle-user", 24., "MysticGod", "muv", function() local sB, sD, sE, sF = nil, nil, nil, nil;
+local sC = nil; sC = 2; while true do sC = 3066. - sC; do if sC < 8191 then if sC < 3063. then if sC < 3061 then break elseif sC < 3062 then sB[tL[369.]] = false; sC = 4 elseif sC == 3062 then sC = 1 else sC = 2443; continue end elseif sC < 3065 then if sC < 3064 then
+break elseif sC == 3064 then local ui = tL; sF = if not isOn(ui[236]) then ui[268] else ui[143]; sD = ui[780.] * sF + ui[648.] * (ui[268] - sF); sE = ui[846.] * sF + ui[880] * (ui[268] - sF); sC = if (sD * ui[186.] + sE * ui[25] + sD * sE) % ui[131] == ui[406] then 0. else 1
+else sC = 2372; continue end elseif sC < 3066. then if sC == 3065 then sC = 3. else sC = 10044.; continue end elseif sC == 3066. then sB = mc(); sC = if sB then 5 else 4 else break end else break end end end end, "zeorfpzgijh", "ogoc", "Fly Speed", "eqiy",
+"vicojxwkef", "HumanoidRootPart", "Plot", "Essential", "iklocup", 3134, "] (", "DPI Scale", "CornerRadius", 18., "prwzn", 3724, 2016., "Default", "tqwipwchk", 2179092., "fuuq", 1061, function(bh) local n8, n9, oa = nil, nil, nil; local ob = nil; ob = 6.; while true do
+ob = 16082 - ob; do if ob < 16076 then if ob < 11524 then break elseif ob < 14887 then break elseif ob < 16075 then break else oa = n8[tL[215]]; ob = if oa then 0. else 1 end elseif ob < 16079 then if ob < 16077. then if ob == 16076 then n8 = lR(bh); n9 = n8;
+ob = if n9 then 7 else 4 else ob = 16082; continue end elseif ob < 16078 then if ob == 16077. then return n8 else ob = 2715.; continue end elseif ob == 16078 then n8 = n9; ob = if n8 then 5 else 3. else ob = 9770; continue end elseif ob < 16081 then if ob < 16080. then
+n8 = tostring(bh); ob = 5 else break end elseif ob < 16082 then if ob == 16081 then oa = bh; ob = 0. else ob = 11524; continue end else n9 = tostring(oa); ob = 4 end end end end, "part", "UserInputType", 95, 3988, "fylh", "JumpRequest", "Menu", "Min", "EPIC",
+"50%", 442, function() local nN, nO, nP, nQ, nS, nT, nU = nil, nil, nil, nil, nil, nil, nil; local nR = nil; nR = 1; while true do nR = 8183 - nR; do if nR < 8169. then if nR < 8159 then if nR < 5492 then break elseif nR < 7253 then break elseif nR < 7926. then
+break elseif nR < 8158 then break else nR = 19 end elseif nR < 8164 then if nR < 8161 then if nR < 8160. then nR = 16 elseif nR == 8160. then nR = if fluxus then 0. else 18. else nR = 8171; continue end elseif nR < 8162 then nP = type(nN) == tL[773]; nR = if nP then 9. else 6.
+elseif nR < 8163. then nQ = nP; nR = 7 else nN = nO; nR = 3. end elseif nR < 8166. then if nR < 8165 then nR = 24. elseif nR == 8165 then nR = if KRNL_LOADED then 11 else 13 else nR = 8174; continue end elseif nR < 8167 then nN = nP; nR = if nN then 3. else 20
+elseif nR < 8168 then nR = 2 elseif nR == 8168 then mq = tL[56]; nR = 25 else nR = 16068.; continue end elseif nR < 8179 then if nR < 8174 then if nR < 8171 then if nR < 8170 then break elseif nR == 8170 then nR = if pebc_execute then 15. else 25 else nR = 8173;
+continue end elseif nR < 8172. then nR = if syn then 10 else 23 elseif nR < 8173 then mq = tL[896]; nR = 19 elseif nR == 8173 then mq = tL[219.]; nR = 16 else nR = 5492; continue end elseif nR < 8176 then if nR < 8175. then nP = nN ~= tL[10]; nR = 6. elseif nR == 8175. then
+nP = nO .. tL[996.] .. nN; nR = 17 else nR = 8165; continue end elseif nR < 8177 then nR = if nQ then 22 else 4 elseif nR < 8178. then if nR == 8177 then nR = if nP then 8 else 17 else nR = 12250; continue end else nO, nN = identifyexecutor(); nP = nO ~= tL[10];
+nQ = type(nO) == tL[773]; nR = if nQ then 21. else 7 end elseif nR < 8631. then if nR < 8181. then if nR < 8180 then if nR == 8179 then nR = 2 else nR = 8182; continue end elseif nR == 8180 then mq = nN; nR = 4 else nR = 8166.; continue end elseif nR < 8182 then
+nR = 14 elseif nR < 8183 then nU = if identifyexecutor then tL[268] else tL[143]; nS = tL[811] * nU + tL[313] * (tL[268] - nU); nT = tL[720.] * nU + tL[978.] * (tL[268] - nU); nR = if (nS * tL[321.] + nT * tL[52] + nS * nT) % tL[131] == tL[990.] then 5 else 12.
+elseif nR == 8183 then mq = tL[196]; nR = 24. else nR = 3411.; continue end else break end end end end, "BaseRate", "CoreGui", 22, 14, "Join the Discord and drop it in suggestions, most get added.", "SetText", "PlotIndex", "SecretGod", 1015, "Rscripts", 6.,
+"WalkSpeedEnabled", "Footer", '<font color="%s">%s</font>', "HumanoidStateType", "EX", "gvfr", 160, 400, CFrame.new, function(dv) local qf, qg, qh, qi, qk, ql, qm, qn, qo = nil, nil, nil, nil, nil, nil, nil, nil, nil; local qj = nil; qj = 8; while true do qj = 9760 - qj;
+do if qj < 9755 then if qj < 9752 then if qj < 9749 then if qj < 9747. then if qj < 7231 then break elseif qj < 9746 then break elseif qj == 9746 then qj = if qi then 6. else 7 else qj = 4075; continue end elseif qj < 9748 then break elseif qj == 9748 then
+qi = not qf; qj = if qi then 14 else 4 else qj = 9749; continue end elseif qj < 9750. then if qj == 9749 then qj = if qi then 2 else 12. else qj = 11173; continue end elseif qj < 9751 then if qj == 9750. then return qg, qf else qj = 14157.; continue end elseif qj == 9751 then
+qn = qm; qj = 1 else qj = 9758; continue end elseif qj < 9754 then if qj < 9753. then if qj == 9752 then qg, qf = nil, nil; qh = #dv; qm = tL[268]; qk = qh; qj = 5 else qj = 11173; continue end elseif qj == 9753. then qj = 3. else qj = 9758; continue end elseif qj == 9754 then
+qf = qh; qj = 7 else qj = 9755; continue end elseif qj < 9759. then if qj < 9757 then if qj < 9756. then if qj == 9755 then qj = if qm <= qk then 9. else 10 else qj = 9746; continue end else qi = qh[tL[199]] < qf[tL[199]]; qj = 14 end elseif qj < 9758 then
+qm += tL[268]; qj = 5 else qg = qh; qj = 12. end elseif qj < 11173 then if qj < 9760 then qo = qn; qh = dv[qo]; qi = not qg; qj = if qi then 11 else 0. elseif qj == 9760 then qi = qh[tL[199]] > qg[tL[199]]; qj = 11 else qj = 9753.; continue end else break end
+end end end, "eadsts", 1366, 7714388, 93275783, 1471, "addons/SaveManager.lua", "IBdihP Hub Loaded - Welcome, ", 2738, 1213241560, 1513, "pnwtcyqrs", "akwjw", "UserInputService", "%dm %ds", Enum, "Character", function(gi) local sb, sc, sd = nil, nil, nil; local sa = nil;
+sa = 1; while true do sa = 4437. - sa; do if sa < 4435 then if sa < 1930 then break elseif sa < 2432 then break elseif sa < 4434. then break else lG[tL[610]][tL[238]] = gi; sa = 2 end elseif sa < 4437. then if sa < 4436 then if sa == 4435 then sa = 0. else
+sa = 4437.; continue end elseif sa == 4436 then sd = if lG[tL[610]] then tL[268] else tL[143]; sb = tL[109] * sd + tL[827] * (tL[268] - sd); sc = tL[115] * sd + tL[777.] * (tL[268] - sd); sa = if (sb * tL[574] + sc * tL[686] + sb * sc) % tL[131] == tL[968] then 3. else 2
+else sa = 9443; continue end else break end end end end, 29, function() local sG, sI, sJ, sK = nil, nil, nil, nil; local sH = nil; sH = 5; while true do sH = 5729 - sH; do if sH < 5727. then if sH < 5724. then break elseif sH < 5725 then local uj = tL; sK = if not isOn(uj[706]) then uj[268] else uj[143];
+sI = uj[626] * sK + uj[991] * (uj[268] - sK); sJ = uj[393.] * sK + uj[907] * (uj[268] - sK); sH = if (sI * uj[693.] + sJ * uj[511] + sI * sJ) % uj[131] == uj[679] then 1 else 2 elseif sH < 5726 then if sH == 5725 then sG[tL[904]] = tL[315.]; sH = 3. else sH = 362;
+continue end else sH = 2 end elseif sH < 10053. then if sH < 5728 then if sH == 5727. then sH = 0. else sH = 2774; continue end elseif sH < 5729 then sG = mc(); local uj = tL; sK = if sG then uj[268] else uj[143]; sI = uj[152] * sK + uj[802] * (uj[268] - sK);
+sJ = uj[444.] * sK + uj[1006] * (uj[268] - sK); sH = if (sI * uj[960.] + sJ * uj[536] + sI * sJ) % uj[131] == uj[718] then 4 else 3. else break end else break end end end end, 20, "Inventory", "Auto Rebirth", "Auto Collect Cash", function(cV) local pU, pV, pX, pY, pZ, p_, p0 = nil, nil, nil, nil, nil, nil, nil;
+local pW = nil; pW = 2; while true do pW = 9939. - pW; do if pW < 9935 then if pW < 9929 then if pW < 9928 then if pW < 7983. then break elseif pW < 9382 then break elseif pW < 9927. then break elseif pW == 9927. then p_ = pZ; pW = 1 else pW = 9938; continue
+end else pW = if pZ <= pX then 12. else 5 end elseif pW < 9930. then pZ += tL[268]; pW = 11 elseif pW < 9932 then if pW < 9931 then return pU elseif pW == 9931 then return tL[143] else pW = 9929; continue end elseif pW < 9933. then pU = tL[143]; pW = 9. elseif pW < 9934 then
+break elseif pW == 9934 then local uk = tL; pU = cV:GetAttribute(uk[636.]); pV = m_(pU); pU = (tonumber(pV)); pW = if pU then 9. else 7 else pW = 966.; continue end elseif pW < 9938 then if pW < 9936. then if pW == 9935 then return pV else pW = 9939.; continue
+end elseif pW < 9937 then pW = 10 else pW = if not cV then 8 else 0. end elseif pW < 12849. then if pW < 9939. then if pW == 9938 then p0 = p_; pV = tonumber(cV:GetAttribute(pU[p0])); pW = if pV then 4 else 3. else pW = 12849.; continue end elseif pW == 9939. then
+local uk = tL; pU = { uk[34], uk[153.], uk[482], uk[695], uk[1012], uk[545] }; pV = #pU; pZ = uk[268]; pX = pV; pW = 11 else break end else break end end end end, pcall, "NoUI", 1313, "Uses the game's built-in EquipBest remote to automatically equip your best characters.",
+"skltbzdb", "jtc", "Claims rolled characters that match your rarity/id filters", "Magnitude", "not found", 1130, function() local tR = math.floor; local tS = string.format; local r1, r2 = nil, nil; local r3 = nil; r3 = 10; while true do r3 = 10352 - r3; do
+if r3 < 10346 then if r3 < 10342 then if r3 < 10341. then if r3 < 10340 then if r3 < 6017 then break elseif r3 < 8092 then break elseif r3 < 10339 then break elseif r3 == 10339 then r3 = if r1 < tL[60.] then 8 else 5 else r3 = 10349; continue end else r2 = r1 .. tL[1005.];
+r3 = 11 end else lK:SetText(lQ(tL[113], r2, mT)); r3 = 1 end elseif r3 < 10345 then if r3 < 10344. then if r3 < 10343 then if r3 == 10342 then r3 = 4 else r3 = 13700; continue end else local ul = tL[492.][tL[984.]]; tL[66.](tL[268]); r1 = tR(os[tL[39.]]() - mI);
+r2 = nil; r3 = if r1 < tL[639.] then 12. else 13 end elseif r3 == 10344. then r2 = tS(tL[729.], tR(r1 / tL[639.]), r1 % tL[639.]); r3 = 6. else r3 = 13700; continue end else r3 = if not lG[tL[269]] then 9. else 3. end elseif r3 < 10349 then if r3 < 10348 then
+if r3 < 10347. then r3 = 11 elseif r3 == 10347. then r2 = tS(tL[291.], tR(r1 / tL[60.]), tR(r1 % tL[60.] / tL[639.])); r3 = 6. else r3 = 10350.; continue end elseif r3 == 10348 then r3 = if true then 7 else 2 else r3 = 12479; continue end elseif r3 < 10352 then
+if r3 < 10350. then r3 = 2 elseif r3 < 10351 then r3 = 0. elseif r3 == 10351 then r3 = 4 else r3 = 2194; continue end else break end end end end, 10424845, "sparkles", "-", "Rebirth", "AutoCollect", "dibrja", "xdlcqt", function() local nY, nZ = nil, nil; local n_ = nil;
+n_ = 0.; while true do n_ = 7751 - n_; do if n_ < 7746. then break elseif n_ < 7750 then if n_ < 7748 then if n_ < 7747 then if n_ == 7746. then return nil else n_ = 7747; continue end elseif n_ == 7747 then return nZ:FindFirstChild(tL[666.] .. tostring(nY))
+else n_ = 7750; continue end elseif n_ < 7749. then break else nZ = mY:FindFirstChild(tL[561.]); n_ = if not nZ then 5 else 4 end elseif n_ < 9297. then if n_ < 7751 then if n_ == 7750 then return nil else n_ = 1873; continue end elseif n_ == 7751 then nY = mu:GetAttribute(tL[701]);
+n_ = if not nY then 1 else 2 else break end else break end end end end, "#6ec1ff", 397, "jkablddc", "RenderStepped", "Show Keybind Menu", "NoClip", "hvvjnf", "Copied Rscripts profile to clipboard", "hki", function() mf = false end, "dhy", "#e8a34d", function(bn)
+local oc, od, oe = nil, nil, nil; local of = nil; of = 7; while true do of = 13120 - of; do if of < 13115 then if of < 12670 then break elseif of < 13113. then break elseif of < 13114 then oc = lR(bn); od = oc; of = if od then 4 else 3. else oc = tL[97]; of = 0.
+end elseif of < 13119. then if of < 13117 then if of < 13116. then if of == 13115 then oe = tL[97]; of = 2 else of = 6626; continue end else oe = oc[tL[537.]]; of = if oe then 2 else 5 end elseif of < 13118 then if of == 13117 then oc = od; of = if oc then 0. else 6.
+else of = 12345.; continue end elseif of == 13118 then od = tostring(oe); of = 3. else of = 6626; continue end elseif of < 13243 then if of < 13120 then break elseif of == 13120 then return oc else break end else break end end end end, "^Placed_", "string",
+3108., "Callback", 61, 2952., 3581026, "ajvjdpnt", 382, "hakhq", "%.1fM", 3516., "txvln", 124694617, "noey", "#8b93a3", 300., "tcib", 1999, 589, "Stepped", 3114., 3487, "lcgtyarnw", "200%", "fmacmuv", "yfiibt", "ItemUid", "Spams RollCharacters as fast as the server allows",
+"text", 1842., "excfsxf", "IBdihPHub", "fields", 839, "refresh-cw", "rayrviatezy", function(fy) local fz = fy:AddLeftGroupbox(tL[189.], tL[1009], true, false, true); fz:AddButton({ [tL[334]] = tL[385], [tL[930.]] = mt }); fz:AddButton({ [tL[334]] = tL[400],
+[tL[930.]] = mt }) end, "Keyless", 3520, "xlxzm", "unpwzwrurkv", 3902, function() local rE, rF = nil, nil; local rG = nil; rG = 3.; while true do rG = 9604 - rG; do if rG < 9602 then if rG < 6602 then break elseif rG < 8128 then break elseif rG < 9601 then
+break else rE = mu[tL[731]]; rF = rE; rG = if rF then 1 else 2 end elseif rG < 13920. then if rG < 9604 then if rG < 9603. then return rF elseif rG == 9603. then rF = rE:FindFirstChildOfClass(tL[831.]); rG = 2 else rG = 16149.; continue end else break end else
+break end end end end, "nooutc", 3., "iwdtzdwyzv", 2730117355, 826, 1507, "qffzyl", "scanning...", "cwvphrg", 4056390207., 2139., 2841., function() local tF = nil; tF = 6.; while true do tF = 12627. - tF; do if tF < 12626 then if tF < 12624. then if tF < 12622 then
+if tF < 8772. then break elseif tF < 12620 then break elseif tF < 12621. then if tF == 12620 then tF = 5 else tF = 13772; continue end elseif tF == 12621. then tF = 2 else tF = 854; continue end elseif tF < 12623 then break else tF = 7 end elseif tF < 12625 then
+local um = tL[492.][tL[984.]]; local un = tL; un[66.](un[140]); un[740](l5); tF = 0. else tF = if true then 1 else 7 end elseif tF < 12981. then if tF < 12627. then if tF == 12626 then tF = if not lG[tL[269]] then 3. else 4 else tF = 12625; continue end elseif tF == 12627. then
+tF = 2 else tF = 12621.; continue end else break end end end end, "KeyCode", "function", "Humanoid", 1473528., " [", "100%", "cbqc", "Auto Claim Rolled Characters", function() local qU, qV, qW, qX, qZ, q_, q0, q1, q2 = nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local qY = nil; qY = 16; while true do qY = 4407. - qY; do if qY < 4400 then if qY < 4394 then if qY < 4393 then if qY < 4390 then if qY < 4388 then break elseif qY < 4389. then if qY == 4388 then qW = qV:FindFirstChild(tL[665]); qY = 11 else qY = 4390; continue
+end else q2 = q1; qW = qU[q2][tL[643]]:FindFirstChild(tL[744.]); qX = qW; qY = if qX then 0. else 8 end elseif qY < 4391 then break elseif qY < 4392. then qU = mU(); qY = if #qU == tL[143] then 3. else 10 elseif qY == 4392. then qY = 9. else qY = 4396; continue
+end else qW = #qU; q0 = tL[268]; qZ = qW; qY = 6. end elseif qY < 4396 then if qY < 4395. then if qY == 4394 then qY = if not l8 then 15. else 18. else qY = 14822; continue end elseif qY == 4395. then q0 += tL[268]; qY = 6. else qY = 4405; continue end elseif qY < 4398. then
+if qY < 4397 then qV = qW; qY = if not qV then 1 else 14 else qV = mu[tL[731]]; qW = qV; qY = if qW then 19 else 11 end elseif qY < 4399 then if qY == 4398. then qY = 17 else qY = 4391; continue end else qY = if qX then 2 else 5 end elseif qY < 4404. then if qY < 4402 then
+if qY < 4401. then qY = 12. else qY = if q0 <= qZ then 4 else 9. end elseif qY < 4403 then q2 = q1; local uo = tL[363.][tL[541]]; l6(qU[q2][tL[981.]] + tL[899](tL[143], tL[268], tL[143])); uo = tL[492.][tL[984.]]; tL[66.](tL[81.]); qY = 7 elseif qY == 4403 then
+q1 = q0; qY = 13 else qY = 4392.; continue end elseif qY < 6048. then if qY < 4406 then if qY < 4405 then if qY == 4404. then return else qY = 14906; continue end elseif qY == 4405 then tL[740](firetouchinterest, qV, qW, tL[143]); tL[740](firetouchinterest, qV, qW, tL[268]);
+qY = 7 else qY = 4401.; continue end elseif qY < 4407. then return elseif qY == 4407. then qX = type(firetouchinterest) == tL[830]; qY = 8 else qY = 4400; continue end else break end end end end, "FlySpeed", "ScreenGui", "Auto Roll / Claim / Filters", 1474,
+"kuaav", "MenuKeybind", 10, "xvt", 2476, "Auto Roll / Claim", 1182., 34, "yebchzvvbvhu", "zajazd", "unknown", "package", 100, "UltraGod", "sbezbk", 3836, 106, "kqey", "hetgi", "IsHammer", "Place ID", "Settings", ipairs, function() local fM = string.format(tL[1003], tL[11][tL[166]], lI);
+md(fM, tL[577]) end, "bbj", "Max", "Rounding", "wknrdfb", "Equip Best (Once)", "claimed", function(cO) local pL, pM, pN, pP, pQ, pR, pS, pT = nil, nil, nil, nil, nil, nil, nil, nil; local pO = nil; pO = 3.; while true do pO = 5665 - pO; do if pO < 5659 then
+if pO < 5655. then if pO < 5652. then if pO < 5651 then break else pR += tL[268]; pO = 8 end elseif pO < 5653 then if pO == 5652. then pM = lW; pO = if pM then 4 else 10 else pO = 5658.; continue end elseif pO < 5654 then return nil else pT = pS; pO = if type(pL[pM[pT]]) == tL[470] then 7 else 1
+end elseif pO < 5658. then if pO < 5656 then pO = if pM then 2 else 0. elseif pO < 5657 then if pO == 5656 then return lT[cO] else pO = 5665; continue end else pO = if pR <= pP then 6. else 9. end else pT = pS; return pL[pM[pT]] end elseif pO < 5665 then if pO < 5662 then
+if pO < 5660 then if pO == 5659 then pS = pR; pO = 11 else pO = 5657; continue end elseif pO < 5661. then break elseif pO == 5661. then pM = type(pL[lW]) == tL[470]; pO = 10 else pO = 5660; continue end elseif pO < 5663 then if pO == 5662 then pL = lR(cO);
+pO = if not pL then 12. else 13 else pO = 5654; continue end elseif pO < 5664. then return pL[lW] elseif pO == 5664. then pO = 14 else pO = 5660; continue end elseif pO < 9648. then if pO == 5665 then local up = tL; pM = { up[34], up[153.], up[482], up[695],
+up[1012], up[545], up[628], up[989], up[296], up[74] }; pN = #pM; pR = up[268]; pP = pN; pO = 8 else pO = 15165.; continue end else break end end end end, 51., "tis", 56, "%.1fQn", "Info", "fwfcnbhbfn", "ukiqnluais", 205, function() local tq = nil; tq = 8;
+while true do tq = 1983. - tq; do if tq < 1981 then if tq < 1978 then if tq < 1977. then if tq < 1974. then if tq < 1973 then break else tq = 9. end elseif tq < 1975 then tq = 5 elseif tq < 1976 then tq = 0. elseif tq == 1976 then local uq = tL; uq[740](function()
+local hQ = mQ:InvokeServer(); mr(hQ) end); local ur = uq[492.][uq[984.]]; uq[66.](); tq = 1 else tq = 379; continue end else local us = tL[492.][tL[984.]]; tL[66.](tL[891.]); tq = 1 end elseif tq < 1980. then if tq < 1979 then break elseif tq == 1979 then tq = 0.
+else tq = 1982; continue end else tq = if not lG[tL[269]] then 2 else 10 end elseif tq < 1983. then if tq < 1982 then tq = if isOn(tL[900.]) then 7 else 6. else tq = 4 end elseif tq < 8773 then if tq == 1983. then tq = if true then 3. else 9. else break end
+else break end end end end, "ijq", function() md(mH, tL[924.]) end, "table", "ShowCustomCursor", "Shared", "bvt", "Unit", "Workspace", "GridH", 0.5, "Claim Filters", "%.1fQd", "mdxbxvtwkhg", 64, "KRNL", "G", "Player Movement / Fly / NoClip", Vector3.new, "AutoRoll",
+" placed | Rate: ", "Common", 60., "WalkSpeed", "ukqlnxw", 4094322324., 1445, 992171, 497, "InputChanged", "POST", "ddpavochxn", "hllaa", "settings", "W", function() lG:Unload() end, "Collect Cash", 881, "Socials", 3291., "qypnrtnt", "Auto Collect Character Cash",
+"Game", "Copied Discord invite to clipboard", "footer", print, "trending-up", "Placement", "bnoqnyiikoyh", "Func", "alkdhorkqbw", "AssemblyLinearVelocity", "ghdyve", 2950, "vfuanymoh", "JumpPower Amount", 38, "175%", "How do I get help or updates?", "CurrentCamera",
+"%x %X", "Copy Discord Invite", "hmdwigoxpoo", "twdugj", 1000000, "AutoRebirth", 2069145653, "VirtualUser", "#7fd47f", 14745599, "elowq", "fyj", "Claim Character Id Filter", 12., function() local q7, q8, q9 = nil, nil, nil; local ra = nil; ra = 3.; while true do
+ra = 13537 - ra; do if ra < 13532 then break elseif ra < 13537 then if ra < 13534 then if ra < 13533. then q8 = {}; q9 = q7; ra = if q9 then 4 else 2 elseif ra == 13533. then return q9 else ra = 785; continue end elseif ra < 13535 then q7 = Options[tL[503]];
+ra = if q7 then 0. else 5 elseif ra < 13536. then q9 = q8; ra = 4 else break end elseif ra < 15993. then if ra < 15984. then if ra == 13537 then q7 = Options[tL[503]][tL[232]]; ra = 5 else break end else break end else break end end end end, "mzyxf", 3261925558,
+function(bM) local ov, ox, oy, oz = nil, nil, nil, nil; local ow = nil; ow = 5; while true do ow = 15933. - ow; do if ow < 14894 then break elseif ow < 15928 then if ow < 15829 then break elseif ow < 15926 then break elseif ow < 15927. then oy = tL[485] * oz + tL[41] * (tL[268] - oz);
+ow = 1 else return nil end elseif ow < 15931 then if ow < 15929 then if ow == 15928 then ow = if not bM then 6. else 3. else ow = 14894; continue end elseif ow < 15930. then break elseif ow == 15930. then ov = tostring(bM[tL[215]]); oz = if mx(ov) then tL[268] else tL[143];
+ox = tL[494] * oz + tL[50] * (tL[268] - oz); ow = 7 else ow = 3654.; continue end elseif ow < 15932 then if ow == 15931 then return nil else ow = 15278; continue end elseif ow < 15933. then ow = if (ox * tL[63.] + oy * tL[971] + ox * oy) % tL[131] == tL[751] then 0. else 2
+elseif ow == 15933. then return string.sub(ov, tL[204.]) else ow = 10729; continue end end end end, "RightVector", 1907, " (", "]", "AntiAFK", "%.1fT", "tqxfyzi", "gus", 3956, 7832693, "150%", "ifkceiqapa", 3975., "pwlbjwlvcs", " | Index: ", 211, " | Best: ",
+"Url", "Scripts", 1804, function() local sX = nil; local sY = nil; sY = 0.; while true do sY = 5855 - sY; do if sY < 7621 then if sY < 5852 then break elseif sY < 5854 then if sY < 5853. then if sY == 5852 then return else sY = 5767; continue end else break
+end elseif sY < 5855 then local ut = tL[279.][tL[541]]; mD:Button2Down(tL[630.](tL[143], tL[143]), sX[tL[409]]); ut = tL[492.][tL[984.]]; tL[66.](tL[81.]); ut = tL[279.][tL[541]]; mD:Button2Up(tL[630.](tL[143], tL[143]), sX[tL[409]]); m1 = tick(); sY = 2 elseif sY == 5855 then
+local uu = tL[432.][tL[940]]; sX = tL[486.]; sY = if not sX then 3. else 1 else break end else break end end end end, "%.1fSp", "position", function() lG[tL[839]][tL[418]] = tL[11]:GetService(tL[696.]) end, 2176658660, "wait", "miicsromb", "RebirthAmount",
+"Equip Best - Equipped best characters!", function(aS) local nV = nil; nV = 3.; while true do nV = 8243 - nV; do if nV < 8240 then break elseif nV < 8243 then if nV < 8241. then if nV == 8240 then nV = if aS == nil then 2 else 0. else nV = 4621; continue end
+elseif nV < 8242 then if nV == 8241. then return tL[10] else nV = 8029; continue end else break end elseif nV < 12367 then if nV < 9113 then if nV == 8243 then return string.lower(tostring(aS)) else break end else break end else break end end end end, "Yield",
+8800075, 1200., print, 1977., "wzbbczz", "tgb", " ", "Library.lua", "Content-Type", "Space", "Join the Discord, the config channel has configs shared for every script.", "Anti-AFK", 3935, 'game:GetService("TeleportService"):TeleportToPlaceInstance(%d, "%s", game:GetService("Players").LocalPlayer)',
+" {", "s", 1240, "S", 681., "message-circle", "nil", "cxbdndnglokc", "CashPerTick", "https://raw.githubusercontent.com/joustingmatch/ObsidianUltra/main/" }; lE = nil; lF = nil; lG = nil; lH = nil; lI = nil; lJ = nil; lK = nil; lL = nil; lM = nil; lN = nil;
+lO = nil; lP = nil; lQ = nil; lR = nil; lT = nil; lU = nil; lV = nil; lW = nil; lX = nil; lY = nil; lZ = nil; l_ = nil; l0 = nil; l1 = nil; l2 = nil; l4 = nil; l5 = nil; l6 = nil; l7 = nil; l8 = nil; l9 = nil; ma = nil; mb = nil; mc = nil; md = nil; me = nil;
+mf = nil; mg = nil; mh = nil; mi = nil; mj = nil; mk = nil; ml = nil; mn = nil; mo = nil; mp = nil; local lD, lS, l3, mm = nil, nil, nil, nil; mq = nil; mr = nil; ms = nil; mt = nil; mu = nil; mv = nil; mw = nil; mx = nil; my = nil; mz = nil; mA = nil; mB = nil;
+mC = nil; mD = nil; mE = nil; mF = nil; mG = nil; mH = nil; mI = nil; mJ = nil; mK = nil; mL = nil; mM = nil; mN = nil; mO = nil; mP = nil; mQ = nil; mR = nil; mS = nil; mT = nil; mU = nil; mV = nil; mX = nil; mY = nil; mZ = nil; m_ = nil; m0 = nil; m1 = nil;
+m2 = nil; local mW; mW = nil; tT[1] = nil; tT[7] = nil; tT[14] = nil; tT[4] = nil; tT[10] = nil; tT[16] = nil; tT[5] = nil; tT[11] = nil; tT[18.] = nil; tT[6.] = nil; local nh, ni, nj, nk, nl, nm, no, nq, nr, ns, nt, nv, nw, nx, ny, nz, nA, nB, nC, nD, nE, nF, nG, nH, nI, nJ, nL;
+tT[13] = nil; tT[3.] = nil; tT[9.] = nil; tT[15.] = nil; nh = nil; ni = nil; nj = nil; nk = nil; nl = nil; nm = nil; no = nil; tT[2] = nil; nq = nil; nr = nil; ns = nil; nt = nil; tT[17] = nil; nv = nil; nw = nil; nx = nil; ny = nil; nz = nil; nA = nil; nB = nil;
+nC = nil; nD = nil; nE = nil; nF = nil; nG = nil; nH = nil; nI = nil; nJ = nil; nL = nil; local nn = nil; nn = 746; while true do nn = 13861 - nn; do if nn < 13491. then if nn < 13305. then if nn < 13209. then if nn < 13160 then if nn < 13136 then if nn < 13125. then
+if nn < 13119. then if nn < 13115 then if nn < 13114 then if nn < 12208 then break elseif nn < 12499 then break elseif nn < 13113. then break elseif nn == 13113. then tT[14] = nil; local uv = tL; tT[14] = uv[140] - uv[268]; tT[14] = uv[249.] - uv[27.]; tT[14] = uv[817] - uv[140];
+nn = 566 else nn = 13453; continue end else tT[14] = (tT[14] + tL[396.]) % tL[315.]; nn = 520 end elseif nn < 13118 then if nn < 13117 then if nn < 13116. then if nn == 13115 then local uv = tL; uv[547], uv[744.] = uv[744.], uv[547]; uv[860], uv[623], uv[902] = uv[860], uv[623], uv[902];
+uv[938], uv[99.], uv[682], uv[667], uv[688], uv[551], uv[705.], uv[717.], uv[1010] = uv[682], uv[717.], uv[705.], uv[551], uv[688], uv[938], uv[667], uv[99.], uv[1010]; uv[728], uv[168.], uv[507.], uv[227], uv[177.] = uv[168.], uv[507.], uv[177.], uv[728], uv[227];
+uv[271], uv[415], uv[261.], uv[136], uv[825.], uv[513.], uv[56], uv[380], uv[274], uv[207.], uv[765.], uv[464] = uv[207.], uv[261.], uv[464], uv[513.], uv[56], uv[765.], uv[271], uv[274], uv[136], uv[825.], uv[415], uv[380]; uv[316], uv[502], uv[35], uv[237.], uv[643], uv[405.], uv[175], uv[903.], uv[49], uv[639.], uv[856], uv[203], uv[821], uv[857], uv[390.], uv[875] = uv[35], uv[390.], uv[175], uv[643], uv[203], uv[405.], uv[316], uv[502], uv[875], uv[903.], uv[237.], uv[49], uv[856], uv[857], uv[821], uv[639.];
+lD, tT[10], mY, mW, tT[16], mJ, mD, tT[7], mu, mq, tT[4], tT[14], mQ, mL, mE, mz, mw, ms, tT[1] = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; tT[1] = uv[437]; nn = 459. else nn = 13459; continue end else nn = 77
+end elseif nn == 13117 then nn = 125 else nn = 13514; continue end else lJ = tL[254]; nn = 256 end elseif nn < 13122. then if nn < 13121 then if nn < 13120 then nn = 708. elseif nn == 13120 then nn = if tT[7] <= tL[589] then 467 else 281 else nn = 13407.; continue
+end elseif nn == 13121 then nn = 99. else nn = 13299.; continue end elseif nn < 13124 then if nn < 13123 then if nn == 13122. then ms = require(tT[14]:WaitForChild(tL[88])); nn = 511 else nn = 13823; continue end elseif nn == 13123 then local uv = tL; mg = uv[456.];
+mX = uv[938]; mB = uv[771.]; nn = 339. else nn = 13186; continue end elseif nn == 13124 then nn = 202 else nn = 13791.; continue end elseif nn < 13131. then if nn < 13128. then if nn < 13127 then if nn < 13126 then if nn == 13125. then nn = if tT[5] <= tL[27.] then 109 else 64
+else nn = 13286; continue end else nn = 16 end elseif nn == 13127 then nn = 179 else nn = 13385; continue end elseif nn < 13130 then if nn < 13129 then nn = 563 else nv += tL[268]; nn = 35 end else nn = 730 end elseif nn < 13134. then if nn < 13133 then if nn < 13132 then
+if nn == 13131. then nn = 585. else nn = 13387; continue end elseif nn == 13132 then nn = 433 else nn = 13616; continue end elseif nn == 13133 then nn = if tT[1] * tL[87.] + tL[817] + tL[268] >= tT[1] * tL[87.] + tL[817] + tL[268] + tL[268] then 295 else 190
+else nn = 13717; continue end elseif nn < 13135 then if nn == 13134. then nn = if (tT[3.] * tL[817] + tL[27.]) * tL[396.] % tL[27.] == ((tT[3.] * tL[817] + tL[27.]) * tL[396.] + tL[27.]) % tL[27.] then 418 else 598 else nn = 13733; continue end else nn = 487
+end elseif nn < 13149. then if nn < 13143. then if nn < 13140. then if nn < 13139 then if nn < 13137. then if nn == 13136 then nn = 234. else nn = 13535; continue end elseif nn < 13138 then tT[7] = tT[1]; nn = 189. else nr = nq; nn = 108. end elseif nn == 13139 then
+nn = 715 else nn = 13370; continue end elseif nn < 13142 then if nn < 13141 then if nn == 13140. then nn = if tT[5] <= tL[954.] then 686 else 358 else nn = 13264; continue end else nn = 313 end else nn = 629 end elseif nn < 13146. then if nn < 13145 then if nn < 13144 then
+if nn == 13143. then nn = 490 else nn = 13595; continue end else nn = 560 end else lI = tostring(tL[11][tL[403]]); nn = 67 end elseif nn < 13148 then if nn < 13147 then nn = 408. else nn = if tT[7] <= tL[954.] then 23 else 320 end elseif nn == 13148 then tT[1] = mn;
+tT[7] = #tT[1]; nq = tL[268]; no = tT[7]; nn = 2 else nn = 13752.; continue end elseif nn < 13155. then if nn < 13152. then if nn < 13151 then if nn < 13150 then nn = 128 elseif nn == 13150 then ni = tL[642.]; nn = 192. else nn = 13490; continue end elseif nn == 13151 then
+mH = tT[11]:CreateWindow({ [tL[558.]] = tL[333.], [tL[707]] = tT[15.] .. tL[347] .. lG, [tL[136]] = tL[214], [tL[672.]] = tL[844], [tL[475]] = tL[214], [tL[885.]] = false, [tL[621.]] = tL[612.] }); nn = 172 else nn = 13127; continue end elseif nn < 13154 then
+if nn < 13153 then nn = 417. elseif nn == 13153 then nn = 29 else nn = 13472; continue end elseif nn == 13154 then local uv = tL; tT[14] = { uv[860], uv[507.], uv[966.], uv[200], uv[508], uv[412], uv[931], uv[4], uv[824], uv[467], uv[620] }; nn = if tT[14][(tT[3.] * uv[776] + uv[429.]) % uv[47] + uv[268]] < tT[14][(tT[3.] * uv[776] + uv[429.]) % uv[47] + uv[268]] then 229 else 55
+else nn = 13178; continue end elseif nn < 13158. then if nn < 13157 then if nn < 13156 then if nn == 13155. then local uw = bit32.rrotate(bit32.bxor(bit32.lrotate(tT[3.], tL[416]), string.byte(tostring(lU))), tL[817]); nn = if bit32.bxor(bit32.lrotate(bit32.bxor(uw, tL[303.]), tL[698]), tL[957.]) ~= bit32.lrotate(uw, tL[698]) then 253 else 267.
+else nn = 13789; continue end elseif nn == 13156 then nn = if tT[7] <= tL[673] then 79 else 530 else nn = 13410.; continue end else tT[4] = mL:WaitForChild(tL[481]); nn = 327. end elseif nn < 13159 then local uv = tL; tT[5] = { uv[660.], uv[596], uv[745], uv[727],
+uv[450.], uv[607], uv[756.], uv[882.], uv[440], uv[527] }; local ux = tT[14]; tT[11] = tT[5][ux % uv[844] + uv[268]]; nn = if tT[11]:len() >= tT[11]:gsub(uv[179], uv[75.], ux % uv[817] % uv[140] + uv[268]):len() then 410 else 223 else nn = 96. end elseif nn < 13186 then
+if nn < 13174 then if nn < 13167. then if nn < 13164. then if nn < 13162 then if nn < 13161. then nn = 32 else nn = 453. end elseif nn < 13163 then if nn == 13162 then nn = 705. else nn = 13256; continue end elseif nn == 13163 then tT[1] = (tT[1] + tL[298]) % tL[895];
+nn = 660. else nn = 13741; continue end elseif nn < 13166 then if nn < 13165 then nn = 396. else nn = 701 end elseif nn == 13166 then local uv = tL; mm = uv[872]; m_ = uv[739]; nn = 498. else nn = 13560.; continue end elseif nn < 13171 then if nn < 13170. then
+if nn < 13169 then if nn < 13168 then if nn == 13167. then nn = if tT[11] then 245 else 590 else nn = 13191.; continue end else local uv = tL; l6 = uv[229]; lR = uv[1]; mx = uv[758]; mp = uv[583]; mi = uv[336.]; nn = 243. end else tT[13] = tL[958]; nn = 478
+end else nn = 266 end elseif nn < 13173. then if nn < 13172 then tT[1] = {}; nn = 363. elseif nn == 13172 then tT[5] = nil; local uv = tL; tT[5] = uv[27.] - uv[817]; tT[5] = uv[143] + uv[268]; nn = 593 else nn = 13452.; continue end elseif nn == 13173. then
+tT[5] = (tT[1] * tL[47] + tL[47]) % tL[315.] + tL[268]; nn = 206 else nn = 13736; continue end elseif nn < 13181 then if nn < 13178 then if nn < 13176. then if nn < 13175 then nn = 58 elseif nn == 13175 then nn = 374 else nn = 13605.; continue end elseif nn < 13177 then
+tT[4], tT[14], tT[18.], lK, lI, tT[11], tT[5] = nil, nil, nil, nil, nil, nil, nil; tT[5] = tL[252.]; nn = 453. elseif nn == 13177 then nn = if true then 393. else 194 else nn = 13272.; continue end elseif nn < 13180 then if nn < 13179. then nn = 610 elseif nn == 13179. then
+nn = 519. else nn = 13178; continue end else mL = tT[4]:WaitForChild(tL[481]); nn = 327. end elseif nn < 13184 then if nn < 13183 then if nn < 13182. then tT[10] = {}; nn = 504. elseif nn == 13182. then tT[11] = nil; local uv = tL; tT[11] = uv[249.] - uv[27.];
+tT[11] = uv[27.] - uv[817]; tT[11] = uv[143] + uv[268]; nn = 423. else nn = 13321; continue end else tT[13] = (tT[5] * tL[249.] + tL[268]) % tL[682] + tL[268]; nn = 445 end elseif nn < 13185. then if nn == 13184 then nn = 449 else nn = 13802; continue end elseif nn == 13185. then
+nn = if tT[1] <= tL[268] then 386 else 495. else nn = 13327; continue end elseif nn < 13197. then if nn < 13192 then if nn < 13189 then if nn < 13188. then if nn < 13187 then nn = if tT[7] <= tL[301] then 37 else 366. else lD = mu[tL[107]]; nn = 288. end elseif nn == 13188. then
+local uv = tL; tT[1] = { uv[540.], uv[595], uv[821], uv[78.], uv[808], uv[108.], uv[340] }; local uy = tT[14]; tT[7] = tT[1][uy % uv[594.] + uv[268]]; nn = if tT[7]:len() >= tT[7]:gsub(uv[179], uv[75.], uy % uv[817] % uv[140] + uv[268]):len() then 553 else 601
+else nn = 13429; continue end elseif nn < 13191. then if nn < 13190 then nn = 21. else nn = if (not mE and not mw and (not mE and mY) or (mE or mw) and (not mw or not lD)) and (not mE and mY or tT[14] and tT[14] or (not lD and not tT[14] or (mw or not tT[14]))) and not ((not mE and not mw and (not mE and mY) or (mE or mw) and (not mw or not lD)) and (not mE and mY or tT[14] and tT[14] or (not lD and not tT[14] or (mw or not tT[14])))) then 573. else 414.
+end elseif nn == 13191. then lV = tL[759.]; nn = 259 else nn = 13513; continue end elseif nn < 13195 then if nn < 13194. then if nn < 13193 then nn = 610 elseif nn == 13193 then local uz = bit32.rrotate(bit32.bxor(bit32.lrotate(tT[3.], tL[589]), string.byte(tostring(nk))), tL[594.]);
+nn = if bit32.bxor(bit32.lrotate(bit32.bxor(uz, tL[116]), tL[140]), tL[819.]) == bit32.lrotate(uz, tL[140]) then 571 else 157 else nn = 13233.; continue end else nn = 133 end elseif nn < 13196 then if nn == 13195 then nn = if (tT[5] * tL[140] + tL[249.]) * tL[161] % tL[817] == ((tT[5] * tL[140] + tL[249.]) * tL[161] + (tL[143] + tL[268])) % tL[817] then 344 else 112
+else nn = 13149.; continue end elseif nn == 13196 then nn = 411. else nn = 13575.; continue end elseif nn < 13203. then if nn < 13200. then if nn < 13199 then if nn < 13198 then if nn == 13197. then local uv = tL; tT[11] = (vector.create((tT[1] * uv[249.] + uv[268]) % uv[47] + uv[268], (tT[1] * uv[140] + uv[27.]) % uv[161] + uv[268], (tT[1] * uv[844] + uv[682]) % uv[24.] + uv[268]));
+tT[18.] = (vector.create((tT[1] * uv[594.] + uv[817]) % uv[47] + uv[268], (tT[1] * uv[27.] + uv[594.]) % uv[161] + uv[268], (tT[1] * uv[47] + uv[594.]) % uv[24.] + uv[268])); local uA = vector.dot(tT[11], tT[18.]); nn = if uA * uA >= vector.dot(tT[11], tT[11]) * vector.dot(tT[18.], tT[18.]) + uv[268] then 20 else 391
+else nn = 13160; continue end elseif nn == 13198 then nn = 155 else nn = 13719.; continue end else tT[14] = (tT[14] + tL[849.]) % tL[276.]; nn = 171. end elseif nn < 13202 then if nn < 13201 then tT[14] = nil; local uv = tL; tT[14] = uv[27.] - uv[817]; tT[14] = uv[143] + uv[268];
+tT[14] = uv[27.] - uv[817]; tT[14] = uv[143] + uv[268]; tT[14] = uv[27.] - uv[817]; nn = 118 elseif nn == 13201 then nn = 232 else nn = 13360; continue end elseif nn == 13202 then nh = tL[759.]; nn = 259 else nn = 13557.; continue end elseif nn < 13207 then
+if nn < 13206. then if nn < 13205 then if nn < 13204 then if nn == 13203. then nn = 92 else nn = 13847; continue end else tT[5] = (tT[5] + tL[249.]) % tL[656]; nn = 476 end elseif nn == 13205 then nn = if (tT[3.] * tL[817] + tL[27.]) * tL[24.] % tL[27.] == ((tT[3.] * tL[817] + tL[27.]) * tL[24.] + (tL[954.] + tL[268])) % tL[27.] then 78. else 159.
+else nn = 13769; continue end else mB = tL[958]; nn = 478 end elseif nn < 13208 then if nn == 13207 then tT[14] = nil; tT[14] = tL[817] - tL[268]; nn = 741. else nn = 13559; continue end else nB = nA; tT[5] = tT[14][nB][tL[537.]]; nn = if tT[5] then 562 else 268
+end elseif nn < 13256 then if nn < 13233. then if nn < 13221. then if nn < 13215. then if nn < 13212. then if nn < 13211 then if nn < 13210 then if nn == 13209. then nn = 672. else nn = 13302.; continue end elseif nn == 13210 then nn = 200 else nn = 13724;
+continue end elseif nn == 13211 then tT[3.] = (tT[3.] + tL[268]) % tL[357.]; nn = 68 else nn = 13582; continue end elseif nn < 13214 then if nn < 13213 then if nn == 13212. then nx = nw; mh[tT[11][nx]] = nx; nn = 110 else nn = 13624; continue end else nn = 672.
+end else local uv = tL; tT[7] = (vector.create((tT[5] * uv[682] + uv[268]) % uv[47] + uv[268], (tT[5] * uv[249.] + uv[396.]) % uv[161] + uv[268], (tT[5] * uv[204.] + uv[140]) % uv[24.] + uv[268])); tT[14] = (vector.create((tT[5] * uv[682] + uv[594.]) % uv[47] + uv[268], (tT[5] * uv[249.] + uv[954.]) % uv[161] + uv[268], (tT[5] * uv[396.] + uv[204.]) % uv[24.] + uv[268]));
+tT[11] = (vector.create((tT[5] * uv[140] + uv[27.]) % uv[249.] + uv[268], (tT[5] * uv[268] + uv[268]) % uv[594.] + uv[268], (tT[5] * uv[249.] + uv[249.]) % uv[396.] + uv[268])); nn = if math.abs((vector.angle(tT[7], tT[14], tT[11]))) - math.abs((vector.angle(tT[14], tT[7], tT[11]))) == uv[143] + uv[140] then 435. else 592
+end elseif nn < 13218. then if nn < 13217 then if nn < 13216 then if nn == 13215. then nn = if tT[7] <= tL[24.] then 188 else 554 else nn = 13401.; continue end elseif nn == 13216 then tT[1] = (tT[1] + tL[298]) % tL[895]; nn = 648. else nn = 13575.; continue
+end else nn = 54. end elseif nn < 13220 then if nn < 13219 then if nn == 13218. then tT[3.] = (tT[3.] + tL[270.]) % tL[357.]; nn = 66. else nn = 13456; continue end else nn = 534. end else tT[11] = nil; local uv = tL; tT[11] = uv[249.] - uv[27.]; tT[11] = uv[817] - uv[140];
+tT[11] = uv[140] - uv[268]; tT[11] = uv[143] + uv[268]; nn = 91 end elseif nn < 13227. then if nn < 13224. then if nn < 13223 then if nn < 13222 then if nn == 13221. then nn = 220 else nn = 13318; continue end elseif nn == 13222 then nn = 162. else nn = 13248.;
+continue end elseif nn == 13223 then nn = 576. else nn = 13840; continue end elseif nn < 13226 then if nn < 13225 then if nn == 13224. then tT[3.] = (tT[3.] + tL[270.]) % tL[357.]; nn = 390. else nn = 13487; continue end elseif nn == 13225 then tT[14] = nil;
+tT[14] = tL[140] - tL[268]; nn = 486. else nn = 13796; continue end elseif nn == 13226 then nn = 499 else nn = 13185.; continue end elseif nn < 13230. then if nn < 13229 then if nn < 13228 then if nn == 13227. then nn = 412 else nn = 13181; continue end elseif nn == 13228 then
+nn = 235 else nn = 13200.; continue end else local uB = (tT[7] * tL[268] + tL[143]) % tL[268] + tL[268]; nn = 346 end elseif nn < 13232 then if nn < 13231 then if nn == 13230. then tT[7] = tT[1]; nn = 444. else nn = 13761.; continue end else lE = tL[949]; nn = 650
+end elseif nn == 13232 then nv += tL[268]; nn = 546. else nn = 13221.; continue end elseif nn < 13245. then if nn < 13239. then if nn < 13236. then if nn < 13235 then if nn < 13234 then if nn == 13233. then lZ = function() local c2 = {}; local function c3(c4)
+local p1, p2, p3, p4, p5, p7, p8, p9, qa, qb = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local p6 = nil; p6 = 15.; while true do p6 = 6373 - p6; do if p6 < 6367 then if p6 < 6363. then if p6 < 6361 then if p6 < 6360. then if p6 < 6358 then if p6 < 6357. then
+break else return end elseif p6 < 6359 then if p6 == 6358 then p6 = if not c4 then 16 else 8 else p6 = 6372.; continue end else p3 = not p2:GetAttribute(tL[861.]); p6 = 9. end else table.insert(c2, { [tL[614]] = p2, [tL[292]] = p3, [tL[162.]] = p4, [tL[253]] = mB(p4),
+[tL[516.]] = mg(p4), [tL[616]] = lS(p4), [tL[199]] = mm(p2) }); p6 = 12. end elseif p6 < 6362 then if p6 == 6361 then p6 = 5 else p6 = 6359; continue end else p5 = type(p4) == tL[773]; p6 = 7 end elseif p6 < 6366. then if p6 < 6365 then if p6 < 6364 then p6 = 2
+else p6 = if p3 then 1 else 5 end else p1 = c4:GetChildren(); p2 = #p1; p9 = tL[268]; p7 = p2; p6 = 6. end else p6 = if p5 then 13 else 12. end elseif p6 < 6371 then if p6 < 6369. then if p6 < 6368 then if p6 == 6367 then p6 = if p9 <= p7 then 0. else 10 else
+p6 = 6364; continue end elseif p6 == 6368 then p6 = 4 else p6 = 6373; continue end elseif p6 < 6370 then if p6 == 6369. then p9 += tL[268]; p6 = 6. else p6 = 6361; continue end else qb = qa; p2 = p1[qb]; p3 = (p2:IsA(tL[443])); p6 = if p3 then 14 else 9. end
+elseif p6 < 7293. then if p6 < 6373 then if p6 < 6372. then break else p3 = p2:GetAttribute(tL[799]); p4 = p2:GetAttribute(tL[636.]); p5 = type(p3) == tL[773]; p6 = if p5 then 11 else 7 end elseif p6 == 6373 then qa = p9; p6 = 3. else break end else break end
+end end end; local uC = tL; c3(mu:FindFirstChild(uC[565])); c3(mu[uC[731]]); table.sort(c2, function(dm, dn) local qc, qd = nil, nil; local qe = nil; qe = 1; while true do qe = 3933. - qe; do if qe < 3933. then if qe < 3928 then if qe < 3926 then break elseif qe < 3927. then
+return dm[tL[199]] > dn[tL[199]] elseif qe == 3927. then local uD = tL; qc = l3(dm[uD[162.]]); qd = l3(dn[uD[162.]]); qe = if qc == qd then 2 else 4 else qe = 3931; continue end elseif qe < 3930. then if qe < 3929 then if qe == 3928 then return dm[tL[253]] < dn[tL[253]]
+else qe = 5323; continue end else return qc > qd end elseif qe < 3931 then break elseif qe < 3932 then if qe == 3931 then qe = if dm[tL[616]] == dn[tL[616]] then 5 else 0. else qe = 960.; continue end elseif qe == 3932 then qe = if dm[tL[199]] == dn[tL[199]] then 6. else 7
+else qe = 960.; continue end elseif qe < 5323 then if qe < 5196. then if qe < 4496 then if qe == 3933. then return dm[tL[616]] < dn[tL[616]] else qe = 8256.; continue end else break end else break end else break end end end end); return c2 end; local uv = tL;
+lU = uv[715]; mU = uv[206]; l7 = uv[825.]; mC = uv[837.]; nn = 31 else nn = 13187; continue end else mh = { tL[702.], tL[710], tL[855.], tL[559], tL[103], tL[479], tL[691], tL[902], tL[590], tL[627.], tL[657.] }; nn = 747. end elseif nn == 13235 then nn = 658
+else nn = 13790; continue end elseif nn < 13238 then if nn < 13237 then tT[5] = (tT[5] + tL[249.]) % tL[353]; nn = 286 elseif nn == 13237 then nn = 194 else nn = 13433; continue end elseif nn == 13238 then tT[14] = tL[10]; nn = 301 else nn = 13325; continue
+end elseif nn < 13242. then if nn < 13241 then if nn < 13240 then if nn == 13239. then nn = 44 else nn = 13280; continue end else nn = 47 end else tT[11] = string.sub(lI, tL[268], tL[673]) .. tL[474.]; nn = 533 end elseif nn < 13244 then if nn < 13243 then
+if nn == 13242. then local uv = tL; tT[3.] = { uv[491], uv[338], uv[156.], uv[473], uv[419], uv[178], uv[859], uv[835] }; local uE = tT[5]; tT[9.] = tT[3.][uE % uv[204.] + uv[268]]; nn = if tT[9.]:len() <= tT[9.]:gsub(uv[179], uv[75.], uE % uv[817] % uv[140] + uv[268]):len() then 230 else 454
+else nn = 13674.; continue end else lI = string.sub(tT[11], tL[268], tL[673]) .. tL[474.]; nn = 533 end else nn = 53 end elseif nn < 13251. then if nn < 13248. then if nn < 13247 then if nn < 13246 then tT[3.] = nil; tT[3.] = tL[204.] - tL[249.]; nn = 421 elseif nn == 13246 then
+nn = 490 else nn = 13832; continue end else nn = 96. end elseif nn < 13250 then if nn < 13249 then if nn == 13248. then tT[11] = nil; local uv = tL; tT[11] = uv[140] - uv[268]; tT[11] = uv[143] + uv[268]; tT[11] = uv[249.] - uv[27.]; nn = 246. else nn = 13850;
+continue end else nn = 181 end else nn = if tT[1] <= tL[204.] then 87. else 406 end elseif nn < 13254. then if nn < 13253 then if nn < 13252 then nn = 555. elseif nn == 13252 then local uv = tL; tT[14]:AddLabel(lQ(uv[265], mu[uv[215]], ni), true); tT[14]:AddLabel(lQ(uv[573.], uv[810.], ni), true);
+tT[14]:AddLabel(lQ(uv[137], mq, ni), true); tT[14]:AddLabel(lQ(uv[666.], tostring(tT[4]), nh), true); tT[18.] = nj[uv[877]]:AddLeftGroupbox(uv[278], uv[33.]); nn = 625 else nn = 13841; continue end else nn = if tT[7] <= tL[735.] then 699. else 168. end elseif nn < 13255 then
+if nn == 13254. then nn = 176 else nn = 819.; continue end elseif nn == 13255 then nn = 46 else nn = 13694; continue end elseif nn < 13280 then if nn < 13268 then if nn < 13262 then if nn < 13259 then if nn < 13258 then if nn < 13257. then local uv = tL; tT[14] = { uv[155],
+uv[317], uv[294.], uv[124], uv[550], uv[423.], uv[875], uv[245] }; local uF = tT[3.]; tT[4] = tT[14][uF % uv[204.] + uv[268]]; nn = if tT[4]:len() <= tT[4]:gsub(uv[179], uv[75.], uF % uv[817] % uv[140] + uv[268]):len() then 539 else 501. elseif nn == 13257. then
+nn = 731 else nn = 13753; continue end elseif nn == 13258 then tT[11] = lG:CreateWindow({ [tL[621.]] = tL[612.], [tL[707]] = mH .. tL[347] .. tT[15.], [tL[558.]] = tL[333.], [tL[136]] = tL[214], [tL[475]] = tL[214], [tL[885.]] = false, [tL[672.]] = tL[844] });
+nn = 172 else nn = 13743.; continue end elseif nn < 13261 then if nn < 13260. then tT[3.] = (tT[3.] + tL[270.]) % tL[357.]; nn = 521 else mh = {}; nn = 148 end else nn = 644 end elseif nn < 13266. then if nn < 13265 then if nn < 13264 then if nn < 13263. then
+tT[5], lG, nk, nl, mS, mN, ni, nh, mT, mO, mH, mA, tT[15.], tT[11], nj, mG, mx, mp, mi, l6, lR, mX, mB, mg, l3, lS, mV, tT[13], ma, lE, mP, mv, lO, m_, mm, lZ, lU, mU, l7, mC, l0, lV, lN, mr, mk, mc, lY, mo, md, l_, lQ, mt, tT[9.], tT[3.] = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+tT[3.] = tL[268]; nn = 433 else ni = tL[787]; nn = 74 end else mb = {}; nn = 504. end elseif nn == 13265 then nn = 58 else nn = 13252; continue end elseif nn < 13267 then if nn == 13266. then nn = if tT[5] <= tL[268] then 300. else 426. else nn = 13429; continue
+end else tT[1] = (tT[1] + tL[298]) % tL[895]; nn = 239 end elseif nn < 13275. then if nn < 13271 then if nn < 13270 then if nn < 13269. then local uG = bit32.rrotate(bit32.bxor(bit32.lrotate(tT[14], tL[268]), string.byte(tostring(mb))), tL[817]); nn = if bit32.bxor(bit32.lrotate(bit32.bxor(uG, tL[305]), tL[252.]), tL[471.]) ~= bit32.lrotate(uG, tL[252.]) then 535 else 429.
+else lM = {}; nn = 489. end elseif nn == 13270 then lW = nil; lT = {}; lP = nil; nn = 662 else nn = 13602.; continue end elseif nn < 13274 then if nn < 13273 then if nn < 13272. then tT[7] = tT[11]; nn = if tT[7] then 236 else 70 elseif nn == 13272. then local uv = tL;
+tT[5] = { uv[460], uv[168.], uv[965], uv[784], uv[905], uv[903.], uv[439], uv[943], uv[242], uv[114.], uv[818], uv[951.], uv[374], uv[65], uv[223] }; nn = if tT[5][(tT[14] * uv[270.] + uv[194]) % uv[437] + uv[268]] < tT[5][(tT[14] * uv[270.] + uv[194]) % uv[437] + uv[268]] then 597. else 680
+else nn = 13656.; continue end elseif nn == 13273 then nn = if (tT[5] * tL[24.] + tL[143]) % tL[656] == tL[47] then 626 else 622 else nn = 13298; continue end else nn = 199 end elseif nn < 13278. then if nn < 13277 then if nn < 13276 then mZ = nil; m2 = nil;
+lF = nil; lJ = nil; nn = 524 else nn = 293 end elseif nn == 13277 then tT[18.] = tostring(tL[11][tL[403]]); nn = 67 else nn = 13243; continue end elseif nn < 13279 then tT[3.] = (tT[3.] + tL[268]) % tL[357.]; nn = 218 elseif nn == 13279 then tT[5] = nil; local uv = tL;
+tT[5] = uv[249.] - uv[27.]; tT[5] = uv[27.] - uv[817]; nn = 173 else nn = 13305.; continue end elseif nn < 13293. then if nn < 13288 then if nn < 13284. then if nn < 13282 then if nn < 13281. then if nn == 13280 then tT[1] = (tT[1] + tL[20]) % tL[895]; nn = 455
+else nn = 13694; continue end else nn = if nv <= nt then 240. else 690. end elseif nn < 13283 then if nn == 13282 then tT[3.] = (tT[3.] + tL[270.]) % tL[357.]; nn = 303. else nn = 13539.; continue end else mq = tL[97]; nn = 645. end elseif nn < 13287. then
+if nn < 13285 then tT[18.], tT[6.], lM, tT[5] = nil, nil, nil, nil; tT[5] = tL[27.]; nn = 44 elseif nn < 13286 then nI = false; local uv = tL; for fB, fC in uv[504.](nj) do nJ = fB; nL = fC; tT[12.] = nJ; tT[8] = nL; local nH = nil; nH = uv[27.]; while true do
+if nH < 2 then if nH < 1 then nI = true; nH = uv[268] else break end elseif nH < 3. then tT[9.](tT[8]); nH = uv[817] elseif nH < 4 then nH = uv[268] else tT[7] = { [nj[uv[877]]] = true, [nj[uv[286]]] = true }; nH = if not tT[7][tT[8]] then uv[140] else uv[817]
+end end; if nI then break end end; tT[7] = (mu:GetAttribute(uv[701])); nn = if tT[7] then 685 else 103 elseif nn == 13286 then nn = 154 else nn = 13782.; continue end elseif nn == 13287. then tT[14] = nil; local uv = tL; tT[14] = uv[140] - uv[268]; tT[14] = uv[817] - uv[140];
+nn = 198. else nn = 13194.; continue end elseif nn < 13291 then if nn < 13290. then if nn < 13289 then lD = tL[11]:GetService(tL[174.]); nn = 581 elseif nn == 13289 then tT[1] = (tT[1] + tL[817]) % tL[895]; nn = 525. else nn = 13746.; continue end elseif nn == 13290. then
+mA = tL[525.]; nn = 368 else nn = 13248.; continue end elseif nn < 13292 then if nn == 13291 then nn = 249. else nn = 13849; continue end elseif nn == 13292 then local uv = tL; lE = uv[314]; mv = uv[260]; lO = uv[339.]; mP = uv[376]; ma = uv[235]; nn = 637
+else nn = 13725.; continue end elseif nn < 13300 then if nn < 13296. then if nn < 13295 then if nn < 13294 then tT[1] = (tT[14] * tL[268] + tL[268]) % tL[140] + tL[268]; nn = 676 else tT[7][tT[11]] = true; table.insert(tT[1], tT[11]); nn = 719 end else local uv = tL;
+tT[14] = { uv[251], uv[549.], uv[284], uv[282.], uv[547], uv[295], uv[554], uv[202] }; local uH = tT[3.]; tT[4] = tT[14][uH % uv[204.] + uv[268]]; nn = if tT[4]:len() <= tT[4]:reverse():rep(uH % uv[817] + uv[140]):len() then 89 else 427 end elseif nn < 13298 then
+if nn < 13297 then ni = tL[949]; nn = 650 else tT[14] = nil; local uv = tL; tT[14] = uv[249.] - uv[27.]; tT[14] = uv[817] - uv[140]; tT[14] = uv[249.] - uv[27.]; tT[14] = uv[143] + uv[268]; nn = 706 end elseif nn < 13299. then if nn == 13298 then nn = 590 else
+nn = 13415; continue end else tT[11] = tostring(tT[5]); nn = if not tT[7][tT[11]] then 567. else 719 end elseif nn < 13303 then if nn < 13302. then if nn < 13301 then if nn == 13300 then local uv = tL; l3 = uv[138.]; lS = uv[304]; mV = uv[371]; nn = 52 else
+nn = 13767.; continue end elseif nn == 13301 then nn = 364 else nn = 12499; continue end else tT[14] = nil; local uv = tL; tT[14] = uv[523] - uv[24.]; tT[14] = uv[954.] + uv[817]; tT[14] = uv[315.] - uv[161]; tT[14] = uv[416] - uv[673]; nn = 325 end elseif nn < 13304 then
+nn = 147. else tT[14] = nil; local uv = tL; tT[14] = uv[682] - uv[27.]; tT[14] = uv[143] + uv[140]; nn = 474. end elseif nn < 13399 then if nn < 13353. then if nn < 13329. then if nn < 13317. then if nn < 13311. then if nn < 13308. then if nn < 13307 then if nn < 13306 then
+tT[1] = (tT[1] + tL[298]) % tL[895]; nn = 745 elseif nn == 13306 then nn = 98 else nn = 13367; continue end elseif nn == 13307 then tT[14] = nil; tT[14] = tL[140] - tL[268]; nn = 367 else nn = 13823; continue end elseif nn < 13310 then if nn < 13309 then if nn == 13308. then
+tT[11] = {}; nn = 148 else nn = 13594; continue end elseif nn == 13309 then nn = 642. else nn = 13465; continue end else local uI = bit32.rrotate(bit32.bxor(bit32.lrotate(tT[1], tL[249.]), string.byte(tostring(ms))), tL[315.]); nn = if bit32.bxor(bit32.lrotate(bit32.bxor(uI, tL[64]), tL[673]), tL[538]) ~= bit32.lrotate(uI, tL[673]) then 94 else 338
+end elseif nn < 13314. then if nn < 13313 then if nn < 13312 then if nn == 13311. then nn = if nv <= nt then 36. else 322 else nn = 13419.; continue end else nn = 19 end else tT[11] = { [tL[863]] = nj:AddTab(tL[863], tL[914]), [tL[181]] = nj:AddTab(tL[181], tL[927.]),
+[tL[928]] = nj:AddTab(tL[928], tL[127]), [tL[383]] = nj:AddTab(tL[383], tL[567.]), [tL[286]] = nj:AddTab(tL[286], tL[33.]), [tL[877]] = nj:AddTab(tL[877], tL[364]), [tL[405.]] = nj:AddTab(tL[405.], tL[433]) }; nn = 381. end elseif nn < 13316 then if nn < 13315 then
+nn = 513. elseif nn == 13315 then nn = if nv <= nt then 544 else 512 else nn = 13591; continue end else nn = 509 end elseif nn < 13323. then if nn < 13320. then if nn < 13319 then if nn < 13318 then if nn == 13317. then nA = nv; nn = 653 else nn = 13788.; continue
+end else nn = if (tT[7] * tL[817] + tL[143]) % tL[27.] == tL[268] then 733 else 225. end else local uJ = bit32.rrotate(bit32.bxor(bit32.lrotate(tT[3.], tL[698]), string.byte(tostring(mt))), tL[252.]); nn = if bit32.bxor(bit32.lrotate(bit32.bxor(uJ, tL[31]), tL[140]), tL[947]) ~= bit32.lrotate(uJ, tL[140]) then 76 else 95
+end elseif nn < 13322 then if nn < 13321 then if nn == 13320. then local uv = tL; nG = if tT[7] <= uv[844] then uv[268] else uv[143]; nE = uv[548] * nG + uv[322] * (uv[268] - nG); nF = uv[320] * nG + uv[669.] * (uv[268] - nG); nn = if (nE * uv[275] + nF * uv[20] + nE * nF) % uv[131] == uv[267.] then 255. else 419
+else nn = 13267; continue end else nn = 730 end else mH = tL[248]; nn = 537. end elseif nn < 13326. then if nn < 13325 then if nn < 13324 then nn = if tT[7] <= tL[204.] then 734 else 208 elseif nn == 13324 then tT[3.] = (tT[3.] + tL[226]) % tL[357.]; nn = 27.
+else nn = 13216; continue end elseif nn == 13325 then tT[1] = (tT[1] + tL[20]) % tL[895]; nn = 265 else nn = 13256; continue end elseif nn < 13328 then if nn < 13327 then if nn == 13326. then l4 = false; l8 = false; nn = 447. else nn = 13150; continue end else
+nn = 318. end elseif nn == 13328 then tT[7] = (tT[7] + tL[817]) % tL[27.]; nn = 543. else nn = 13598; continue end elseif nn < 13341. then if nn < 13336 then if nn < 13332. then if nn < 13331 then if nn < 13330 then nn = 684. else tT[3.] = (tT[3.] + tL[226]) % tL[357.];
+nn = 284 end elseif nn == 13331 then tT[14] = nil; local uv = tL; tT[14] = uv[682] - uv[249.]; tT[14] = uv[143] + uv[268]; nn = 470 else nn = 13411; continue end elseif nn < 13334 then if nn < 13333 then nn = if tT[5] <= tL[140] then 1 else 62 elseif nn == 13333 then
+nn = 703 else nn = 13692.; continue end elseif nn < 13335. then if nn == 13334 then tT[11], mh, tT[14] = nil, nil, nil; tT[14] = tL[682]; nn = 107 else nn = 13393; continue end elseif nn == 13335. then local uv = tL; tT[14] = { uv[258.], uv[92], uv[15.], uv[680],
+uv[562], uv[615.], uv[856], uv[866], uv[351.], uv[68] }; nn = if tT[14][(tT[3.] * uv[318.] + uv[594.]) % uv[844] + uv[268]] < tT[14][(tT[3.] * uv[318.] + uv[594.]) % uv[844] + uv[268]] then 63. else 161 else nn = 13122.; continue end elseif nn < 13339 then
+if nn < 13338. then if nn < 13337 then nn = 125 elseif nn == 13337 then tT[14] = (tT[14] + tL[496]) % tL[276.]; nn = 687. else nn = 13160; continue end else nn = 221 end elseif nn < 13340 then if nn == 13339 then tT[14] = (tT[14] + tL[301]) % tL[276.]; nn = 151
+else nn = 13628; continue end elseif nn == 13340 then nn = 147. else nn = 13704.; continue end elseif nn < 13347. then if nn < 13344. then if nn < 13343 then if nn < 13342 then if nn == 13341. then nn = 323 else nn = 13156; continue end elseif nn == 13342 then
+nn = 644 else nn = 13861; continue end elseif nn == 13343 then nn = 12. else nn = 13584.; continue end elseif nn < 13346 then if nn < 13345 then mY = tL[11]:GetService(tL[521]); nn = 216. elseif nn == 13345 then nn = 296 else nn = 13564; continue end else tT[14] = nil;
+local uv = tL; tT[14] = uv[682] - uv[249.]; tT[14] = uv[143] + uv[268]; nn = 510. end elseif nn < 13351 then if nn < 13349 then if nn < 13348 then if nn == 13347. then tT[5] = nil; tT[5] = tL[27.] - tL[817]; nn = 180. else nn = 13118; continue end else nn = 105.
+end elseif nn < 13350. then if nn == 13349 then nn = 577 else nn = 13427; continue end else tT[1] = (tT[1] + tL[20]) % tL[895]; nn = 737 end elseif nn < 13352 then if nn == 13351 then nn = if tT[7] <= tL[594.] then 131 else 748 else nn = 13540; continue end
+elseif nn == 13352 then nn = 503 else nn = 13801; continue end elseif nn < 13376 then if nn < 13365. then if nn < 13359. then if nn < 13356. then if nn < 13355 then if nn < 13354 then if nn == 13353. then tT[14] = nil; tT[14] = tL[140] - tL[268]; nn = 312.
+else nn = 13153; continue end elseif nn == 13354 then nn = 736 else nn = 13448; continue end else tT[9.] = tL[809]; nn = 115 end elseif nn < 13358 then if nn < 13357 then local uv = tL; tT[13] = { uv[663.], uv[533], uv[445], uv[994], uv[995], uv[165.], uv[9.],
+uv[415], uv[466], uv[495.], uv[391], uv[408.] }; local uK = tT[5]; tT[3.] = tT[13][uK % uv[954.] + uv[268]]; nn = if tT[3.]:len() >= tT[3.]:gsub(uv[179], uv[75.], uK % uv[817] % uv[140] + uv[268]):len() then 350 else 166 elseif nn == 13357 then tT[14] = (tT[14] + tL[849.]) % tL[276.];
+nn = 596 else nn = 13780; continue end elseif nn == 13358 then nn = 408. else nn = 14161; continue end elseif nn < 13362. then if nn < 13361 then if nn < 13360 then if nn == 13359. then local uv = tL; tT[11] = (vector.create((tT[1] * uv[817] + uv[27.]) % uv[47] + uv[268], (tT[1] * uv[47] + uv[47]) % uv[161] + uv[268], (tT[1] * uv[954.] + uv[204.]) % uv[24.] + uv[268]));
+tT[18.] = (vector.create((tT[1] * uv[682] + uv[396.]) % uv[47] + uv[268], (tT[1] * uv[249.] + uv[204.]) % uv[161] + uv[268], (tT[1] * uv[698] + uv[844]) % uv[24.] + uv[268])); tT[6.] = (vector.create((tT[1] * uv[817] + uv[594.]) % uv[47] + uv[268], (tT[1] * uv[204.] + uv[817]) % uv[161] + uv[268], (tT[1] * uv[844] + uv[140]) % uv[24.] + uv[268]));
+tT[13] = (vector.create((tT[1] * uv[140] + uv[140]) % uv[249.] + uv[268], (tT[1] * uv[249.] + uv[140]) % uv[594.] + uv[268], (tT[1] * uv[268] + uv[682]) % uv[396.] + uv[268])); nn = if vector.dot(vector.cross(tT[11], (vector.cross(tT[18.], tT[6.]))), tT[13]) == vector.dot(tT[18.] * vector.dot(tT[11], tT[6.]) - tT[6.] * vector.dot(tT[11], tT[18.]), tT[13]) + uv[249.] then 164 else 578
+else nn = 13502; continue end elseif nn == 13360 then mk = tL[248]; nn = 537. else nn = 13757; continue end else nn = 604 end elseif nn < 13364 then if nn < 13363 then if nn == 13362. then nn = if tT[13] <= tL[268] then 309. else 237. else nn = 13155.; continue
+end elseif nn == 13363 then tT[3.] = (tT[3.] + tL[268]) % tL[357.]; nn = 276. else nn = 13810; continue end elseif nn == 13364 then local uv = tL; tT[14] = (vector.create((tT[3.] * uv[249.] + uv[249.]) % uv[47] + uv[268], (tT[3.] * uv[204.] + uv[204.]) % uv[161] + uv[268], (tT[3.] * uv[954.] + uv[268]) % uv[24.] + uv[268]));
+tT[4] = (vector.create((tT[3.] * uv[27.] + uv[140]) % uv[47] + uv[268], (tT[3.] * uv[47] + uv[27.]) % uv[161] + uv[268], (tT[3.] * uv[817] + uv[698]) % uv[24.] + uv[268])); local uL = vector.cross(tT[14], tT[4]); local uM = vector.dot(tT[14], tT[4]); nn = if vector.dot(uL, uL) + uM * uM == vector.dot(tT[14], tT[14]) * vector.dot(tT[4], tT[4]) then 360. else 491
+else nn = 13456; continue end elseif nn < 13371. then if nn < 13368. then if nn < 13367 then if nn < 13366 then if nn == 13365. then nn = 722 else nn = 13421; continue end else tT[1] = nil; local uv = tL; tT[1] = uv[817] - uv[140]; tT[1] = uv[143] + uv[268];
+tT[1] = uv[817] - uv[140]; tT[1] = uv[140] - uv[268]; nn = 260 end else nn = if tT[3.] * tL[349] + tL[140] + tL[268] >= tT[3.] * tL[349] + tL[140] + tL[268] + tL[249.] then 461 else 443 end elseif nn < 13370 then if nn < 13369 then if nn == 13368. then tT[3.] = (tT[3.] + tL[226]) % tL[357.];
+nn = 558. else nn = 13138; continue end else nn = 311 end else mk = tL[518]; nn = 191 end elseif nn < 13374. then if nn < 13373 then if nn < 13372 then if nn == 13371. then nn = 341 else nn = 13368.; continue end else tT[5] = (tT[5] + tL[735.]) % tL[656]; nn = 298
+end elseif nn == 13373 then tT[4] = tT[5]; nn = 401 else nn = 13722.; continue end elseif nn < 13375 then if nn == 13374. then local uv = tL; nG = if (tT[3.] * uv[226] + uv[140]) % uv[357.] == uv[20] then uv[268] else uv[143]; nE = uv[644] * nG + uv[790] * (uv[268] - nG);
+nF = uv[208] * nG + uv[556] * (uv[268] - nG); nn = if (nE * uv[80] + nF * uv[5] + nE * nF) % uv[131] == uv[246.] then 638 else 729. else nn = 13649; continue end elseif nn == 13375 then nn = if tT[7] <= tL[437] then 677 else 5 else nn = 13781; continue end
+elseif nn < 13387 then if nn < 13382 then if nn < 13379 then if nn < 13378 then if nn < 13377. then if nn == 13376 then nn = 232 else nn = 13775; continue end elseif nn == 13377. then tT[14] = nj[tL[877]]:AddLeftGroupbox(tL[243.], tL[655]); nn = 33. else nn = 13513;
+continue end elseif nn == 13378 then tT[5] = nil; local uv = tL; tT[5] = uv[140] - uv[268]; tT[5] = uv[249.] - uv[27.]; tT[5] = uv[143] + uv[268]; tT[5] = uv[817] - uv[140]; nn = 150. else nn = 13381; continue end elseif nn < 13381 then if nn < 13380. then
+tT[1] = (tT[1] + tL[298]) % tL[895]; nn = 282. else nn = 694 end else tT[11] = { tL[902], tL[479], tL[627.], tL[691], tL[590], tL[710], tL[103], tL[559], tL[855.], tL[657.], tL[702.] }; nn = 747. end elseif nn < 13385 then if nn < 13384 then if nn < 13383. then
+if nn == 13382 then nn = 697 else nn = 13407.; continue end else tT[3.] = (tT[3.] + tL[226]) % tL[357.]; nn = 244 end elseif nn == 13384 then nn = 722 else nn = 13728.; continue end elseif nn < 13386. then if nn == 13385 then nn = 441. else nn = 13214; continue
+end elseif nn == 13386. then nj = tT[14][tL[877]]:AddLeftGroupbox(tL[243.], tL[655]); nn = 33. else nn = 13184; continue end elseif nn < 13393 then if nn < 13390 then if nn < 13389. then if nn < 13388 then nn = if tT[7] <= tL[46] then 549. else 90. else nn = 608
+end else nn = 683 end elseif nn < 13392. then if nn < 13391 then if nn == 13390 then lT = nil; lP = {}; lW = nil; nn = 662 else nn = 13519; continue end elseif nn == 13391 then nn = if tT[7] <= tL[298] then 709 else 431 else nn = 13452.; continue end else tT[7] = (tT[3.] * tL[268] + tL[844]) % tL[523] + tL[268];
+nn = 182 end elseif nn < 13397 then if nn < 13396 then if nn < 13395. then if nn < 13394 then if nn == 13393 then tT[4], mf, me, mb, l8, l4, l2, lX, lW, lT, lP, lL, lJ, lF, m2, mZ, tT[10], mR, mM, tT[14] = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+tT[14] = tL[624.]; nn = 684. else nn = 13594; continue end else nn = 169 end else nn = 142 end else tT[10] = tL[11]:GetService(tL[591.]); nn = 572 end elseif nn < 13398. then local uv = tL; tT[5] = { uv[674], uv[61], uv[879.], uv[366.], uv[878], uv[289], uv[767],
+uv[13], uv[19], uv[803], uv[73] }; local uN = tT[14]; tT[11] = tT[5][uN % uv[47] + uv[268]]; nn = if tT[11]:len() >= tT[11]:reverse():rep(uN % uv[817] + uv[140]):len() then 586 else 460 elseif nn == 13398. then nn = 53 else nn = 13572.; continue end elseif nn < 13445 then
+if nn < 13423 then if nn < 13411 then if nn < 13405 then if nn < 13402 then if nn < 13401. then if nn < 13400 then nn = 378. elseif nn == 13400 then local uv = tL; isOn = uv[85]; mA = uv[581]; nn = 579. else nn = 13454; continue end elseif nn == 13401. then
+lJ = nil; lF = nil; m2 = nil; mZ = nil; nn = 524 else nn = 13299.; continue end elseif nn < 13404. then if nn < 13403 then nn = if true then 688 else 26 elseif nn == 13403 then nn = 269 else nn = 13206.; continue end elseif nn == 13404. then nn = if true then 632 else 563
+else nn = 13771; continue end elseif nn < 13408 then if nn < 13407. then if nn < 13406 then nn = 258. elseif nn == 13406 then nn = 195. else nn = 13849; continue end else local uO = tL[11][tL[166]]; local uv = tL; l_:AddLabel(tT[18.](lK .. uv[833] .. tostring(uv[488]) .. uv[962], mT), true);
+uO = uv[11][uv[166]]; l_:AddLabel(tT[15.](uv[862], tostring(uv[488]), mT), true); nh = l_:AddLabel(tT[15.](uv[113], uv[104], lQ), true); nn = 272 end elseif nn < 13410. then if nn < 13409 then nn = if true then 678. else 694 elseif nn == 13409 then lU = function()
+local c2 = {}; local function c3(c4) local p1, p2, p3, p4, p5, p7, p8, p9, qa, qb = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local p6 = nil; p6 = 15.; while true do p6 = 6373 - p6; do if p6 < 6367 then if p6 < 6363. then if p6 < 6361 then if p6 < 6360. then
+if p6 < 6358 then if p6 < 6357. then break else return end elseif p6 < 6359 then if p6 == 6358 then p6 = if not c4 then 16 else 8 else p6 = 6372.; continue end else p3 = not p2:GetAttribute(tL[861.]); p6 = 9. end else table.insert(c2, { [tL[614]] = p2, [tL[292]] = p3,
+[tL[162.]] = p4, [tL[253]] = mB(p4), [tL[516.]] = mg(p4), [tL[616]] = lS(p4), [tL[199]] = mm(p2) }); p6 = 12. end elseif p6 < 6362 then if p6 == 6361 then p6 = 5 else p6 = 6359; continue end else p5 = type(p4) == tL[773]; p6 = 7 end elseif p6 < 6366. then if p6 < 6365 then
+if p6 < 6364 then p6 = 2 else p6 = if p3 then 1 else 5 end else p1 = c4:GetChildren(); p2 = #p1; p9 = tL[268]; p7 = p2; p6 = 6. end else p6 = if p5 then 13 else 12. end elseif p6 < 6371 then if p6 < 6369. then if p6 < 6368 then if p6 == 6367 then p6 = if p9 <= p7 then 0. else 10
+else p6 = 6364; continue end elseif p6 == 6368 then p6 = 4 else p6 = 6373; continue end elseif p6 < 6370 then if p6 == 6369. then p9 += tL[268]; p6 = 6. else p6 = 6361; continue end else qb = qa; p2 = p1[qb]; p3 = (p2:IsA(tL[443])); p6 = if p3 then 14 else 9.
+end elseif p6 < 7293. then if p6 < 6373 then if p6 < 6372. then break else p3 = p2:GetAttribute(tL[799]); p4 = p2:GetAttribute(tL[636.]); p5 = type(p3) == tL[773]; p6 = if p5 then 11 else 7 end elseif p6 == 6373 then qa = p9; p6 = 3. else break end else break
+end end end end; local uP = tL; c3(mu:FindFirstChild(uP[565])); c3(mu[uP[731]]); table.sort(c2, function(dm, dn) local qc, qd = nil, nil; local qe = nil; qe = 1; while true do qe = 3933. - qe; do if qe < 3933. then if qe < 3928 then if qe < 3926 then break
+elseif qe < 3927. then return dm[tL[199]] > dn[tL[199]] elseif qe == 3927. then local uQ = tL; qc = l3(dm[uQ[162.]]); qd = l3(dn[uQ[162.]]); qe = if qc == qd then 2 else 4 else qe = 3931; continue end elseif qe < 3930. then if qe < 3929 then if qe == 3928 then
+return dm[tL[253]] < dn[tL[253]] else qe = 5323; continue end else return qc > qd end elseif qe < 3931 then break elseif qe < 3932 then if qe == 3931 then qe = if dm[tL[616]] == dn[tL[616]] then 5 else 0. else qe = 960.; continue end elseif qe == 3932 then
+qe = if dm[tL[199]] == dn[tL[199]] then 6. else 7 else qe = 960.; continue end elseif qe < 5323 then if qe < 5196. then if qe < 4496 then if qe == 3933. then return dm[tL[616]] < dn[tL[616]] else qe = 8256.; continue end else break end else break end else break
+end end end end); return c2 end; local uv = tL; mC = uv[715]; lZ = uv[206]; mU = uv[825.]; l7 = uv[837.]; nn = 31 else nn = 13572.; continue end elseif nn == 13410. then nn = if tT[5] <= tL[437] then 61 else 582. else nn = 13437.; continue end elseif nn < 13417 then
+if nn < 13414 then if nn < 13413. then if nn < 13412 then if nn == 13411 then nn = 348. else nn = 13736; continue end elseif nn == 13412 then nn = if (nh and lN or (lG or not lG)) and (not lN and not nh and (not nh or not lN)) and not ((nh and lN or (lG or not lG)) and (not lN and not nh and (not nh or not lN))) then 25 else 561.
+else nn = 13589; continue end else tT[14] = nil; local uv = tL; tT[14] = uv[594.] - uv[682]; tT[14] = uv[249.] - uv[268]; nn = 372. end elseif nn < 13416. then if nn < 13415 then tT[14] = (tT[14] + tL[436]) % tL[276.]; nn = 615. elseif nn == 13415 then nn = 334
+else nn = 13607; continue end else nn = if tT[13] <= tL[817] then 129. else 616 end elseif nn < 13421 then if nn < 13420 then if nn < 13419. then if nn < 13418 then mn = tT[7]; tT[1] = {}; tT[7] = ms[tL[666.]]; nn = if tT[7] then 189. else 724 elseif nn == 13418 then
+local uv = tL; isOn = uv[85]; mo = uv[581]; nn = 579. else nn = 13846; continue end else mL = tL[11]:GetService(tL[552.]); nn = 297. end elseif nn == 13420 then nn = 614 else nn = 13811; continue end elseif nn < 13422. then tT[7] = nil; local uv = tL; tT[7] = uv[249.] - uv[27.];
+tT[7] = uv[143] + uv[268]; tT[7] = uv[140] - uv[268]; tT[7] = uv[140] - uv[268]; tT[7] = uv[143] + uv[268]; nn = 7 else mR = {}; mM = {}; nn = 210. end elseif nn < 13434. then if nn < 13429 then if nn < 13426 then if nn < 13425. then if nn < 13424 then if nn == 13423 then
+nn = 323 else nn = 13722.; continue end else nn = if tT[7] <= tL[697] then 667 else 654. end elseif nn == 13425. then nn = 422 else nn = 13596.; continue end elseif nn < 13428. then if nn < 13427 then tT[18.] = {}; nn = 489. else nn = 696. end else nn = if true then 469 else 576.
+end elseif nn < 13432 then if nn < 13431. then if nn < 13430 then tT[3.] = (tT[3.] + tL[226]) % tL[357.]; nn = 545 else tT[14] = nil; local uv = tL; tT[14] = uv[140] - uv[268]; tT[14] = uv[143] + uv[268]; nn = 542 end else nn = if tT[1] <= tL[268] then 4 else 146
+end elseif nn < 13433 then if nn == 13432 then l8 = false; l4 = false; nn = 447. else nn = 13219; continue end else tT[1] = #tT[11]; nv = tL[268]; nt = tT[1]; nn = 580 end elseif nn < 13440. then if nn < 13437. then if nn < 13436 then if nn < 13435 then if nn == 13434. then
+mH = tL[883]; nn = 136 else nn = 13193; continue end elseif nn == 13435 then tT[11] = nil; local uv = tL; tT[11] = uv[249.] - uv[27.]; tT[11] = uv[249.] - uv[27.]; tT[11] = uv[143] + uv[268]; nn = 310 else nn = 13713.; continue end elseif nn == 13436 then nn = if tT[5] <= tL[47] then 640 else 307
+else nn = 13220; continue end elseif nn < 13439 then if nn < 13438 then if nn == 13437. then local uv = tL; mx = uv[229]; mp = uv[1]; mi = uv[758]; l6 = uv[583]; lR = uv[336.]; nn = 243. else nn = 13277; continue end elseif nn == 13438 then nn = if ms and not tT[10] and (tT[14] or not mL) and (tT[14] or ms or (not ms or not tT[10])) or not (ms and not tT[10] and (tT[14] or not mL) and (tT[14] or ms or (not ms or not tT[10]))) then 254 else 517
+else nn = 13401.; continue end else nn = 364 end elseif nn < 13443. then if nn < 13442 then if nn < 13441 then nn = if tT[13] <= tL[249.] then 639. else 184 else tT[14] = tT[5]; nn = 335 end else tT[14] = nil; tT[14] = tL[27.] - tL[140]; nn = 332 end elseif nn < 13444 then
+mO = tL[787]; nn = 74 else nn = if (tT[3.] * tL[140] + tL[27.]) * tL[594.] % tL[817] == ((tT[3.] * tL[140] + tL[27.]) * tL[594.] + tL[143]) % tL[817] then 628 else 452 end elseif nn < 13469 then if nn < 13457 then if nn < 13451 then if nn < 13448 then if nn < 13447 then
+if nn < 13446. then if nn == 13445 then tT[1] = (tT[1] + tL[20]) % tL[895]; nn = 652 else nn = 13782.; continue end elseif nn == 13446. then nn = 231. else nn = 13616; continue end else tT[16] = tL[11]:GetService(tL[174.]); nn = 581 end elseif nn < 13450 then
+if nn < 13449. then if nn == 13448 then nn = if tT[1] <= tL[594.] then 101 else 400 else nn = 13243; continue end else nn = 117. end elseif nn == 13450 then nn = 269 else nn = 13140.; continue end elseif nn < 13454 then if nn < 13453 then if nn < 13452. then
+me = mf; mb = false; tT[7] = false; tT[4] = false; nn = 247 elseif nn == 13452. then tT[14] = (tT[14] + tL[496]) % tL[276.]; nn = 315. else nn = 13709; continue end elseif nn == 13453 then nn = 233 else nn = 13825; continue end elseif nn < 13456 then if nn < 13455. then
+tT[14] = nil; local uv = tL; tT[14] = uv[396.] - uv[682]; tT[14] = uv[143] + uv[817]; nn = 97 elseif nn == 13455. then tT[1] = nil; local uv = tL; tT[1] = uv[27.] - uv[817]; tT[1] = uv[143] + uv[268]; tT[1] = uv[817] - uv[140]; tT[1] = uv[143] + uv[268]; nn = 178
+else nn = 13457; continue end elseif nn == 13456 then nn = 139 else nn = 13718; continue end elseif nn < 13463 then if nn < 13460 then if nn < 13459 then if nn < 13458. then lE = tL[1013]; nn = 371 elseif nn == 13458. then l2 = tL[254]; nn = 522. else nn = 13678;
+continue end else nn = 434 end elseif nn < 13462 then if nn < 13461. then tT[11] = tostring(tT[4]); tT[4] = tT[14][tL[509]]; nn = if tT[4] then 262 else 30. else tT[5] = nil; local uv = tL; tT[5] = uv[817] - uv[268]; tT[5] = uv[143] + uv[140]; tT[5] = uv[140] - uv[268];
+nn = 611 end else nn = 669. end elseif nn < 13467. then if nn < 13466 then if nn < 13464. then local uv = tL; tT[13] = { uv[560], uv[125], uv[225.], uv[557], uv[543.], uv[645.], uv[786.], uv[452] }; local uR = tT[5]; tT[3.] = tT[13][uR % uv[204.] + uv[268]];
+nn = if tT[3.]:len() >= tT[3.]:gsub(uv[179], uv[75.], uR % uv[817] % uv[140] + uv[268]):len() then 584 else 716 elseif nn < 13465 then nn = 527 else nn = 99. end else nn = 398 end elseif nn < 13468 then if nn == 13467. then nn = if (tT[3.] * tL[140] + tL[682]) * tL[27.] % tL[817] == ((tT[3.] * tL[140] + tL[682]) * tL[27.] + tL[817]) % tL[817] then 177. else 144.
+else nn = 13460; continue end elseif nn == 13468 then tT[1] = (tT[14] * tL[27.] + tL[817]) % tL[396.] + tL[268]; nn = 263 else nn = 13524.; continue end elseif nn < 13480 then if nn < 13475 then if nn < 13472 then if nn < 13471 then if nn < 13470. then nz = ny;
+tT[14] = tT[11][nz]; tT[7][tT[14]] = true; table.insert(tT[1], tT[14]); nn = 82 else mQ = tT[4]:WaitForChild(tL[263]); nn = 698 end elseif nn == 13471 then nn = 270. else nn = 13289; continue end elseif nn < 13474 then if nn < 13473. then if nn == 13472 then
+nn = if (tT[1] * tL[140] + tL[268]) * tL[161] % tL[817] == ((tT[1] * tL[140] + tL[268]) * tL[161] + tL[682]) % tL[817] then 681. else 704 else nn = 13239.; continue end elseif nn == 13473. then nn = 389 else nn = 13290.; continue end elseif nn == 13474 then
+tT[14] = nil; tT[14] = tL[698] - tL[844]; nn = 382 else nn = 13277; continue end elseif nn < 13478 then if nn < 13477 then if nn < 13476. then nn = 673 else local uv = tL; nG = if tT[7] <= uv[252.] then uv[268] else uv[143]; nE = uv[1002.] * nG + uv[497] * (uv[268] - nG);
+nF = uv[723.] * nG + uv[42.] * (uv[268] - nG); nn = if (nE * uv[1008.] + nF * uv[237.] + nE * nF) % uv[131] == uv[832] then 369. else 557 end elseif nn == 13477 then nD = nC; tT[14] = tT[7][nD]; tT[4] = tT[14][tL[365]]; nn = if tT[4] then 0. else 283 else nn = 13853;
+continue end elseif nn < 13479. then if nn == 13478 then tT[14] = nil; local uv = tL; tT[14] = uv[249.] - uv[27.]; tT[14] = uv[143] + uv[268]; nn = 274 else nn = 13140.; continue end elseif nn == 13479. then nn = if tT[7] <= tL[416] then 355 else 448 else nn = 13579;
+continue end elseif nn < 13486 then if nn < 13483 then if nn < 13482. then if nn < 13481 then tT[3.] = (tT[3.] + tL[270.]) % tL[357.]; nn = 362 elseif nn == 13481 then nn = if tT[5] <= tL[594.] then 606. else 613 else nn = 13235; continue end elseif nn == 13482. then
+tT[14] = tT[10]:WaitForChild(tL[886]); nn = 102. else nn = 13764.; continue end elseif nn < 13485. then if nn < 13484 then if nn == 13483 then nn = 318. else nn = 13229; continue end elseif nn == 13484 then local uv = tL; tT[14] = { uv[222.], uv[851], uv[331],
+uv[568], uv[310], uv[480.], uv[678.], uv[603.], uv[952] }; local uS = tT[3.]; tT[4] = tT[14][uS % uv[396.] + uv[268]]; nn = if tT[4]:len() >= tT[4]:gsub(uv[179], uv[75.], uS % uv[817] % uv[140] + uv[268]):len() then 655 else 692 else nn = 13714; continue end
+elseif nn == 13485. then mu = lD[tL[107]]; nn = 288. else nn = 13736; continue end elseif nn < 13489 then if nn < 13488. then if nn < 13487 then local uT = bit32.rrotate(bit32.bxor(bit32.lrotate(tT[3.], tL[315.]), string.byte(tostring(lN))), tL[24.]); nn = if bit32.bxor(bit32.lrotate(bit32.bxor(uT, tL[101]), tL[143]), tL[101]) ~= bit32.lrotate(uT, tL[143]) then 250 else 183.
+else nn = if tT[5] <= tL[844] then 153. else 361 end elseif nn == 13488. then nn = 671 else nn = 13323.; continue end elseif nn < 13490 then nn = if tT[7] <= tL[356] then 175 else 661 elseif nn == 13490 then tT[3.] = (tT[3.] + tL[270.]) % tL[357.]; nn = 402.
+else nn = 13411; continue end elseif nn < 13677. then if nn < 13583 then if nn < 13537 then if nn < 13514 then if nn < 13503. then if nn < 13497. then if nn < 13494. then if nn < 13493 then if nn < 13492 then nn = if ((me and not mR or mR and not lX) and (not me and not mR and (not mR and mR)) or (lX and not lX or lX and not mM) and ((mR or not mM) and (not mM or me)) or (not mR and mR and (lX and not mR) and (not me and not mR and (not mR and mM)) or (not me or not me or not mM and not lX or lX and me and (not mM and lX)))) and not ((me and not mR or mR and not lX) and (not me and not mR and (not mR and mR)) or (lX and not lX or lX and not mM) and ((mR or not mM) and (not mM or me)) or (not mR and mR and (lX and not mR) and (not me and not mR and (not mR and mM)) or (not me or not me or not mM and not lX or lX and me and (not mM and lX)))) then 471. else 591.
+else nn = 675. end elseif nn == 13493 then tT[3.] = (tT[3.] + tL[268]) % tL[357.]; nn = 317 else nn = 13339; continue end elseif nn < 13496 then if nn < 13495 then local uv = tL; tT[14] = { uv[822.], uv[133], uv[169], uv[28], uv[158], uv[913], uv[604], uv[534.],
+uv[728], uv[779], uv[687.] }; nn = if tT[14][(tT[3.] * uv[316] + uv[55]) % uv[47] + uv[268]] <= tT[14][(tT[3.] * uv[316] + uv[55]) % uv[47] + uv[268]] then 287 else 695 elseif nn == 13495 then tT[14] = nil; local uv = tL; tT[14] = uv[249.] - uv[27.]; tT[14] = uv[27.] - uv[817];
+tT[14] = uv[143] + uv[268]; nn = 526 else nn = 13846; continue end else nn = 436 end elseif nn < 13500. then if nn < 13499 then if nn < 13498 then if nn == 13497. then nn = 100 else nn = 13603; continue end elseif nn == 13498 then tT[7] = {}; tT[14] = #tT[11];
+nv = tL[268]; nt = tT[14]; nn = 550 else nn = 13466; continue end elseif nn == 13499 then nn = 462. else nn = 13689.; continue end elseif nn < 13502 then if nn < 13501 then if nn == 13500. then tT[11] = nil; tT[11] = tL[817] - tL[268]; nn = 425 else nn = 13697;
+continue end elseif nn == 13501 then md = tL[518]; nn = 191 else nn = 13807; continue end else nn = 494 end elseif nn < 13509. then if nn < 13506. then if nn < 13505 then if nn < 13504 then if nn == 13503. then tT[11] = nil; local uv = tL; tT[11] = uv[249.] - uv[27.];
+tT[11] = uv[204.] - uv[249.]; nn = 8 else nn = 13194.; continue end else tT[10] = tT[14]:WaitForChild(tL[886]); nn = 102. end elseif nn == 13505 then nn = 502 else nn = 13594; continue end elseif nn < 13508 then if nn < 13507 then nn = 385 else nC = nv; nn = 384.
+end elseif nn == 13508 then nn = if tT[5] <= tL[817] then 720. else 679 else nn = 13476.; continue end elseif nn < 13512. then if nn < 13511 then if nn < 13510 then if nn == 13509. then nn = if (tT[5] * tL[298] + tL[673]) % tL[353] == tL[252.] then 481 else 700
+else nn = 13209.; continue end elseif nn == 13510 then nn = 285. else nn = 13472; continue end elseif nn == 13511 then tT[7] = tT[4]; nn = 302 else nn = 13844; continue end elseif nn < 13513 then nn = 547 elseif nn == 13513 then local uv = tL; tT[14] = { uv[354.],
+uv[894.], uv[420.], uv[96.], uv[323], uv[434], uv[842], uv[12.], uv[102.], uv[118], uv[478] }; local uU = tT[3.]; tT[4] = tT[14][uU % uv[47] + uv[268]]; nn = if tT[4]:len() >= tT[4]:reverse():rep(uU % uv[817] + uv[140]):len() then 57. else 506 else nn = 13331;
+continue end elseif nn < 13526 then if nn < 13520 then if nn < 13517 then if nn < 13516 then if nn < 13515. then if nn == 13514 then tT[11] = nil; tT[11] = tL[27.] - tL[817]; nn = 84. else nn = 13335.; continue end elseif nn == 13515. then local uV = bit32.rrotate(bit32.bxor(bit32.lrotate(tT[7], tL[844]), string.byte(tostring(tT[7]))), tL[733]);
+nn = if bit32.bxor(bit32.lrotate(bit32.bxor(uV, tL[454]), tL[673]), tL[421]) == bit32.lrotate(uV, tL[673]) then 620 else 618. else nn = 13802; continue end else nn = 633. end elseif nn < 13519 then if nn < 13518. then lI = #tT[11] > tL[673]; nn = 121 elseif nn == 13518. then
+local uW = bit32.rrotate(bit32.bxor(bit32.lrotate(tT[3.], tL[697]), string.byte(tostring(md))), tL[697]); nn = if bit32.bxor(bit32.lrotate(bit32.bxor(uW, tL[906.]), tL[27.]), tL[241]) ~= bit32.lrotate(uW, tL[27.]) then 711. else 135. else nn = 13145; continue
+end else tT[18.] = {}; nn = 141. end elseif nn < 13523 then if nn < 13522 then if nn < 13521. then if nn == 13520 then nn = 47 else nn = 13558; continue end elseif nn == 13521. then mS = lG[tL[257]]; nn = 41 else nn = 13680.; continue end else tT[3.] = (tT[3.] + tL[268]) % tL[357.];
+nn = 6. end elseif nn < 13525 then if nn < 13524. then local uv = tL; mE = tT[4]:WaitForChild(uv[209]); mz = tT[4]:WaitForChild(uv[367]); nn = 594. elseif nn == 13524. then local uv = tL; lY = uv[44]; mk = uv[815]; mc = uv[435.]; nn = 493 else nn = 13486; continue
+end elseif nn == 13525 then tT[3.] = (tT[3.] + tL[268]) % tL[357.]; nn = 328 else nn = 13626.; continue end elseif nn < 13532 then if nn < 13529 then if nn < 13528 then if nn < 13527. then tT[11] = tostring(tT[14]); table.insert(tT[10], tT[5]); mR[tT[5]] = tT[7];
+mM[string.lower(tT[11])] = tT[7]; mM[string.lower(tT[5])] = tT[7]; nn = 11 else nn = 18. end elseif nn == 13528 then lQ = tL[6.]; nn = 531. else nn = 13154; continue end elseif nn < 13531 then if nn < 13530. then if nn == 13529 then nn = if tT[7] <= tL[47] then 450. else 564.
+else nn = 13235; continue end else tT[11] = nil; local uv = tL; tT[11] = uv[249.] - uv[27.]; tT[11] = uv[143] + uv[268]; nn = 551 end elseif nn == 13531 then nn = if (tT[1] * tL[140] + tL[204.]) * tL[844] % tL[817] == ((tT[1] * tL[140] + tL[204.]) * tL[844] + tL[682]) % tL[817] then 72. else 442
+else nn = 13547; continue end elseif nn < 13535 then if nn < 13534 then if nn < 13533. then if nn == 13532 then tT[5] = nil; local uv = tL; tT[5] = uv[817] - uv[140]; tT[5] = uv[143] + uv[268]; nn = 413 else nn = 13394; continue end elseif nn == 13533. then
+nn = 663. else nn = 13472; continue end elseif nn == 13534 then tT[1] = (tT[1] + tL[20]) % tL[895]; nn = 349 else nn = 13209.; continue end elseif nn < 13536. then nn = if tT[5] <= tL[396.] then 356 else 347 else nn = if tT[7] <= tL[656] then 473 else 387.
+end elseif nn < 13560. then if nn < 13549 then if nn < 13543 then if nn < 13540 then if nn < 13539. then if nn < 13538 then nn = 462. else nn = 60. end else tT[14] = mn; tT[5] = #tT[14]; nv = tL[268]; nt = tT[5]; nn = 546. end elseif nn < 13542. then if nn < 13541 then
+nj = { [tL[877]] = tT[11]:AddTab(tL[877], tL[364]), [tL[286]] = tT[11]:AddTab(tL[286], tL[33.]), [tL[383]] = tT[11]:AddTab(tL[383], tL[567.]), [tL[928]] = tT[11]:AddTab(tL[928], tL[127]), [tL[181]] = tT[11]:AddTab(tL[181], tL[927.]), [tL[405.]] = tT[11]:AddTab(tL[405.], tL[433]),
+[tL[863]] = tT[11]:AddTab(tL[863], tL[914]) }; nn = 381. elseif nn == 13541 then tT[14] = nil; local uv = tL; tT[14] = uv[27.] - uv[140]; tT[14] = uv[268] + uv[268]; tT[14] = uv[249.] - uv[27.]; tT[14] = uv[143] + uv[268]; nn = 114. else nn = 13548.; continue
+end elseif nn == 13542. then local uv = tL; mD = uv[11]:GetService(uv[948.]); tT[7] = uv[11]:GetService(uv[370]); nn = 556 else nn = 13690; continue end elseif nn < 13546 then if nn < 13545. then if nn < 13544 then if nn == 13543 then nn = 242 else nn = 13752.;
+continue end elseif nn == 13544 then nn = 665 else nn = 13230.; continue end elseif nn == 13545. then tT[3.] = nil; local uv = tL; tT[3.] = uv[27.] - uv[817]; tT[3.] = uv[27.] - uv[817]; nn = 619 else nn = 13482.; continue end elseif nn < 13548. then if nn < 13547 then
+nn = 717. else mY = tL[11]:GetService(tL[889]); nn = 212 end elseif nn == 13548. then local uv = tL; tT[11] = (vector.create((tT[1] * uv[140] + uv[268]) % uv[47] + uv[268], (tT[1] * uv[204.] + uv[204.]) % uv[161] + uv[268], (tT[1] * uv[698] + uv[682]) % uv[24.] + uv[268]));
+tT[18.] = (vector.create((tT[1] * uv[594.] + uv[140]) % uv[47] + uv[268], (tT[1] * uv[844] + uv[682]) % uv[161] + uv[268], (tT[1] * uv[698] + uv[594.]) % uv[24.] + uv[268])); tT[6.] = (vector.create((tT[1] * uv[140] + uv[268]) % uv[249.] + uv[268], (tT[1] * uv[817] + uv[817]) % uv[594.] + uv[268], (tT[1] * uv[27.] + uv[140]) % uv[396.] + uv[268]));
+nn = if math.abs((vector.angle(tT[11], tT[18.], tT[6.]))) - math.abs((vector.angle(tT[18.], tT[11], tT[6.]))) == uv[143] + uv[268] then 134 else 314 else nn = 13304; continue end elseif nn < 13555 then if nn < 13552 then if nn < 13551. then if nn < 13550 then
+nn = if (not lY and not m_ or (not lR or not lY)) and (not m_ or not lY or (l_ or not lR)) and ((not lR or m_) and (m_ and lY) and ((lY or lR) and (not l_ or lR))) and not ((not lY and not m_ or (not lR or not lY)) and (not m_ or not lY or (l_ or not lR)) and ((not lR or m_) and (m_ and lY) and ((lY or lR) and (not l_ or lR)))) then 548 else 321.
+else nn = 137 end elseif nn == 13551. then nn = if (tT[1] * tL[140] + tL[249.]) * tL[844] % tL[817] == ((tT[1] * tL[140] + tL[249.]) * tL[844] + tL[143]) % tL[817] then 465. else 45. else nn = 13812.; continue end elseif nn < 13554. then if nn < 13553 then
+if nn == 13552 then nn = 213. else nn = 13118; continue end elseif nn == 13553 then nn = 351. else nn = 13724; continue end elseif nn == 13554. then tT[11] = nil; local uv = tL; tT[11] = uv[249.] - uv[27.]; tT[11] = uv[143] + uv[268]; tT[11] = uv[27.] - uv[817];
+tT[11] = uv[817] - uv[140]; nn = 664 else nn = 13383.; continue end elseif nn < 13558 then if nn < 13557. then if nn < 13556 then local uv = tL; tT[18.]:AddLabel(mu(uv[265], nj[uv[215]], nh), true); tT[18.]:AddLabel(mu(uv[573.], uv[810.], nh), true); tT[18.]:AddLabel(mu(uv[137], tT[14], nh), true);
+tT[18.]:AddLabel(mu(uv[666.], tostring(ni), tT[4]), true); lQ = mq[uv[877]]:AddLeftGroupbox(uv[278], uv[33.]); nn = 625 elseif nn == 13556 then nn = 412 else nn = 13173.; continue end elseif nn == 13557. then nn = if tT[7] <= tL[268] then 516. else 3. else
+nn = 13743.; continue end elseif nn < 13559 then nn = 200 elseif nn == 13559 then tT[5] = (tT[5] + tL[249.]) % tL[353]; nn = 446 else nn = 13660; continue end elseif nn < 13572. then if nn < 13566. then if nn < 13563. then if nn < 13562 then if nn < 13561 then
+if nn == 13560. then tT[5] = tostring(tT[14]); tT[14] = tT[7][tL[215]]; nn = if tT[14] then 335 else 420. else nn = 13725.; continue end else nn = 330. end elseif nn == 13562 then nn = 479 else nn = 13714; continue end elseif nn < 13565 then if nn < 13564 then
+if nn == 13563. then nn = 441. else nn = 13561; continue end elseif nn == 13564 then tT[1] = (tT[1] + tL[873.]) % tL[895]; nn = 744. else nn = 13683.; continue end elseif nn == 13565 then local uv = tL; tT[7] = (vector.create((tT[5] * uv[817] + uv[27.]) % uv[47] + uv[268], (tT[5] * uv[249.] + uv[594.]) % uv[161] + uv[268], (tT[5] * uv[817] + uv[204.]) % uv[24.] + uv[268]));
+local uX = vector.floor(tT[7]) + vector.ceil(tT[7] * uv[217]); nn = if vector.dot(uX, uX) == uv[143] then 140 else 9. else nn = 13191.; continue end elseif nn < 13569. then if nn < 13568 then if nn < 13567 then if nn == 13566. then tT[4] = mw:WaitForChild(tL[311]);
+nn = 536 else nn = 13842.; continue end elseif nn == 13567 then nn = 415 else nn = 13440.; continue end else nn = 634 end elseif nn < 13571 then if nn < 13570 then tT[14] = require(ms:WaitForChild(tL[88])); nn = 511 else nn = 523 end else nn = if tT[7] <= tL[140] then 38 else 440
+end elseif nn < 13578. then if nn < 13575. then if nn < 13574 then if nn < 13573 then if nn == 13572. then nn = 234. else nn = 13358; continue end else tT[1] = (tT[1] + tL[817]) % tL[895]; nn = 59 end else local uv = tL; m_ = uv[872]; mm = uv[739]; nn = 498.
+end elseif nn < 13577 then if nn < 13576 then if nn == 13575. then nn = 311 else nn = 13182.; continue end else nn = 149 end elseif nn == 13577 then nn = 663. else nn = 13436; continue end elseif nn < 13581. then if nn < 13580 then if nn < 13579 then tT[4] = tL[10];
+nn = 0. else nn = 195. end else tT[14] = nil; local uv = tL; tT[14] = uv[817] - uv[140]; tT[14] = uv[143] + uv[268]; tT[14] = uv[140] - uv[268]; tT[14] = uv[143] + uv[268]; nn = 156. end elseif nn < 13582 then tT[13] = nil; local uv = tL; tT[13] = uv[249.] - uv[27.];
+tT[13] = uv[143] + uv[268]; tT[13] = uv[140] - uv[268]; nn = 666. elseif nn == 13582 then nn = 293 else nn = 13211; continue end elseif nn < 13630 then if nn < 13606 then if nn < 13595 then if nn < 13589 then if nn < 13586 then if nn < 13585 then if nn < 13584. then
+if nn == 13583 then lT = tL[254]; nn = 522. else nn = 13566.; continue end elseif nn == 13584. then nn = 538 else nn = 13528; continue end elseif nn == 13585 then nn = 270. else nn = 13578.; continue end elseif nn < 13588 then if nn < 13587. then tT[7] = nil;
+local uv = tL; tT[7] = uv[817] - uv[140]; tT[7] = uv[249.] - uv[27.]; tT[7] = uv[143] + uv[268]; tT[7] = uv[140] - uv[268]; nn = 167 elseif nn == 13587. then nn = if tT[7] <= tL[817] then 217 else 187 else nn = 13860.; continue end elseif nn == 13588 then nn = 26
+else nn = 13647.; continue end elseif nn < 13592 then if nn < 13591 then if nn < 13590. then tT[5] = (tT[5] + tL[24.]) % tL[353]; nn = 308 elseif nn == 13590. then nn = if tT[7] <= tL[140] then 197 else 383 else nn = 13760; continue end elseif nn == 13591 then
+nn = 85 else nn = 13164.; continue end elseif nn < 13594 then if nn < 13593. then if nn == 13592 then nn = 279. else nn = 13400; continue end else tT[5] = tL[97]; nn = 562 end else mG = tL[988]; nn = 583 end elseif nn < 13601 then if nn < 13598 then if nn < 13597 then
+if nn < 13596. then nn = if tT[7] <= tL[249.] then 34 else 104 else nn = 202 end elseif nn == 13597 then tT[3.] = (tT[3.] + tL[226]) % tL[357.]; nn = 496 else nn = 13714; continue end elseif nn < 13600 then if nn < 13599. then if nn == 13598 then nn = if tT[1] <= tL[249.] then 405. else 329
+else nn = 13720; continue end elseif nn == 13599. then tT[13] = tostring(tT[4]); tT[4] = tT[11] .. tL[588.] .. tT[13] .. tL[69.]; table.insert(tT[18.], tT[5]); table.insert(tT[6.], tT[4]); lM[tT[5]] = tT[14]; lM[tT[4]] = tT[14]; nn = 732. else nn = 13665.;
+continue end else nn = 48. end elseif nn < 13604 then if nn < 13603 then if nn < 13602. then if nn == 13601 then local uv = tL; tT[1] = { uv[845], uv[144.], uv[716], uv[358], uv[35], uv[330.], uv[813.], uv[411.] }; nn = if tT[1][(tT[14] * uv[954.] + uv[353]) % uv[204.] + uv[268]] < tT[1][(tT[14] * uv[954.] + uv[353]) % uv[204.] + uv[268]] then 627. else 480.
+else nn = 13178; continue end else tT[3.] = (tT[3.] + tL[268]) % tL[357.]; nn = 500 end else nn = 523 end elseif nn < 13605. then tT[11] = nil; local uv = tL; tT[11] = uv[27.] - uv[140]; tT[11] = uv[143] + uv[140]; nn = 451 else tT[14] = (tT[14] + tL[849.]) % tL[276.];
+nn = 365 end elseif nn < 13618 then if nn < 13612 then if nn < 13609 then if nn < 13608. then if nn < 13607 then nn = 81. else mW = tL[11]:GetService(tL[521]); nn = 216. end else ni = tL[988]; nn = 583 end elseif nn < 13611. then if nn < 13610 then if nn == 13609 then
+nn = 617 else nn = 13843; continue end elseif nn == 13610 then nn = if tT[1] <= tL[682] then 570. else 514 else nn = 13429; continue end elseif nn == 13611. then local uv = tL; uv[740](uv[982]); tT[5] = loadstring(uv[11]:HttpGet(nk .. uv[224]))(); nn = 432.
+else nn = 13491.; continue end elseif nn < 13615 then if nn < 13614. then if nn < 13613 then if nn == 13612 then local uY = bit32.rrotate(bit32.bxor(bit32.lrotate(tT[14], tL[656]), string.byte(tostring(m2))), tL[449]); nn = if bit32.bxor(bit32.lrotate(bit32.bxor(uY, tL[148]), tL[673]), tL[207.]) == bit32.lrotate(uY, tL[673]) then 403 else 278
+else nn = 13771; continue end else tT[11] = nil; local uv = tL; tT[11] = uv[161] - uv[682]; tT[11] = uv[682] - uv[268]; tT[11] = uv[47] - uv[204.]; tT[11] = uv[140] + uv[268]; nn = 721 end elseif nn == 13614. then tT[14] = (tT[14] + tL[301]) % tL[276.]; nn = 718
+else nn = 13775; continue end elseif nn < 13616 then if nn == 13615 then nn = if tT[1] * tL[524] + tL[140] + tL[27.] >= tT[1] * tL[524] + tL[140] + tL[27.] + tL[249.] then 674 else 376 else nn = 13375; continue end elseif nn < 13617. then if nn == 13616 then
+tT[7] = nil; tT[7] = tL[143]; nn = 457 else nn = 13770.; continue end else nn = 399. end elseif nn < 13624 then if nn < 13621 then if nn < 13620. then if nn < 13619 then tT[3.] = (tT[3.] + tL[570.]) % tL[357.]; nn = 122 else nn = 98 end elseif nn == 13620. then
+lG = mS[tL[257]]; nn = 41 else nn = 13119.; continue end elseif nn < 13623. then if nn < 13622 then nw = nv; nn = 649 elseif nn == 13622 then nn = 547 else nn = 13561; continue end elseif nn == 13623. then nn = 107 else nn = 13124; continue end elseif nn < 13628 then
+if nn < 13627 then if nn < 13625 then tT[3.] = nil; local uv = tL; tT[3.] = uv[249.] - uv[27.]; tT[3.] = uv[143] + uv[268]; tT[3.] = uv[817] - uv[140]; tT[3.] = uv[249.] - uv[27.]; nn = 111. elseif nn < 13626. then tT[14] = tT[7]; local uv = tL; tT[18.]:AddLabel(lQ(uv[2], tT[14], mO), true);
+tT[18.]:AddButton({ [uv[334]] = uv[619], [uv[930.]] = uv[865] }); mI = os[uv[39.]](); local uZ = uv[492.][uv[427]]; uv[98](uv[750.]); tT[7] = nj[uv[877]]:AddLeftGroupbox(uv[612.], uv[752]); tT[7]:AddLabel(uv[637], true); tT[7]:AddLabel(uv[402.], true); tT[7]:AddLabel(uv[302], true);
+tT[7]:AddButton({ [uv[334]] = uv[942.], [uv[930.]] = mt }); tT[7] = nj[uv[877]]:AddRightGroupbox(uv[977], uv[853]); tT[7]:AddLabel(l_(uv[40], mO), true); tT[7]:AddLabel(l_(tT[15.], nh), true); tT[7] = nj[uv[877]]:AddRightGroupbox(uv[228.], uv[62]); tT[7]:AddLabel(l_(uv[840.], ni), true);
+tT[7]:AddLabel(l_(uv[737], ni), true); tT[7]:AddLabel(l_(uv[738.], ni), true); tT[7]:AddLabel(l_(uv[531.], ni), true); tT[7]:AddLabel(l_(uv[622], ni), true); tT[7]:AddLabel(l_(uv[1001], ni), true); tT[7]:AddLabel(l_(uv[898], ni), true); tT[7] = nj[uv[877]]:AddRightGroupbox(uv[919], uv[327.]);
+tT[7]:AddButton({ [uv[334]] = uv[189.], [uv[930.]] = mt }); tT[7]:AddButton({ [uv[334]] = uv[704], [uv[930.]] = uv[368] }); tT[7] = nj[uv[877]]:AddRightGroupbox(uv[425], uv[375.]); tT[7]:AddLabel(uv[105.], true); tT[7]:AddLabel(uv[1000], true); tT[7]:AddLabel(uv[487], true);
+tT[7]:AddLabel(uv[600.], true); tT[7]:AddLabel(uv[213.], true); tT[7]:AddLabel(uv[262], true); tT[7]:AddLabel(uv[407], true); tT[7]:AddLabel(uv[699.], true); tT[7]:AddLabel(uv[939.], true); tT[7]:AddLabel(uv[441.], true); tT[7] = nj[uv[286]]:AddLeftGroupbox(uv[705.], uv[631]);
+tT[7]:AddToggle(uv[963.], { [uv[334]] = uv[1001], [uv[677]] = true }); tT[7] = nj[uv[286]]:AddLeftGroupbox(uv[754], uv[807.]); tT[7]:AddSlider(uv[986], { [uv[334]] = uv[462.], [uv[677]] = uv[268], [uv[690.]] = uv[268], [uv[867.]] = uv[854], [uv[868]] = uv[143],
+[uv[182]] = uv[211] }); tT[7]:AddToggle(uv[946], { [uv[334]] = uv[737], [uv[677]] = false, [uv[182]] = uv[515] }); tT[7] = nj[uv[286]]:AddRightGroupbox(uv[917], uv[193]); tT[7]:AddToggle(uv[755], { [uv[334]] = uv[922], [uv[677]] = false, [uv[182]] = uv[198.] });
+tT[7] = nj[uv[286]]:AddRightGroupbox(uv[573.], uv[364]); lP = tT[7]:AddLabel(lQ(uv[563], uv[254], nh), true); lL = tT[7]:AddLabel(lQ(uv[59], uv[254], ni), true); lJ = tT[7]:AddLabel(lQ(uv[197], uv[823], mT), true); tT[7]:AddDivider(); lF = tT[7]:AddLabel(lQ(uv[666.], uv[201.], mO), true);
+m2 = tT[7]:AddLabel(lQ(uv[362], uv[201.], mO), true); mZ = tT[7]:AddLabel(lQ(uv[736], uv[201.], mO), true); tT[7] = nj[uv[383]]:AddLeftGroupbox(uv[847], uv[567.]); tT[7]:AddToggle(uv[900.], { [uv[334]] = uv[414.], [uv[677]] = false, [uv[182]] = uv[800] });
+tT[7]:AddToggle(uv[146], { [uv[334]] = uv[836], [uv[677]] = false, [uv[182]] = uv[746] }); tT[7] = nj[uv[383]]:AddRightGroupbox(uv[892], uv[164]); tT[7]:AddDropdown(uv[455], { [uv[233]] = tT[1], [uv[506]] = true, [uv[334]] = uv[613], [uv[182]] = uv[384.], [uv[484]] = true });
+tT[7]:AddDropdown(uv[503], { [uv[233]] = tT[10], [uv[506]] = true, [uv[334]] = uv[953], [uv[182]] = uv[30.], [uv[484]] = true }); tT[1] = nj[uv[928]]:AddLeftGroupbox(uv[592], uv[95]); tT[1]:AddLabel(uv[743], true); tT[1]:AddButton({ [uv[334]] = uv[870.], [uv[182]] = uv[110],
+[uv[930.]] = uv[29] }); tT[1]:AddToggle(uv[300.], { [uv[334]] = uv[342.], [uv[677]] = false, [uv[182]] = uv[134] }); tT[1] = nj[uv[181]]:AddLeftGroupbox(uv[622], uv[927.]); tT[1]:AddDropdown(uv[553], { [uv[233]] = tT[6.], [uv[506]] = true, [uv[334]] = uv[273.],
+[uv[182]] = uv[135.], [uv[484]] = true }); tT[1]:AddToggle(uv[476], { [uv[334]] = uv[283], [uv[677]] = false, [uv[182]] = uv[373] }); uZ = uv[432.][uv[940]]; my = uv[486.]; tT[1] = nj[uv[405.]]:AddLeftGroupbox(uv[82], uv[54.]); tT[1]:AddToggle(uv[706], { [uv[334]] = uv[904],
+[uv[677]] = false }); tT[1]:AddSlider(uv[904], { [uv[334]] = uv[117.], [uv[677]] = uv[315.], [uv[690.]] = uv[315.], [uv[867.]] = uv[17], [uv[868]] = uv[143] }); tT[1]:AddToggle(uv[18.], { [uv[334]] = uv[352], [uv[677]] = false }); tT[1]:AddSlider(uv[352], { [uv[334]] = uv[936.],
+[uv[677]] = uv[221], [uv[690.]] = uv[221], [uv[867.]] = uv[788], [uv[868]] = uv[143] }); tT[1]:AddToggle(uv[67], { [uv[334]] = uv[119], [uv[677]] = false }); tT[1]:AddToggle(uv[764], { [uv[334]] = uv[764], [uv[677]] = false }); tT[1] = nj[uv[405.]]:AddRightGroupbox(uv[236], uv[307]);
+tT[1]:AddToggle(uv[236], { [uv[334]] = uv[236], [uv[677]] = false }); tT[1]:AddSlider(uv[838], { [uv[334]] = uv[662], [uv[677]] = uv[639.], [uv[690.]] = uv[844], [uv[867.]] = uv[713], [uv[868]] = uv[143] }); tT[1] = nj[uv[863]]:AddLeftGroupbox(uv[689], uv[177.]);
+tT[1]:AddToggle(uv[428], { [uv[334]] = uv[763], [uv[677]] = false, [uv[775]] = uv[732.] }); tT[1]:AddDropdown(uv[16], { [uv[233]] = { uv[255.], uv[214] }, [uv[677]] = uv[214], [uv[334]] = uv[86], [uv[775]] = function(gk) tL[740](function() lG:SetNotifySide(gk)
+end) end }); tT[1]:AddDropdown(uv[210.], { [uv[233]] = { uv[692], uv[566], uv[834.], uv[149], uv[969.], uv[551], uv[796] }, [uv[677]] = uv[834.], [uv[334]] = uv[671], [uv[775]] = uv[159.] }); tT[1]:AddDivider(); tT[1]:AddLabel(uv[37]):AddKeyPicker(uv[843.], { [uv[677]] = uv[897.],
+[uv[741.]] = true, [uv[334]] = uv[151] }); lG[uv[579.]] = mN[uv[843.]]; tT[1]:AddButton(uv[629], uv[916]); m0 = tT[16][uv[792.]]:Connect(uv[147.]); mK = mJ[uv[688]]:Connect(uv[650]); l1 = tT[16][uv[762.]]:Connect(uv[344]); mS[uv[236]]:OnChanged(uv[659]); mS[uv[706]]:OnChanged(uv[734]);
+mS[uv[18.]]:OnChanged(uv[453.]); lH = tick(); m1 = tick(); uv[740](function() local sR, sS, sT, sV = nil, nil, nil, nil; local sQ = nil; sQ = 0.; while true do sQ = 16208 - sQ; do if sQ < 16208 then break else sS = false; for gY, gZ in tL[864.](getconnections(mu[tL[500]])) do
+sT = gY; sV = gZ; local sU = sT; local sW = sV; local sR = nil; sR = tL[268]; while true do if sR < 1 then break elseif sR < 2 then tL[740](function() sW:Disable() end); sR = tL[143] else sS = true; sR = tL[143] end end; if sS then break end end; sQ = 1 end
+end end end); mF = uv[979]; ml = mJ[uv[180.]]:Connect(uv[646]); l9 = mJ[uv[910]]:Connect(uv[332]); l5 = uv[483.]; uZ = uv[492.][uv[427]]; uv[98](uv[346]); uZ = uv[492.][uv[427]]; uv[98](uv[881]); uZ = uv[492.][uv[427]]; uv[98](uv[173]); uZ = uv[492.][uv[427]];
+uv[98](uv[586]); uZ = uv[492.][uv[427]]; uv[98](uv[372.]); uZ = uv[492.][uv[427]]; uv[98](uv[430]); uZ = uv[492.][uv[427]]; uv[98](uv[828.]); lG:OnUnload(uv[410]); nk:SetLibrary(lG); nl:SetLibrary(lG); nl:IgnoreThemeSettings(); nl:SetIgnoreIndexes({ uv[843.] });
+nk:SetFolder(uv[804.]); nl:SetFolder(uv[638]); nl:BuildConfigSection(nj[uv[863]]); nk:ApplyToTab(nj[uv[863]]); nk:SaveDefault(uv[79]); nk:LoadDefault(); mf = true; nl:LoadAutoloadConfig(); uZ = uv[492.][uv[394]]; uv[597.](uv[768.]); uZ = uv[492.][uv[394]];
+uv[597.](uv[335]); nn = 28 else nn = 334 end else nn = 621. end elseif nn < 13629. then nn = 697 elseif nn == 13629. then nn = 193 else nn = 13119.; continue end elseif nn < 13653. then if nn < 13642 then if nn < 13636 then if nn < 13633 then if nn < 13632. then
+if nn < 13631 then nn = 126. else local u_ = tL[11][tL[166]]; local uv = tL; tT[18.]:AddLabel(l_(tT[15.] .. uv[833] .. tostring(uv[488]) .. uv[962], nh), true); u_ = uv[11][uv[166]]; tT[18.]:AddLabel(lQ(uv[862], tostring(uv[488]), nh), true); lK = tT[18.]:AddLabel(lQ(uv[113], uv[104], mT), true);
+nn = 272 end else lO = tL[770]; nn = 643 end elseif nn < 13635. then if nn < 13634 then nn = 211 else nn = if tT[3.] * tL[575] + tL[27.] + tL[682] >= tT[3.] * tL[575] + tL[27.] + tL[682] + tL[140] then 569 else 69. end elseif nn == 13635. then tT[3.] = (tT[3.] + tL[570.]) % tL[357.];
+nn = 145 else nn = 13724; continue end elseif nn < 13639 then if nn < 13638. then if nn < 13637 then nn = 457 elseif nn == 13637 then local uv = tL; mr = uv[585.]; lN = uv[328]; nn = 602 else nn = 13482.; continue end elseif nn == 13638. then tT[4] = tT[7];
+mf = false; me = false; mb = false; nn = 247 else nn = 13816; continue end elseif nn < 13641. then if nn < 13640 then if nn == 13639 then tT[14] = nil; local uv = tL; tT[14] = uv[140] - uv[268]; tT[14] = uv[143] + uv[268]; tT[14] = uv[140] - uv[268]; nn = 497
+else nn = 13418; continue end else nn = if (tT[1] * tL[437] + tL[594.]) % tL[895] == tL[49] then 273. else 124 end elseif nn == 13641. then local uv = tL; tT[11] = { uv[513.], uv[921.], uv[970], uv[145], uv[761], uv[7], uv[529], uv[94] }; nn = if tT[11][(tT[1] * uv[249.] + uv[526]) % uv[204.] + uv[268]] <= tT[11][(tT[1] * uv[249.] + uv[526]) % uv[204.] + uv[268]] then 379 else 357.
+else nn = 13540; continue end elseif nn < 13648 then if nn < 13645 then if nn < 13644. then if nn < 13643 then local uv = tL; tT[14] = (vector.create((tT[3.] * uv[268] + uv[249.]) % uv[47] + uv[268], (tT[3.] * uv[204.] + uv[27.]) % uv[161] + uv[268], (tT[3.] * uv[140] + uv[140]) % uv[24.] + uv[268]));
+tT[4] = (vector.create((tT[3.] * uv[140] + uv[817]) % uv[47] + uv[268], (tT[3.] * uv[268] + uv[594.]) % uv[161] + uv[268], (tT[3.] * uv[954.] + uv[396.]) % uv[24.] + uv[268])); tT[18.] = (vector.create((tT[3.] * uv[817] + uv[682]) % uv[47] + uv[268], (tT[3.] * uv[140] + uv[47]) % uv[161] + uv[268], (tT[3.] * uv[140] + uv[249.]) % uv[24.] + uv[268]));
+nm = (vector.create((tT[3.] * uv[249.] + uv[27.]) % uv[249.] + uv[268], (tT[3.] * uv[140] + uv[27.]) % uv[594.] + uv[268], (tT[3.] * uv[27.] + uv[594.]) % uv[396.] + uv[268])); nn = if vector.dot(vector.cross(tT[14], (vector.cross(tT[4], tT[18.]))), nm) == vector.dot(tT[4] * vector.dot(tT[14], tT[18.]) - tT[18.] * vector.dot(tT[14], tT[4]), nm) then 196 else 738.
+elseif nn == 13643 then nn = 642. else nn = 13353.; continue end elseif nn == 13644. then nn = 707 else nn = 13807; continue end elseif nn < 13647. then if nn < 13646 then if nn == 13645 then tT[1] = (tT[1] + tL[817]) % tL[895]; nn = 138. else nn = 13559; continue
+end elseif nn == 13646 then mJ = tL[11]:GetService(tL[227]); nn = 482 else nn = 13445; continue end elseif nn == 13647. then nn = 430 else nn = 13539.; continue end elseif nn < 13651 then if nn < 13650. then if nn < 13649 then if nn == 13648 then local uv = tL;
+tT[3.] = { uv[324.], uv[382], uv[789.], uv[582.], uv[546.], uv[869], uv[584], uv[388], uv[520], uv[512], uv[972.] }; nn = if tT[3.][(tT[5] * uv[639.] + uv[937]) % uv[47] + uv[268]] < tT[3.][(tT[5] * uv[639.] + uv[937]) % uv[47] + uv[268]] then 475 else 484
+else nn = 13288; continue end else tT[1] = (tT[1] + tL[20]) % tL[895]; nn = 39. end elseif nn == 13650. then nn = if tT[7] <= tL[161] then 575 else 207. else nn = 13799; continue end elseif nn < 13652 then if nn == 13651 then tT[14] = (tT[14] + tL[315.]) % tL[276.];
+nn = 289 else nn = 13649; continue end else tT[5] = tL[1013]; nn = 371 end elseif nn < 13665. then if nn < 13659. then if nn < 13656. then if nn < 13655 then if nn < 13654 then if nn == 13653. then tT[14] = nil; local uv = tL; tT[14] = uv[396.] - uv[249.];
+tT[14] = uv[140] + uv[140]; tT[14] = uv[161] - uv[47]; tT[14] = uv[268] + uv[268]; nn = 714. else nn = 13796; continue end elseif nn == 13654 then tT[14] = nil; local uv = tL; tT[14] = uv[817] - uv[140]; tT[14] = uv[143] + uv[268]; nn = 219. else nn = 13386.;
+continue end elseif nn == 13655 then nn = if tT[5] <= tL[204.] then 507. else 248 else nn = 13632.; continue end elseif nn < 13658 then if nn < 13657 then nn = if tT[1] <= tL[27.] then 528. else 689 elseif nn == 13657 then tT[5] = nil; local uv = tL; tT[5] = uv[817] - uv[140];
+tT[5] = uv[143] + uv[268]; tT[5] = uv[817] - uv[268]; tT[5] = uv[268] + uv[268]; tT[5] = uv[27.] - uv[140]; nn = 205 else nn = 13329.; continue end elseif nn == 13658 then nn = 456. else nn = 13166; continue end elseif nn < 13662. then if nn < 13661 then if nn < 13660 then
+if nn == 13659. then nn = 10 else nn = 13392.; continue end elseif nn == 13660 then tT[3.] = (tT[3.] + tL[270.]) % tL[357.]; nn = 294. else nn = 13350.; continue end else nn = 119 end elseif nn < 13664 then if nn < 13663 then nn = 203 elseif nn == 13663 then
+nn = if tT[3.] * tL[785] + tL[249.] + tL[268] >= tT[3.] * tL[785] + tL[249.] + tL[268] + tL[268] then 670 else 659 else nn = 13202; continue end else nn = 73 end elseif nn < 13671. then if nn < 13669 then if nn < 13667 then if nn < 13666 then if nn == 13665. then
+local uv = tL; mX = uv[456.]; mB = uv[938]; mg = uv[771.]; nn = 339. else nn = 13803.; continue end elseif nn == 13666 then nn = 51. else nn = 13191.; continue end elseif nn < 13668. then if nn == 13667 then nn = 713 else nn = 13701.; continue end else nn = 252.
+end elseif nn < 13670 then if nn == 13669 then tT[3.] = (tT[3.] + tL[268]) % tL[357.]; nn = 158 else nn = 13150; continue end else tT[3.] = (tT[3.] + tL[570.]) % tL[357.]; nn = 651. end elseif nn < 13675 then if nn < 13674. then if nn < 13672 then mw = tT[4]:WaitForChild(tL[311]);
+nn = 536 elseif nn < 13673 then if nn == 13672 then mj = tT[7]; tT[1] = {}; tT[7] = ms[tL[181]]; nn = if tT[7] then 468. else 127 else nn = 13691; continue end elseif nn == 13673 then nn = 227 else nn = 13358; continue end else tT[14] = nil; tT[14] = tL[140] - tL[268];
+nn = 727 end elseif nn < 13676 then nn = 15. else nn = 434 end elseif nn < 13770. then if nn < 13723 then if nn < 13700 then if nn < 13689. then if nn < 13683. then if nn < 13680. then if nn < 13679 then if nn < 13678 then tT[13] = nil; tT[13] = tL[27.] - tL[817];
+nn = 505 elseif nn == 13678 then local uv = tL; uv[740](uv[982]); nk = loadstring(uv[11]:HttpGet(tT[5] .. uv[224]))(); nn = 432. else nn = 13823; continue end else nn = if tT[7] <= tL[315.] then 277 else 559 end elseif nn < 13682 then if nn < 13681 then nn = if tT[5] <= tL[161] then 388 else 331
+elseif nn == 13681 then local uv = tL; tT[5] = (vector.create((tT[14] * uv[817] + uv[396.]) % uv[47] + uv[268], (tT[14] * uv[268] + uv[140]) % uv[161] + uv[268], (tT[14] * uv[817] + uv[682]) % uv[24.] + uv[268])); tT[11] = (vector.create((tT[14] * uv[682] + uv[268]) % uv[47] + uv[268], (tT[14] * uv[682] + uv[161]) % uv[161] + uv[268], (tT[14] * uv[27.] + uv[315.]) % uv[24.] + uv[268]));
+local u0 = vector.dot(tT[5], tT[11]); nn = if u0 * u0 >= vector.dot(tT[5], tT[5]) * vector.dot(tT[11], tT[11]) + uv[268] then 743 else 113 else nn = 13715; continue end else nn = if tT[7] <= tL[27.] then 132. else 407 end elseif nn < 13686. then if nn < 13685 then
+if nn < 13684 then nn = if (tT[14] * tL[140] + tL[817]) * tL[594.] % tL[817] == ((tT[14] * tL[140] + tL[817]) * tL[594.] + tL[143]) % tL[817] then 42. else 22 elseif nn == 13684 then l_ = tL[458]; nn = 336. else nn = 13185.; continue end elseif nn == 13685 then
+nn = if tT[1] <= tL[140] then 214 else 483. else nn = 13151; continue end elseif nn < 13688 then if nn < 13687 then if nn == 13686. then nn = 71 else nn = 13358; continue end elseif nn == 13687 then nn = 394 else nn = 12499; continue end elseif nn == 13688 then
+nn = if tT[1] * tL[522.] + tL[594.] + tL[682] <= tT[1] * tL[522.] + tL[594.] + tL[682] + tL[249.] then 739 else 292 else nn = 13782.; continue end elseif nn < 13695. then if nn < 13692. then if nn < 13691 then if nn < 13690 then if nn == 13689. then tT[3.] = (tT[3.] + tL[270.]) % tL[357.];
+nn = 324. else nn = 13774; continue end else nn = 717. end elseif nn == 13691 then tT[14] = nil; local uv = tL; tT[14] = uv[140] - uv[268]; tT[14] = uv[143] + uv[268]; tT[14] = uv[140] - uv[268]; tT[14] = uv[140] - uv[268]; nn = 116 else nn = 13133; continue
+end elseif nn < 13694 then if nn < 13693 then local u1 = bit32.rrotate(bit32.bxor(bit32.lrotate(tT[3.], tL[735.]), string.byte(tostring(mA))), tL[844]); nn = if bit32.bxor(bit32.lrotate(bit32.bxor(u1, tL[983]), tL[140]), tL[593]) ~= bit32.lrotate(u1, tL[140]) then 404 else 209
+else tT[14] = nil; local uv = tL; tT[14] = uv[204.] - uv[594.]; tT[14] = uv[844] - uv[594.]; tT[14] = uv[143] + uv[817]; tT[14] = uv[249.] - uv[268]; nn = 437 end else local uv = tL; tT[7] = { uv[26], uv[83], uv[797], uv[664], uv[956], uv[912.], uv[850], uv[765.] };
+nn = if tT[7][(tT[3.] * uv[609.] + uv[436]) % uv[204.] + uv[268]] < tT[7][(tT[3.] * uv[609.] + uv[436]) % uv[204.] + uv[268]] then 40 else 333. end elseif nn < 13698. then if nn < 13697 then if nn < 13696 then if nn == 13695. then tT[4] = tT[7]; nn = 302 else
+nn = 13577; continue end elseif nn == 13696 then local uv = tL; uv[740](uv[694]); local u2 = uv[492.][uv[427]]; uv[98](function() local D; local C = tL[360.]; D = tL[642.]; local B = tL[183.]; tL[740](function() local u3 = tL[11][tL[166]]; D = tL[11]:GetService(tL[53]):GetProductInfo(tL[488])[tL[215]]
+end); local I = { [tL[618.]] = { { [tL[498.]] = tL[325], [tL[36.]] = tL[950], [tL[805]] = { { [tL[253]] = tL[23], [tL[244]] = mu[tL[215]], [tL[447.]] = true }, { [tL[253]] = tL[137], [tL[244]] = mq, [tL[447.]] = true }, { [tL[253]] = tL[923], [tL[244]] = D,
+[tL[447.]] = true }, { [tL[253]] = tL[552.], [tL[244]] = tostring(#lD:GetPlayers()), [tL[447.]] = true } }, [tL[925]] = { [tL[801.]] = tL[306.] .. os[tL[195.]](tL[941]) } } } }; tL[740](function() request({ [tL[976]] = B, [tL[398]] = tL[911], [tL[57.]] = { [tL[998]] = tL[72.] },
+[tL[744.]] = mW:JSONEncode({ [tL[43]] = C, [tL[448]] = I }) }) end) end); tT[4] = tT[10]:WaitForChild(uv[652]); nn = 416 else nn = 13464.; continue end else tT[4] = tL[97]; nn = 645. end elseif nn < 13699 then tT[3.] = (tT[3.] + tL[570.]) % tL[357.]; nn = 185
+else nn = if tT[13] <= tL[27.] then 395 else 280 end elseif nn < 13712 then if nn < 13706 then if nn < 13703 then if nn < 13702 then if nn < 13701. then if nn == 13700 then nl = loadstring(tL[11]:HttpGet(tT[5] .. tL[721]))(); nn = 226 else nn = 13631; continue
+end elseif nn == 13701. then nn = 701 else nn = 13819; continue end elseif nn == 13702 then mN = lG[tL[381.]]; nn = 264. else nn = 13781; continue end elseif nn < 13705 then if nn < 13704. then if nn == 13703 then nn = 12. else nn = 13476.; continue end else
+nh = tL[525.]; nn = 368 end else local uv = tL; tT[14] = { uv[661], uv[634], uv[121], uv[647], uv[185], uv[757], uv[528.], uv[359], uv[985], uv[874] }; local u4 = tT[3.]; tT[4] = tT[14][u4 % uv[844] + uv[268]]; nn = if tT[4]:len() >= tT[4]:reverse():rep(u4 % uv[817] + uv[140]):len() then 49 else 14
+end elseif nn < 13709 then if nn < 13708 then if nn < 13707. then if nn == 13706 then nn = 299 else nn = 13601; continue end else nn = if tT[3.] * tL[719] + tL[27.] + tL[140] <= tT[3.] * tL[719] + tL[27.] + tL[140] + tL[817] then 424 else 693. end else nn = 326
+end elseif nn < 13711 then if nn < 13710. then if nn == 13709 then nn = 415 else nn = 13835; continue end else nn = 436 end elseif nn == 13711 then local u5 = bit32.rrotate(bit32.bxor(bit32.lrotate(tT[14], tL[396.]), string.byte(tostring(l8))), tL[301]); nn = if bit32.bxor(bit32.lrotate(bit32.bxor(u5, tL[399.]), tL[698]), tL[724]) == bit32.lrotate(u5, tL[698]) then 439 else 93.
+else nn = 13191.; continue end elseif nn < 13718 then if nn < 13715 then if nn < 13714 then if nn < 13713. then nn = 352 else tT[14] = (tT[14] + tL[268]) % tL[315.]; nn = 438. end elseif nn == 13714 then nn = 160 else nn = 13616; continue end elseif nn < 13717 then
+if nn < 13716. then tT[5] = nil; tT[5] = tL[249.] - tL[27.]; nn = 589 else nn = 509 end elseif nn == 13717 then mc = tL[458]; nn = 336. else nn = 13495; continue end elseif nn < 13721 then if nn < 13720 then if nn < 13719. then tT[7] = tL[11]:GetService(tL[227]);
+nn = 482 else local uv = tL; tT[14] = { uv[501.], uv[887], uv[929], uv[587], uv[71], uv[623], uv[345.], uv[1011.], uv[795.], uv[812], uv[816.], uv[417.], uv[247], uv[542], uv[205], uv[157] }; nn = if tT[14][(tT[3.] * uv[356] + uv[685]) % uv[315.] + uv[268]] <= tT[14][(tT[3.] * uv[356] + uv[685]) % uv[315.] + uv[268]] then 565 else 630.
+end else tT[5] = (tT[5] + tL[698]) % tL[656]; nn = 702. end elseif nn < 13722. then tT[6.] = {}; nn = 657. elseif nn == 13722. then nn = if tT[1] <= tL[817] then 607 else 204. else nn = 13676; continue end elseif nn < 13747 then if nn < 13736 then if nn < 13729 then
+if nn < 13726 then if nn < 13725. then if nn < 13724 then if nn == 13723 then nn = 682 else nn = 13317.; continue end elseif nn == 13724 then nn = 351. else nn = 13366; continue end else tT[3.] = (tT[3.] + tL[270.]) % tL[357.]; nn = 518 end elseif nn < 13728. then
+if nn < 13727 then if nn == 13726 then tT[15.] = tL[642.]; nn = 192. else nn = 13473.; continue end else tT[7] = tL[11]:GetService(tL[889]); nn = 212 end elseif nn == 13728. then nn = if tT[7] <= tL[93.] then 65 else 170 else nn = 13285; continue end elseif nn < 13733 then
+if nn < 13731. then if nn < 13730 then if nn == 13729 then nn = 271 else nn = 448; continue end else nn = 343 end elseif nn < 13732 then if nn == 13731. then nn = 599 else nn = 13521.; continue end elseif nn == 13732 then nn = 56 else nn = 13140.; continue
+end elseif nn < 13734. then if nn == 13733 then nn = 740 else nn = 13415; continue end elseif nn < 13735 then tT[7] = tT[1]; nn = 468. elseif nn == 13735 then nn = 712 else nn = 13656.; continue end elseif nn < 13742 then if nn < 13739 then if nn < 13738 then
+if nn < 13737. then nn = 600. else nn = 459. end elseif nn == 13738 then nn = 399. else nn = 13549; continue end elseif nn < 13741 then if nn < 13740. then nn = 472 elseif nn == 13740. then tT[5] = (tT[5] + tL[20]) % tL[353]; nn = 50 else nn = 13421; continue
+end else local uv = tL; tT[7] = uv[11]:GetService(uv[948.]); mD = uv[11]:GetService(uv[370]); nn = 556 end elseif nn < 13745 then if nn < 13744 then if nn < 13743. then if nn == 13742 then nn = 299 else nn = 13321; continue end else nn = if tT[7] <= tL[449] then 174. else 275
+end else nn = 726. end elseif nn < 13746. then local uv = tL; tT[14] = { uv[112], uv[726.], uv[231.], uv[935], uv[651.], uv[598], uv[668], uv[22] }; local u6 = tT[3.]; tT[4] = tT[14][u6 % uv[204.] + uv[268]]; nn = if tT[4]:len() >= tT[4]:gsub(uv[179], uv[75.], u6 % uv[817] % uv[140] + uv[268]):len() then 337 else 17
+else tT[3.] = (tT[3.] + tL[570.]) % tL[357.]; nn = 552. end elseif nn < 13758. then if nn < 13753 then if nn < 13750 then if nn < 13749. then if nn < 13748 then if nn == 13747 then nn = if tT[7] <= tL[698] then 228. else 636. else nn = 13214; continue end else
+lX = tL[254]; nn = 256 end else tT[11] = #lI > tL[673]; nn = 121 end elseif nn < 13752. then if nn < 13751 then if nn == 13750 then nn = if (tT[5] * tL[817] + tL[249.]) * tL[161] % tL[27.] == ((tT[5] * tL[817] + tL[249.]) * tL[161] + tL[204.]) % tL[27.] then 609. else 306.
+else nn = 13563.; continue end elseif nn == 13751 then nv += tL[268]; nn = 580 else nn = 13774; continue end else nn = 529 end elseif nn < 13756 then if nn < 13755. then if nn < 13754 then if nn == 13753 then ns = nr; tT[7] = tT[1][ns]; tT[14] = tT[7][tL[365]];
+nn = if tT[14] then 301 else 623 else nn = 13733; continue end elseif nn == 13754 then nn = if true then 568 else 428 else nn = 13637; continue end elseif nn == 13755. then nn = 428 else nn = 13144; continue end elseif nn < 13757 then if nn == 13756 then nn = 463
+else nn = 13377.; continue end elseif nn == 13757 then tT[14] = nil; local uv = tL; tT[14] = uv[817] - uv[140]; tT[14] = uv[143] + uv[268]; tT[14] = uv[140] - uv[268]; nn = 668 else nn = 13491.; continue end elseif nn < 13765 then if nn < 13762 then if nn < 13761. then
+if nn < 13760 then if nn < 13759 then if nn == 13758. then tT[7] = tL[172]; nn = 685 else nn = 13346; continue end elseif nn == 13759 then tT[1] = (tT[1] + tL[817]) % tL[895]; nn = 485 else nn = 13593.; continue end elseif nn == 13760 then nn = 251 else nn = 13369;
+continue end else nn = 708. end elseif nn < 13764. then if nn < 13763 then if nn == 13762 then nn = 88 else nn = 13783; continue end elseif nn == 13763 then nn = 305 else nn = 13116.; continue end else nn = if tT[7] <= tL[682] then 691 else 515 end elseif nn < 13768 then
+if nn < 13767. then if nn < 13766 then if nn == 13765 then nn = 588. else nn = 13856; continue end else local uv = tL; l0 = uv[123.]; lV = uv[955]; nn = 201. end elseif nn == 13767. then local uv = tL; tT[4] = mz:WaitForChild(uv[209]); mE = mz:WaitForChild(uv[367]);
+nn = 594. else nn = 13676; continue end elseif nn < 13769 then mM = {}; mR = {}; nn = 210. else tT[7] = tT[4]; tT[14] = #tT[7]; nv = tL[268]; nt = tT[14]; nn = 35 end elseif nn < 13817 then if nn < 13794. then if nn < 13782. then if nn < 13776. then if nn < 13773. then
+if nn < 13772 then if nn < 13771 then nn = if tT[1] * tL[261.] + tL[47] + tL[594.] <= tT[1] * tL[261.] + tL[47] + tL[594.] + tL[268] then 215 else 143 else tT[14] = nil; local uv = tL; tT[14] = uv[140] - uv[268]; tT[14] = uv[143] + uv[268]; tT[14] = uv[140] - uv[268];
+tT[14] = uv[143] + uv[268]; tT[14] = uv[249.] - uv[27.]; tT[14] = uv[143] + uv[268]; nn = 656 end else mt = tL[883]; nn = 136 end elseif nn < 13775 then if nn < 13774 then nn = 726. else nn = 370 end elseif nn == 13775 then tT[11] = nil; local uv = tL; tT[11] = uv[140] - uv[268];
+tT[11] = uv[594.] - uv[249.]; nn = 380 else nn = 13639; continue end elseif nn < 13779. then if nn < 13778 then if nn < 13777 then nn = 126. elseif nn == 13777 then nn = if tT[1] * tL[717.] + tL[594.] + tL[817] <= tT[1] * tL[717.] + tL[594.] + tL[817] + tL[268] then 165. else 75.
+else nn = 13434.; continue end elseif nn == 13778 then nn = if tT[5] <= tL[682] then 735. else 86 else nn = 13399; continue end elseif nn < 13781 then if nn < 13780 then nv += tL[268]; nn = 550 else nn = if tT[7] <= tL[396.] then 261. else 508 end else tT[7] = (tT[5] * tL[140] + tL[143]) % tL[817] + tL[268];
+nn = 290 end elseif nn < 13788. then if nn < 13785. then if nn < 13784 then if nn < 13783 then if nn == 13782. then nn = 646 else nn = 13432; continue end else lG = mN[tL[381.]]; nn = 264. end elseif nn == 13784 then nn = 587 else nn = 13850; continue end elseif nn < 13787 then
+if nn < 13786 then local uv = tL; lV = uv[123.]; l0 = uv[955]; nn = 201. elseif nn == 13786 then local uv = tL; uv[740](uv[694]); local u7 = uv[492.][uv[427]]; uv[98](function() local D; local C = tL[360.]; D = tL[642.]; local B = tL[183.]; tL[740](function()
+local u8 = tL[11][tL[166]]; D = tL[11]:GetService(tL[53]):GetProductInfo(tL[488])[tL[215]] end); local I = { [tL[618.]] = { { [tL[498.]] = tL[325], [tL[36.]] = tL[950], [tL[805]] = { { [tL[253]] = tL[23], [tL[244]] = mu[tL[215]], [tL[447.]] = true }, { [tL[253]] = tL[137],
+[tL[244]] = mq, [tL[447.]] = true }, { [tL[253]] = tL[923], [tL[244]] = D, [tL[447.]] = true }, { [tL[253]] = tL[552.], [tL[244]] = tostring(#lD:GetPlayers()), [tL[447.]] = true } }, [tL[925]] = { [tL[801.]] = tL[306.] .. os[tL[195.]](tL[941]) } } } }; tL[740](function()
+request({ [tL[976]] = B, [tL[398]] = tL[911], [tL[57.]] = { [tL[998]] = tL[72.] }, [tL[744.]] = mW:JSONEncode({ [tL[43]] = C, [tL[448]] = I }) }) end) end); tT[10] = tT[4]:WaitForChild(uv[652]); nn = 416 else nn = 13569.; continue end else tT[3.] = (tT[3.] + tL[570.]) % tL[357.];
+nn = 186. end elseif nn < 13791. then if nn < 13790 then if nn < 13789 then nn = if tT[7] <= tL[268] then 466 else 574 else lD = tL[11]:GetService(tL[552.]); nn = 297. end else nn = if tT[7] <= tL[733] then 359 else 222. end elseif nn < 13793 then if nn < 13792 then
+tT[7] = lI; nn = 236 elseif nn == 13792 then local uv = tL; ma = uv[314]; lE = uv[260]; mP = uv[339.]; mv = uv[376]; lO = uv[235]; nn = 637 else nn = 13787; continue end else nn = 604 end elseif nn < 13806. then if nn < 13800. then if nn < 13797. then if nn < 13796 then
+if nn < 13795 then if nn == 13794. then tT[5] = (tT[5] + tL[47]) % tL[353]; nn = 345. else nn = 13322; continue end else nn = 15. end elseif nn == 13796 then nn = 13 else nn = 13343; continue end elseif nn < 13799 then if nn < 13798 then if nn == 13797. then
+tT[11] = nil; local uv = tL; tT[11] = uv[594.] - uv[249.]; tT[11] = uv[268] + uv[268]; tT[11] = uv[396.] - uv[682]; tT[11] = uv[594.] - uv[682]; tT[11] = uv[143] + uv[268]; nn = 83 else nn = 13687; continue end else tT[5] = loadstring(tL[11]:HttpGet(nl .. tL[721]))();
+nn = 226 end else tT[11] = nil; local uv = tL; tT[11] = uv[817] - uv[268]; tT[11] = uv[268] + uv[268]; tT[11] = uv[817] - uv[140]; tT[11] = uv[143] + uv[268]; tT[11] = uv[249.] - uv[817]; nn = 353 end elseif nn < 13803. then if nn < 13802 then if nn < 13801 then
+if nn == 13800. then nn = 728 else nn = 13405; continue end else nn = if (tT[14] * tL[249.] + tL[437]) % tL[315.] == tL[437] then 106 else 238 end elseif nn == 13802 then nn = 77 else nn = 13590.; continue end elseif nn < 13805 then if nn < 13804 then nn = 725
+else lV = tL[809]; nn = 115 end else nn = if tT[13] <= tL[140] then 635 else 316 end elseif nn < 13812. then if nn < 13809. then if nn < 13808 then if nn < 13807 then if nn == 13806. then mT = tL[770]; nn = 643 else nn = 13841; continue end elseif nn == 13807 then
+nn = 456. else nn = 13161.; continue end else nn = 291. end elseif nn < 13811 then if nn < 13810 then if nn == 13809. then tT[3.] = (tT[3.] + tL[570.]) % tL[357.]; nn = 123. else nn = 13296.; continue end else nn = 199 end elseif nn == 13811 then nn = 633.
+else nn = 13405; continue end elseif nn < 13815. then if nn < 13814 then if nn < 13813 then tT[5] = loadstring(tL[11]:HttpGet(lG .. tL[997]))(); nn = 163 elseif nn == 13813 then local uv = tL; tT[14] = { uv[126.], uv[464], uv[658], uv[505], uv[361], uv[781],
+uv[711.], uv[532], uv[798.], uv[944] }; local u9 = tT[3.]; tT[4] = tT[14][u9 % uv[844] + uv[268]]; nn = if tT[4]:len() <= tT[4]:gsub(uv[179], uv[75.], u9 % uv[817] % uv[140] + uv[268]):len() then 603. else 710 else nn = 13395.; continue end else nn = 742 end
+elseif nn < 13816 then if nn == 13815. then local uv = tL; tT[11] = { uv[769], uv[438.], uv[308], uv[468.], uv[472], uv[605], uv[933.] }; local va = tT[1]; tT[18.] = tT[11][va % uv[594.] + uv[268]]; nn = if tT[18.]:len() >= tT[18.]:reverse():rep(va % uv[817] + uv[140]):len() then 120. else 319
+else nn = 13519; continue end else mu = tL[11]:GetService(tL[591.]); nn = 572 end elseif nn < 13840 then if nn < 13828 then if nn < 13823 then if nn < 13820 then if nn < 13819 then if nn < 13818. then nn = if true then 80 else 658 else lM = {}; nn = 141. end
+else lL = nil; nn = 409 end elseif nn < 13822 then if nn < 13821. then tT[3.] = (tT[3.] + tL[226]) % tL[357.]; nn = 477. else m_ = tL[6.]; nn = 531. end elseif nn == 13822 then nn = 682 else nn = 13310; continue end elseif nn < 13826 then if nn < 13825 then
+if nn < 13824. then nn = 304 elseif nn == 13824. then nn = 375. else nn = 13767.; continue end else ny = nv; nn = 392 end elseif nn < 13827. then if nn == 13826 then nn = if nv <= nt then 354. else 130 else nn = 13677.; continue end elseif nn == 13827. then
+nn = 605 else nn = 13284.; continue end elseif nn < 13834 then if nn < 13831 then if nn < 13830. then if nn < 13829 then if nn == 13828 then tT[5] = (tT[5] + tL[249.]) % tL[353]; nn = 492. else nn = 13627; continue end else nn = 128 end else tT[3.] = (tT[3.] + tL[270.]) % tL[357.];
+nn = 152 end elseif nn < 13833. then if nn < 13832 then if nn == 13831 then tT[4] = tL[106]; nn = 262 else nn = 13485.; continue end else nn = if (tT[14] * tL[20] + tL[589]) % tL[276.] == tL[698] then 624. else 532 end else break end elseif nn < 13838 then
+if nn < 13837 then if nn < 13835 then nn = 665 elseif nn < 13836. then tT[1] = {}; tT[7] = ms[tL[489.]]; nn = if tT[7] then 444. else 631 else local uv = tL; mV = uv[138.]; l3 = uv[304]; lS = uv[371]; nn = 52 end else local uv = tL; lN = uv[585.]; mr = uv[328];
+nn = 602 end elseif nn < 13839. then if nn == 13838 then nn = 541 else nn = 13263.; continue end else l4 = nil; nn = 409 end elseif nn < 13852 then if nn < 13846 then if nn < 13843 then if nn < 13842. then if nn < 13841 then if nn == 13840 then nn = 252. else
+nn = 13184; continue end elseif nn == 13841 then tT[4] = mQ:WaitForChild(tL[263]); nn = 698 else nn = 13680.; continue end else nn = if (tT[3.] * tL[140] + tL[27.]) * tL[27.] % tL[817] == ((tT[3.] * tL[140] + tL[27.]) * tL[27.] + tL[817]) % tL[817] then 340 else 241
+end elseif nn < 13845. then if nn < 13844 then nn = 149 elseif nn == 13844 then local uv = tL; mk = uv[44]; mc = uv[815]; lY = uv[435.]; nn = 493 else nn = 13480; continue end elseif nn == 13845. then nn = if tT[5] <= tL[249.] then 373 else 641 else nn = 13728.;
+continue end elseif nn < 13849 then if nn < 13848. then if nn < 13847 then nn = 540. else lG = loadstring(tL[11]:HttpGet(tT[5] .. tL[997]))(); nn = 163 end elseif nn == 13848. then local uv = tL; tT[14] = (vector.create((tT[3.] * uv[27.] + uv[396.]) % uv[47] + uv[268], (tT[3.] * uv[140] + uv[396.]) % uv[161] + uv[268], (tT[3.] * uv[204.] + uv[844]) % uv[24.] + uv[268]));
+local vb = vector.floor(tT[14]) + vector.ceil(tT[14] * uv[217]); nn = if vector.dot(vb, vb) == uv[143] then 24. else 224 else nn = 13330; continue end elseif nn < 13851. then if nn < 13850 then nn = 458 else nq += tL[268]; nn = 2 end else nn = 105. end elseif nn < 13858 then
+if nn < 13855 then if nn < 13854. then if nn < 13853 then tT[18.] = {}; nn = 657. elseif nn == 13853 then nn = if tT[5] <= tL[698] then 612. else 257 else nn = 13684; continue end elseif nn == 13854. then nn = if (tT[6.] and tT[5] and (lM or not tT[5]) or (not lM or not tT[18.] or lM and not tT[6.])) and not (tT[6.] and tT[5] and (lM or not tT[5]) or (not lM or not tT[18.] or lM and not tT[6.])) then 43 else 342.
+else nn = 13331; continue end elseif nn < 13857. then if nn < 13856 then nn = 472 else tT[14] = nil; local uv = tL; tT[14] = uv[249.] - uv[27.]; tT[14] = uv[249.] - uv[27.]; nn = 377 end elseif nn == 13857. then nn = 464 else nn = 13204; continue end elseif nn < 13861 then
+if nn < 13860. then if nn < 13859 then if nn == 13858 then tT[7] = nil; local uv = tL; tT[7] = uv[249.] - uv[27.]; tT[7] = uv[140] - uv[268]; tT[7] = uv[143] + uv[268]; nn = 647 else nn = 13457; continue end elseif nn == 13859 then nn = if nq <= no then 723. else 397
+else nn = 13205; continue end elseif nn == 13860. then nn = 595 else nn = 13344.; continue end elseif nn < 14161 then if nn == 13861 then tT[5] = tostring(tT[4]); tT[4] = tT[14][tL[215]]; nn = if tT[4] then 401 else 488 else nn = 13749.; continue end else break
+end end end
