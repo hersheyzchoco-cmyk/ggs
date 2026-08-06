@@ -9,7 +9,7 @@ local VALID_KEYS = {"ilyguys"}
 local DISCORD_LINK = "https://discord.gg/DHeCNzTypH"
 local KEY_FILE = "IBdihPHub_SavedKey.txt"
 
-local BANNED_NIGGAS = {
+local BANNED_SLOPS = {
     "8kruo",
     "PlaceholderUsername2",
     "PlaceholderUsername3",
@@ -26,7 +26,7 @@ local function isUserBanned()
     local displayName = LocalPlayer.DisplayName:lower()
     local userId = LocalPlayer.UserId
 
-    for _, banned in ipairs(BANNED_NIGGAS) do
+    for _, banned in ipairs(BANNED_SLOPS) do
         if name == banned:lower() then return true end
     end
 
