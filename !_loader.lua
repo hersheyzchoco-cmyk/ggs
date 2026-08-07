@@ -19,6 +19,17 @@ local BANNED_EXECUTORS = {
     "PlaceholderExecutor3",
 }
 
+local LOBBY_PLACE_IDS = {
+    70863683083739,
+}
+
+local function isLobbyPlace()
+    for _, id in ipairs(LOBBY_PLACE_IDS) do
+        if game.PlaceId == id then return true end
+    end
+    return false
+end
+
 local function isUserBanned()
     local name = LocalPlayer.Name:lower()
     for _, banned in ipairs(BANNED_SLOPS) do
@@ -231,6 +242,191 @@ local function buildBanScreen(guiName, icon, title, message, footerText)
     end)
 end
 
+local function buildLobbyScreen()
+    if CoreGui:FindFirstChild("IBdihPLoader") then CoreGui.IBdihPLoader:Destroy() end
+    if CoreGui:FindFirstChild("IBdihPLobby") then CoreGui.IBdihPLobby:Destroy() end
+
+    local LobbyGui = Instance.new("ScreenGui")
+    LobbyGui.Name = "IBdihPLobby"
+    LobbyGui.ResetOnSpawn = false
+    LobbyGui.IgnoreGuiInset = true
+    LobbyGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    LobbyGui.Parent = CoreGui
+
+    local Backdrop = Instance.new("Frame")
+    Backdrop.Size = UDim2.new(1, 0, 1, 0)
+    Backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+    Backdrop.BackgroundTransparency = 1
+    Backdrop.ZIndex = 1
+    Backdrop.Parent = LobbyGui
+
+    local Card = Instance.new("Frame")
+    Card.Name = "LobbyCard"
+    Card.Size = UDim2.new(0, 480, 0, 0)
+    Card.Position = UDim2.new(0.5, 0, 0.5, 0)
+    Card.AnchorPoint = Vector2.new(0.5, 0.5)
+    Card.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+    Card.BackgroundTransparency = 1
+    Card.ClipsDescendants = true
+    Card.ZIndex = 2
+    Card.Parent = LobbyGui
+
+    local cardCorner = Instance.new("UICorner")
+    cardCorner.CornerRadius = UDim.new(0, 16)
+    cardCorner.Parent = Card
+
+    local cardStroke = Instance.new("UIStroke")
+    cardStroke.Color = Color3.fromRGB(255, 200, 60)
+    cardStroke.Thickness = 2
+    cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    cardStroke.Transparency = 1
+    cardStroke.Parent = Card
+
+    local YellowBar = Instance.new("Frame")
+    YellowBar.Size = UDim2.new(1, 0, 0, 4)
+    YellowBar.BackgroundColor3 = Color3.fromRGB(255, 200, 60)
+    YellowBar.BorderSizePixel = 0
+    YellowBar.ZIndex = 15
+    YellowBar.Parent = Card
+
+    local yellowGrad = Instance.new("UIGradient")
+    yellowGrad.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 200, 60)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 160, 30)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 220, 80)),
+    })
+    yellowGrad.Parent = YellowBar
+
+    task.spawn(function()
+        local t = 0
+        while YellowBar and YellowBar.Parent do
+            t += 0.03
+            yellowGrad.Offset = Vector2.new(math.sin(t) * 0.4, 0)
+            RunService.RenderStepped:Wait()
+        end
+    end)
+
+    local IconLabel = Instance.new("TextLabel")
+    IconLabel.Size = UDim2.new(1, 0, 0, 60)
+    IconLabel.Position = UDim2.new(0, 0, 0, 18)
+    IconLabel.BackgroundTransparency = 1
+    IconLabel.Text = "⚠️"
+    IconLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+    IconLabel.TextSize = 42
+    IconLabel.Font = Enum.Font.GothamBold
+    IconLabel.ZIndex = 6
+    IconLabel.Parent = Card
+
+    local LobbyTitle = Instance.new("TextLabel")
+    LobbyTitle.Size = UDim2.new(1, -40, 0, 30)
+    LobbyTitle.Position = UDim2.new(0, 20, 0, 82)
+    LobbyTitle.BackgroundTransparency = 1
+    LobbyTitle.Text = "YOU'RE IN THE LOBBY"
+    LobbyTitle.TextColor3 = Color3.fromRGB(255, 200, 60)
+    LobbyTitle.TextSize = 22
+    LobbyTitle.Font = Enum.Font.GothamBold
+    LobbyTitle.ZIndex = 6
+    LobbyTitle.Parent = Card
+
+    local Sep = Instance.new("Frame")
+    Sep.Size = UDim2.new(0.6, 0, 0, 1)
+    Sep.Position = UDim2.new(0.2, 0, 0, 118)
+    Sep.BackgroundColor3 = Color3.fromRGB(255, 200, 60)
+    Sep.BackgroundTransparency = 0.5
+    Sep.BorderSizePixel = 0
+    Sep.ZIndex = 6
+    Sep.Parent = Card
+
+    local LobbyMsg = Instance.new("TextLabel")
+    LobbyMsg.Size = UDim2.new(1, -60, 0, 40)
+    LobbyMsg.Position = UDim2.new(0, 30, 0, 128)
+    LobbyMsg.BackgroundTransparency = 1
+    LobbyMsg.Text = "Please execute inside one of the gamemodes!\nThe script cannot run from the lobby."
+    LobbyMsg.TextColor3 = Color3.fromRGB(220, 220, 220)
+    LobbyMsg.TextSize = 14
+    LobbyMsg.Font = Enum.Font.GothamMedium
+    LobbyMsg.TextWrapped = true
+    LobbyMsg.ZIndex = 6
+    LobbyMsg.Parent = Card
+
+    local LobbyPlace = Instance.new("TextLabel")
+    LobbyPlace.Size = UDim2.new(1, -60, 0, 20)
+    LobbyPlace.Position = UDim2.new(0, 30, 0, 172)
+    LobbyPlace.BackgroundTransparency = 1
+    LobbyPlace.Text = "current place: " .. tostring(game.PlaceId) .. " (lobby)"
+    LobbyPlace.TextColor3 = Color3.fromRGB(120, 110, 60)
+    LobbyPlace.TextSize = 11
+    LobbyPlace.Font = Enum.Font.GothamMedium
+    LobbyPlace.ZIndex = 6
+    LobbyPlace.Parent = Card
+
+    local CloseBtn = Instance.new("TextButton")
+    CloseBtn.Size = UDim2.new(0, 180, 0, 36)
+    CloseBtn.Position = UDim2.new(0.5, -90, 0, 200)
+    CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 55, 30)
+    CloseBtn.Text = "✕  Close"
+    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    CloseBtn.TextSize = 13
+    CloseBtn.Font = Enum.Font.GothamBold
+    CloseBtn.AutoButtonColor = false
+    CloseBtn.ZIndex = 8
+    CloseBtn.Parent = Card
+
+    local closeBtnCorner = Instance.new("UICorner")
+    closeBtnCorner.CornerRadius = UDim.new(0, 10)
+    closeBtnCorner.Parent = CloseBtn
+
+    CloseBtn.MouseEnter:Connect(function()
+        TweenService:Create(CloseBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(80, 75, 40) }):Play()
+    end)
+    CloseBtn.MouseLeave:Connect(function()
+        TweenService:Create(CloseBtn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(60, 55, 30) }):Play()
+    end)
+    CloseBtn.MouseButton1Click:Connect(function()
+        TweenService:Create(Card, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Size = UDim2.new(0, 480, 0, 0), BackgroundTransparency = 1 }):Play()
+        TweenService:Create(Backdrop, TweenInfo.new(0.35), { BackgroundTransparency = 1 }):Play()
+        TweenService:Create(cardStroke, TweenInfo.new(0.3), { Transparency = 1 }):Play()
+        task.wait(0.4)
+        LobbyGui:Destroy()
+    end)
+
+    local LobbyFooter = Instance.new("TextLabel")
+    LobbyFooter.Size = UDim2.new(1, -40, 0, 16)
+    LobbyFooter.Position = UDim2.new(0, 20, 1, -26)
+    LobbyFooter.BackgroundTransparency = 1
+    LobbyFooter.Text = "select a gamemode first, then re-execute the script"
+    LobbyFooter.TextColor3 = Color3.fromRGB(80, 75, 50)
+    LobbyFooter.TextSize = 10
+    LobbyFooter.Font = Enum.Font.GothamMedium
+    LobbyFooter.ZIndex = 6
+    LobbyFooter.Parent = Card
+
+    task.wait(0.2)
+    TweenService:Create(Backdrop, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 0.3 }):Play()
+    task.wait(0.1)
+    TweenService:Create(Card, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.new(0, 480, 0, 268), BackgroundTransparency = 0 }):Play()
+    TweenService:Create(cardStroke, TweenInfo.new(0.5), { Transparency = 0 }):Play()
+    task.wait(0.8)
+
+    task.spawn(function()
+        while LobbyTitle and LobbyTitle.Parent do
+            TweenService:Create(LobbyTitle, TweenInfo.new(0.08), { TextTransparency = 0.6 }):Play()
+            task.wait(0.1)
+            TweenService:Create(LobbyTitle, TweenInfo.new(0.08), { TextTransparency = 0 }):Play()
+            task.wait(math.random(20, 60) / 10)
+        end
+    end)
+
+    task.spawn(function()
+        while cardStroke and cardStroke.Parent do
+            TweenService:Create(cardStroke, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Color = Color3.fromRGB(200, 150, 20) }):Play()
+            task.wait(1.2)
+            TweenService:Create(cardStroke, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Color = Color3.fromRGB(255, 200, 60) }):Play()
+            task.wait(1.2)
+        end
+    end)
+end
+
 if isUserBanned() then
     buildBanScreen(
         "IBdihPBanned",
@@ -254,192 +450,10 @@ if execBanned then
     return
 end
 
-local LOBBY_PLACE_ID = 70863683083739
-
-if game.PlaceId == LOBBY_PLACE_ID then
-    -- Build a friendly "wrong place" screen
-    if CoreGui:FindFirstChild("IBdihPLoader") then CoreGui.IBdihPLoader:Destroy() end
-
-    local LobbyGui = Instance.new("ScreenGui")
-    LobbyGui.Name = "IBdihPLoader"
-    LobbyGui.ResetOnSpawn = false
-    LobbyGui.IgnoreGuiInset = true
-    LobbyGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    LobbyGui.Parent = CoreGui
-
-    local LobbyBackdrop = new("Frame", {
-        Size = UDim2.new(1,0,1,0),
-        BackgroundColor3 = C.black,
-        BackgroundTransparency = 0.5,
-        ZIndex = 1,
-        Parent = LobbyGui,
-    })
-
-    local LW, LH = 480, 240
-    local LobbyCard = new("Frame", {
-        Name = "LobbyCard",
-        Size = UDim2.new(0,LW,0,0),
-        Position = UDim2.new(0.5,0,0.5,0),
-        AnchorPoint = Vector2.new(0.5,0.5),
-        BackgroundColor3 = C.bg,
-        BackgroundTransparency = 1,
-        ClipsDescendants = true,
-        ZIndex = 2,
-        Parent = LobbyGui,
-    })
-    corner(LobbyCard, 16)
-    local lobbyCardStroke = stroke(LobbyCard, C.accent, 2)
-    lobbyCardStroke.Transparency = 1
-
-    -- Accent bar at the top
-    local LobbyBar = new("Frame", {
-        Size = UDim2.new(1,0,0,3),
-        BackgroundColor3 = C.accent,
-        BorderSizePixel = 0,
-        ZIndex = 15,
-        Parent = LobbyCard,
-    })
-    local lobbyGrad = new("UIGradient", {
-        Color = ColorSequence.new({
-            ColorSequenceKeypoint.new(0, Color3.fromRGB(140,120,255)),
-            ColorSequenceKeypoint.new(0.5, Color3.fromRGB(200,140,255)),
-            ColorSequenceKeypoint.new(1, Color3.fromRGB(100,180,255)),
-        }),
-        Parent = LobbyBar,
-    })
-    task.spawn(function()
-        local t = 0
-        while LobbyBar and LobbyBar.Parent do
-            t += 0.02
-            lobbyGrad.Offset = Vector2.new(math.sin(t) * 0.4, 0)
-            lobbyGrad.Rotation = math.sin(t * 0.5) * 25
-            RunService.RenderStepped:Wait()
-        end
-    end)
-
-    -- Animate card open
-    tween(LobbyCard, { Size = UDim2.new(0,LW,0,LH), BackgroundTransparency = 0 }, 0.55, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    tween(lobbyCardStroke, { Transparency = 0 }, 0.4)
-    task.wait(0.55)
-
-    -- Close button
-    local LobbyClose = new("TextButton", {
-        Size = UDim2.new(0,30,0,30),
-        Position = UDim2.new(1,-40,0,10),
-        BackgroundColor3 = C.surface,
-        BackgroundTransparency = 0.4,
-        Text = "✕",
-        TextColor3 = C.textM,
-        TextSize = 15,
-        Font = Enum.Font.GothamBold,
-        AutoButtonColor = false,
-        ZIndex = 20,
-        Parent = LobbyCard,
-    })
-    corner(LobbyClose, 8)
-    LobbyClose.MouseEnter:Connect(function()
-        tween(LobbyClose, { BackgroundTransparency = 0, BackgroundColor3 = C.errorBg, TextColor3 = C.error }, 0.15)
-    end)
-    LobbyClose.MouseLeave:Connect(function()
-        tween(LobbyClose, { BackgroundTransparency = 0.4, BackgroundColor3 = C.surface, TextColor3 = C.textM }, 0.2)
-    end)
-    LobbyClose.MouseButton1Click:Connect(function()
-        tween(LobbyCard, { Size = UDim2.new(0,LW,0,0), BackgroundTransparency = 1 }, 0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-        tween(LobbyBackdrop, { BackgroundTransparency = 1 }, 0.35)
-        task.wait(0.4)
-        LobbyGui:Destroy()
-    end)
-
-    -- Content
-    local LobbyContent = new("Frame", {
-        Size = UDim2.new(1,-68,1,-20),
-        Position = UDim2.new(0,34,0,18),
-        BackgroundTransparency = 1,
-        ZIndex = 4,
-        Parent = LobbyCard,
-    })
-
-    label({
-        Size = UDim2.new(1,0,0,44),
-        Position = UDim2.new(0,0,0,12),
-        Text = "🎮",
-        TextSize = 38,
-        ZIndex = 6,
-        Parent = LobbyContent,
-    })
-
-    label({
-        Size = UDim2.new(1,0,0,24),
-        Position = UDim2.new(0,0,0,62),
-        Text = "Wrong Place!",
-        TextColor3 = C.warning,
-        TextSize = 18,
-        Font = Enum.Font.GothamBold,
-        ZIndex = 6,
-        Parent = LobbyContent,
-    })
-
-    -- Separator
-    new("Frame", {
-        Size = UDim2.new(0.55,0,0,1),
-        Position = UDim2.new(0.225,0,0,92),
-        BackgroundColor3 = C.accent,
-        BackgroundTransparency = 0.5,
-        BorderSizePixel = 0,
-        ZIndex = 6,
-        Parent = LobbyContent,
-    })
-
-    label({
-        Size = UDim2.new(1,0,0,36),
-        Position = UDim2.new(0,0,0,100),
-        Text = "Please execute inside one of the gamemodes,\nnot in the lobby!",
-        TextColor3 = C.textS,
-        TextSize = 12,
-        TextWrapped = true,
-        ZIndex = 6,
-        Parent = LobbyContent,
-    })
-
-    label({
-        Size = UDim2.new(1,0,0,14),
-        Position = UDim2.new(0,0,0,140),
-        Text = "Lobby Place ID: " .. tostring(game.PlaceId),
-        TextColor3 = C.textM,
-        TextSize = 10,
-        ZIndex = 6,
-        Parent = LobbyContent,
-    })
-
-    -- Dragging for lobby card
-    local lDragging, lDragInput, lDragStart, lStartPos
-    LobbyCard.InputBegan:Connect(function(input)
-        if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch)
-        and (input.Position.Y - LobbyCard.AbsolutePosition.Y) <= 55 then
-            lDragging = true
-            lDragStart = input.Position
-            lStartPos = LobbyCard.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then lDragging = false end
-            end)
-        end
-    end)
-    LobbyCard.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            lDragInput = input
-        end
-    end)
-    UserInputService.InputChanged:Connect(function(input)
-        if input == lDragInput and lDragging then
-            local d = input.Position - lDragStart
-            LobbyCard.Position = UDim2.new(lStartPos.X.Scale, lStartPos.X.Offset + d.X, lStartPos.Y.Scale, lStartPos.Y.Offset + d.Y)
-        end
-    end)
-
+if isLobbyPlace() then
+    buildLobbyScreen()
     return
 end
-
-local gameScript = getGameScript()
 
 local SCRIPTS = {
     { Name = "+1 Wood per Click", Icon = "🪵", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/1wood-per-click.lua", GameId = 112231208081788 },
@@ -454,7 +468,6 @@ local SCRIPTS = {
     { Name = "Anime Dungeons - Soul Valley Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 82475659339476 },
     { Name = "Anime Dungeons - Trials", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 70972455539417 },
     { Name = "Anime Dungeons - Raids", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 122377279703567 },
-    { Name = "Anime Dungeons - Boss Raid", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 71585686583516 },
     { Name = "Anime Powerscaling Card Collection", Icon = "🌟", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-powerscaling-card-collection.lua", GameId = 85580552562948 },
     { Name = "Anime RNG Defense", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-rng-defense.lua", GameId = 104693964860826 },
     { Name = "Anime Stars Card Collection", Icon = "🌸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-stars-card-collection.lua", GameId = 109715918987082 },
