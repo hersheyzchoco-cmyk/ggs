@@ -6,6 +6,8 @@ local CoreGui = game:GetService("CoreGui")
 local LocalPlayer = Players.LocalPlayer
 
 local DISCORD_LINK = "https://discord.gg/DHeCNzTypH"
+local VALID_KEYS = {"ilyguys"}
+local KEY_FILE = "IBdihPHub_SavedKey.txt"
 
 local BANNED_SLOPS = {
     "8kruo",
@@ -22,6 +24,88 @@ local BANNED_EXECUTORS = {
 local LOBBY_PLACE_IDS = {
     70863683083739,
 }
+
+local SCRIPTS = {
+    { Name = "+1 Wood per Click", Icon = "🪵", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/1wood-per-click.lua", GameId = 112231208081788 },
+    { Name = "1 Keyboard = 1$/s", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/1keyboard%3D1%24s.lua", GameId = 121003786627094 },
+    { Name = "Anime Astral Simulator", Icon = "🔥", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-astral-simulator.lua", GameId = 102072869879193 },
+    { Name = "Anime Battles", Icon = "🤺", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-battles.lua", GameId = 126229277218112 },
+    { Name = "Anime Card Farm", Icon = "🃏", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-card-farm.lua", GameId = 125039473548047 },
+    { Name = "Anime Duelists", Icon = "⚔️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-duelists.lua", GameId = 135858844777165 },
+    { Name = "Anime Dungeons - Demon Train Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 127204771568038 },
+    { Name = "Anime Dungeons - Frozen Forest Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 123509790592616 },
+    { Name = "Anime Dungeons - Ninja Village Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 109955310601194 },
+    { Name = "Anime Dungeons - Soul Valley Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 82475659339476 },
+    { Name = "Anime Dungeons - Trials", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 70972455539417 },
+    { Name = "Anime Dungeons - Raids", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 122377279703567 },
+    { Name = "Anime Dungeons - Boss Rush", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 71585686583516 },
+    { Name = "Anime Powerscaling Card Collection", Icon = "🌟", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-powerscaling-card-collection.lua", GameId = 85580552562948 },
+    { Name = "Anime RNG Defense", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-rng-defense.lua", GameId = 104693964860826 },
+    { Name = "Anime Stars Card Collection", Icon = "🌸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-stars-card-collection.lua", GameId = 109715918987082 },
+    { Name = "Anime Universe", Icon = "🌌", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-universe.lua", GameId = 95992966043247 },
+    { Name = "Become an Anime Billionaire", Icon = "💸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/become-an-anime-billionaire.lua", GameId = 96891089305948 },
+    { Name = "Bomb Fishing", Icon = "🎣", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/bomb-fishing.lua", GameId = 118677256126351 },
+    { Name = "Build a Base and Steal", Icon = "🏯", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/build-a-base-and-steal.lua", GameId = 132016691802922 },
+    { Name = "Build a Base and Steal", Icon = "🏯", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/build-a-base-and-steal.lua", GameId = 82441325527385 },
+    { Name = "Build a Keyboard", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/build-a-keyboard.lua", GameId = 91679585668032 },
+    { Name = "Catch and Tame", Icon = "🐒", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/catch-and-tame.lua", GameId = 96645548064314 },
+    { Name = "Chicken Farm", Icon = "🐓", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/chicken-farm.lua", GameId = 137233438285284 },
+    { Name = "Clean the Squishies", Icon = "😻", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/clean-the-squishies.lua", GameId = 84016394196827 },
+    { Name = "Crab Tycoon", Icon = "🦀", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/crab-tycoon.lua", GameId = 92605157087535 },
+    { Name = "Crunch my Butter", Icon = "🧈", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/crunch-my-butter.lua", GameId = 87555052900625 },
+    { Name = "Digimon Era", Icon = "🦖", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/digimon-era.lua", GameId = 77192431769439 },
+    { Name = "Egg Case Farm", Icon = "🥚", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/egg-case-farm.lua", GameId = 74144293690546 },
+    { Name = "Farm an Island", Icon = "🧑‍🌾", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/farm-an-island.lua", GameId = 78769336859161 },
+    { Name = "Grow it RNG", Icon = "🪴", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/grow-it-rng.lua", GameId = 78292727217500 },
+    { Name = "Jump to Steal Soccer Legends", Icon = "⚽️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/jump-to-steal-soccer-legends.lua", GameId = 121474715335865 },
+    { Name = "Loot RNG", Icon = "🗡️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/loot-rng.lua", GameId = 118575129990331 },
+    { Name = "Make a Drill Farm", Icon = "⛏️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/make-a-drill-farm.lua", GameId = 79315121100812 },
+    { Name = "Make Hotsauce", Icon = "🌶️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/make-hotsauce.lua", GameId = 122391683154858 },
+    { Name = "Merge a Blackhole", Icon = "🪐", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/merge-a-blackhole.lua", GameId = 118605709428489 },
+    { Name = "Mine a Mountain", Icon = "🏔️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/mine-a-mountain.lua", GameId = 125927821145949 },
+    { Name = "Mine a Planet", Icon = "🌎", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/mine-a-planet.lua", GameId = 121125129560252 },
+    { Name = "Missiles vs Cities", Icon = "🚀", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/missiles-vs-cities.lua", GameId = 112641748896693 },
+    { Name = "My Fishing Anime", Icon = "🪝", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/my-fishing-anime.lua", GameId = 112244246405144 },
+    { Name = "My Giant Sandwich", Icon = "🥪", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/my-giant-sandwich.lua", GameId = 139546619723000 },
+    { Name = "My Wood Farm", Icon = "🪵", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/my-wood-farm.lua", GameId = 79267089300389 },
+    { Name = "Own a Cafe", Icon = "☕️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/own-a-cafe.lua", GameId = 131906518201863 },
+    { Name = "Place the Keycaps", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/place-the-keycaps.lua", GameId = 103984418130080 },
+    { Name = "RNG Heroes", Icon = "🦸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/rng-heroes.lua", GameId = 108307565942574 },
+    { Name = "Roll Anime", Icon = "🎲", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/roll-anime.lua", GameId = 107706720875645 },
+    { Name = "Roll to Defend", Icon = "🛡️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/roll-to-defend.lua", GameId = 129559579789369 },
+    { Name = "Scratchy Loot", Icon = "🎰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/scratchy-loot.lua", GameId = 78105732598311 },
+    { Name = "Snowcone Stand", Icon = "❄️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/snowcone-stand.lua", GameId = 76113971506717 },
+    { Name = "Soccer Manager", Icon = "🏟️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/soccer-manager.lua", GameId = 83988958116126 },
+    { Name = "Spin a Car", Icon = "🏎️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/spin-a-car.lua", GameId = 136758055891411 },
+    { Name = "Tap Incremental", Icon = "👆", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/tap-incremental.lua", GameId = 82103875404639 },
+    { Name = "Throw a Coin", Icon = "🪙", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/throw-a-coin.lua", GameId = 115681808123944 },
+    { Name = "Throw a Coin - World 2", Icon = "🪙", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/throw-a-coin.lua", GameId = 72042130041700 },
+    { Name = "Throw a Coin - World 3", Icon = "🪙", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/throw-a-coin.lua", GameId = 100875131717601 },
+    { Name = "World Cup Album", Icon = "🏆", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/world-cup-album.lua", GameId = 71724366181884 },
+    { Name = "Youtuber Card Collection", Icon = "💻", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/youtuber-card-collection.lua", GameId = 81440501385895 },
+    { Name = "Zombie Turret Farm", Icon = "🧟‍♂️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/zombie-turret-farm.lua", GameId = 70790155462881 },
+}
+
+-- ═══ HELPERS ═══
+local function trim(s) return s:gsub("^%s+", ""):gsub("%s+$", "") end
+
+local function isKeyValid(key)
+    if not key or key == "" then return false end
+    key = trim(key)
+    for _, k in ipairs(VALID_KEYS) do
+        if key == k then return true end
+    end
+    return false
+end
+
+local function saveKey(key) pcall(function() if writefile then writefile(KEY_FILE, key) end end) end
+
+local function loadKey()
+    local ok, res = pcall(function()
+        return (isfile and readfile and isfile(KEY_FILE)) and readfile(KEY_FILE) or nil
+    end)
+    return ok and res or nil
+end
 
 local function isLobbyPlace()
     for _, id in ipairs(LOBBY_PLACE_IDS) do
@@ -51,6 +135,17 @@ local function isExecutorBanned()
     return false, executorName
 end
 
+local function getGameScript()
+    for _, s in ipairs(SCRIPTS) do
+        if s.GameId == game.PlaceId then return s end
+    end
+end
+
+local function launch(scriptData)
+    pcall(function() loadstring(game:HttpGet(scriptData.URL))() end)
+end
+
+-- ═══ SHARED BAN CARD BUILDER ═══
 local function buildBanScreen(guiName, icon, title, message, footerText)
     if CoreGui:FindFirstChild("IBdihPLoader") then CoreGui.IBdihPLoader:Destroy() end
     if CoreGui:FindFirstChild(guiName) then CoreGui[guiName]:Destroy() end
@@ -196,7 +291,7 @@ local function buildBanScreen(guiName, icon, title, message, footerText)
         TweenService:Create(DiscordBtn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(88, 101, 242) }):Play()
     end)
     DiscordBtn.MouseButton1Click:Connect(function()
-        pcall(function() if setclipboard then setclipboard("https://discord.gg/DHeCNzTypH") end end)
+        pcall(function() if setclipboard then setclipboard(DISCORD_LINK) end end)
         DiscordBtn.Text = "✓  Copied!"
         task.delay(2, function()
             if DiscordBtn and DiscordBtn.Parent then
@@ -242,6 +337,7 @@ local function buildBanScreen(guiName, icon, title, message, footerText)
     end)
 end
 
+-- ═══ LOBBY SCREEN ═══
 local function buildLobbyScreen()
     if CoreGui:FindFirstChild("IBdihPLoader") then CoreGui.IBdihPLoader:Destroy() end
     if CoreGui:FindFirstChild("IBdihPLobby") then CoreGui.IBdihPLobby:Destroy() end
@@ -427,6 +523,7 @@ local function buildLobbyScreen()
     end)
 end
 
+-- ═══ CHECKS ═══
 if isUserBanned() then
     buildBanScreen(
         "IBdihPBanned",
@@ -455,81 +552,11 @@ if isLobbyPlace() then
     return
 end
 
-local SCRIPTS = {
-    { Name = "+1 Wood per Click", Icon = "🪵", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/1wood-per-click.lua", GameId = 112231208081788 },
-    { Name = "1 Keyboard = 1$/s", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/1keyboard%3D1%24s.lua", GameId = 121003786627094 },
-    { Name = "Anime Astral Simulator", Icon = "🔥", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-astral-simulator.lua", GameId = 102072869879193 },
-    { Name = "Anime Battles", Icon = "🤺", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-battles.lua", GameId = 126229277218112 },
-    { Name = "Anime Card Farm", Icon = "🃏", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-card-farm.lua", GameId = 125039473548047 },
-    { Name = "Anime Duelists", Icon = "⚔️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-duelists.lua", GameId = 135858844777165 },
-    { Name = "Anime Dungeons - Demon Train Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 127204771568038 },
-    { Name = "Anime Dungeons - Frozen Forest Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 123509790592616 },
-    { Name = "Anime Dungeons - Ninja Village Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 109955310601194 },
-    { Name = "Anime Dungeons - Soul Valley Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 82475659339476 },
-    { Name = "Anime Dungeons - Trials", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 70972455539417 },
-    { Name = "Anime Dungeons - Raids", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 122377279703567 },
-    { Name = "Anime Dungeons - Boss Rush", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 71585686583516 },
-    { Name = "Anime Powerscaling Card Collection", Icon = "🌟", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-powerscaling-card-collection.lua", GameId = 85580552562948 },
-    { Name = "Anime RNG Defense", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-rng-defense.lua", GameId = 104693964860826 },
-    { Name = "Anime Stars Card Collection", Icon = "🌸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-stars-card-collection.lua", GameId = 109715918987082 },
-    { Name = "Anime Universe", Icon = "🌌", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-universe.lua", GameId = 95992966043247 },
-    { Name = "Become an Anime Billionaire", Icon = "💸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/become-an-anime-billionaire.lua", GameId = 96891089305948 },
-    { Name = "Bomb Fishing", Icon = "🎣", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/bomb-fishing.lua", GameId = 118677256126351 },
-    { Name = "Build a Base and Steal", Icon = "🏯", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/build-a-base-and-steal.lua", GameId = 132016691802922 },
-    { Name = "Build a Base and Steal", Icon = "🏯", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/build-a-base-and-steal.lua", GameId = 82441325527385 },
-    { Name = "Build a Keyboard", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/build-a-keyboard.lua", GameId = 91679585668032 },
-    { Name = "Catch and Tame", Icon = "🐒", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/catch-and-tame.lua", GameId = 96645548064314 },
-    { Name = "Chicken Farm", Icon = "🐓", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/chicken-farm.lua", GameId = 137233438285284 },
-    { Name = "Clean the Squishies", Icon = "😻", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/clean-the-squishies.lua", GameId = 84016394196827 },
-    { Name = "Crab Tycoon", Icon = "🦀", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/crab-tycoon.lua", GameId = 92605157087535 },
-    { Name = "Crunch my Butter", Icon = "🧈", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/crunch-my-butter.lua", GameId = 87555052900625 },
-    { Name = "Digimon Era", Icon = "🦖", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/digimon-era.lua", GameId = 77192431769439 },
-    { Name = "Egg Case Farm", Icon = "🥚", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/egg-case-farm.lua", GameId = 74144293690546 },
-    { Name = "Farm an Island", Icon = "🧑‍🌾", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/farm-an-island.lua", GameId = 78769336859161 },
-    { Name = "Grow it RNG", Icon = "🪴", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/grow-it-rng.lua", GameId = 78292727217500 },
-    { Name = "Jump to Steal Soccer Legends", Icon = "⚽️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/jump-to-steal-soccer-legends.lua", GameId = 121474715335865 },
-    { Name = "Loot RNG", Icon = "🗡️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/loot-rng.lua", GameId = 118575129990331 },
-    { Name = "Make a Drill Farm", Icon = "⛏️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/make-a-drill-farm.lua", GameId = 79315121100812 },
-    { Name = "Make Hotsauce", Icon = "🌶️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/make-hotsauce.lua", GameId = 122391683154858 },
-    { Name = "Merge a Blackhole", Icon = "🪐", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/merge-a-blackhole.lua", GameId = 118605709428489 },
-    { Name = "Mine a Mountain", Icon = "🏔️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/mine-a-mountain.lua", GameId = 125927821145949 },
-    { Name = "Mine a Planet", Icon = "🌎", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/mine-a-planet.lua", GameId = 121125129560252 },
-    { Name = "Missiles vs Cities", Icon = "🚀", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/missiles-vs-cities.lua", GameId = 112641748896693 },
-    { Name = "My Fishing Anime", Icon = "🪝", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/my-fishing-anime.lua", GameId = 112244246405144 },
-    { Name = "My Giant Sandwich", Icon = "🥪", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/my-giant-sandwich.lua", GameId = 139546619723000 },
-    { Name = "My Wood Farm", Icon = "🪵", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/my-wood-farm.lua", GameId = 79267089300389 },
-    { Name = "Own a Cafe", Icon = "☕️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/own-a-cafe.lua", GameId = 131906518201863 },
-    { Name = "Place the Keycaps", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/place-the-keycaps.lua", GameId = 103984418130080 },
-    { Name = "RNG Heroes", Icon = "🦸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/rng-heroes.lua", GameId = 108307565942574 },
-    { Name = "Roll Anime", Icon = "🎲", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/roll-anime.lua", GameId = 107706720875645 },
-    { Name = "Roll to Defend", Icon = "🛡️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/roll-to-defend.lua", GameId = 129559579789369 },
-    { Name = "Scratchy Loot", Icon = "🎰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/scratchy-loot.lua", GameId = 78105732598311 },
-    { Name = "Snowcone Stand", Icon = "❄️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/snowcone-stand.lua", GameId = 76113971506717 },
-    { Name = "Soccer Manager", Icon = "🏟️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/soccer-manager.lua", GameId = 83988958116126 },
-    { Name = "Spin a Car", Icon = "🏎️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/spin-a-car.lua", GameId = 136758055891411 },
-    { Name = "Tap Incremental", Icon = "👆", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/tap-incremental.lua", GameId = 82103875404639 },
-    { Name = "Throw a Coin", Icon = "🪙", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/throw-a-coin.lua", GameId = 115681808123944 },
-    { Name = "Throw a Coin - World 2", Icon = "🪙", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/throw-a-coin.lua", GameId = 72042130041700 },
-    { Name = "Throw a Coin - World 3", Icon = "🪙", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/throw-a-coin.lua", GameId = 100875131717601 },
-    { Name = "World Cup Album", Icon = "🏆", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/world-cup-album.lua", GameId = 71724366181884 },
-    { Name = "Youtuber Card Collection", Icon = "💻", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/youtuber-card-collection.lua", GameId = 81440501385895 },
-    { Name = "Zombie Turret Farm", Icon = "🧟‍♂️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/zombie-turret-farm.lua", GameId = 70790155462881 },
-}
-
-local function getGameScript()
-    for _, s in ipairs(SCRIPTS) do
-        if s.GameId == game.PlaceId then return s end
-    end
-end
-
-local function launch(scriptData)
-    pcall(function() loadstring(game:HttpGet(scriptData.URL))() end)
-end
-
+-- ═══ AUTO-LAUNCH IF KEY SAVED AND GAME SUPPORTED ═══
+local savedKey = loadKey()
 local gameScript = getGameScript()
 
--- Auto-launch if game is supported, skip UI entirely
-if gameScript then
+if isKeyValid(savedKey) and gameScript then
     launch(gameScript)
     return
 end
@@ -587,6 +614,13 @@ local function label(props)
     return new("TextLabel", props)
 end
 
+local function setupHover(btn, n, h, p)
+    btn.MouseEnter:Connect(function() tween(btn, { BackgroundColor3 = h }, 0.15) end)
+    btn.MouseLeave:Connect(function() tween(btn, { BackgroundColor3 = n }, 0.2) end)
+    btn.MouseButton1Down:Connect(function() tween(btn, { BackgroundColor3 = p or h }, 0.05) end)
+    btn.MouseButton1Up:Connect(function() tween(btn, { BackgroundColor3 = h }, 0.1) end)
+end
+
 local function makeBtn(props, parent)
     local btn = new("TextButton", {
         Size = props.size, Position = props.pos,
@@ -597,20 +631,17 @@ local function makeBtn(props, parent)
     corner(btn, 10)
     label({ Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Text = props.text,
         TextColor3 = C.textB, TextSize = props.ts or 12, Font = Enum.Font.GothamBold, ZIndex = (props.z or 7)+1, Parent = btn })
-    btn.MouseEnter:Connect(function() tween(btn, { BackgroundColor3 = props.hov }, 0.15) end)
-    btn.MouseLeave:Connect(function() tween(btn, { BackgroundColor3 = props.col }, 0.2) end)
-    btn.MouseButton1Down:Connect(function() tween(btn, { BackgroundColor3 = props.press or props.hov }, 0.05) end)
-    btn.MouseButton1Up:Connect(function() tween(btn, { BackgroundColor3 = props.hov }, 0.1) end)
+    setupHover(btn, props.col, props.hov, props.press)
     return btn
 end
 
--- ═══ BUILD GUI (Unsupported Game only) ═══
+-- ═══ BUILD GUI ═══
 if CoreGui:FindFirstChild("IBdihPLoader") then CoreGui.IBdihPLoader:Destroy() end
 
 local Gui = new("ScreenGui", { Name = "IBdihPLoader", ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, Parent = CoreGui })
 local Backdrop = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundColor3 = C.black, BackgroundTransparency = 1, ZIndex = 1, Parent = Gui })
 
-local CW, CH = 520, 280
+local CW, CH = 520, 330
 local Card = new("Frame", {
     Name = "Card", Size = UDim2.new(0,CW,0,0),
     Position = UDim2.new(0.5,0,0.5,0), AnchorPoint = Vector2.new(0.5,0.5),
@@ -621,6 +652,7 @@ corner(Card, 16)
 local cardStroke = stroke(Card, C.border, 1)
 cardStroke.Transparency = 1
 
+-- Accent bar
 local AccentBar = new("Frame", { Size = UDim2.new(1,0,0,3), BackgroundColor3 = C.accent, BorderSizePixel = 0, ZIndex = 15, Parent = Card })
 local accentGrad = new("UIGradient", {
     Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(140,120,255)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(200,140,255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(100,180,255)) }),
@@ -636,6 +668,7 @@ task.spawn(function()
     end
 end)
 
+-- Intro animation
 task.wait(0.15)
 tween(Backdrop, { BackgroundTransparency = 0.5 }, 0.5)
 task.wait(0.05)
@@ -643,6 +676,7 @@ tween(Card, { Size = UDim2.new(0,CW,0,CH), BackgroundTransparency = 0 }, 0.55, E
 tween(cardStroke, { Transparency = 0 }, 0.4)
 task.wait(0.55)
 
+-- Close button
 local CloseBtn = new("TextButton", { Size = UDim2.new(0,30,0,30), Position = UDim2.new(1,-40,0,10), BackgroundColor3 = C.surface, BackgroundTransparency = 0.4, Text = "✕", TextColor3 = C.textM, TextSize = 15, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 20, Parent = Card })
 corner(CloseBtn, 8)
 CloseBtn.MouseEnter:Connect(function() tween(CloseBtn, { BackgroundTransparency = 0, BackgroundColor3 = C.errorBg, TextColor3 = C.error }, 0.15) end)
@@ -653,24 +687,196 @@ CloseBtn.MouseButton1Click:Connect(function()
     task.wait(0.4); Gui:Destroy()
 end)
 
-local Content = new("Frame", { Size = UDim2.new(1,-68,1,-56), Position = UDim2.new(0,34,0,28), BackgroundTransparency = 1, ZIndex = 4, Parent = Card })
+-- Content area
+local Content = new("Frame", { Size = UDim2.new(1,-68,1,-56), Position = UDim2.new(0,34,0,28), BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 4, Parent = Card })
 
-label({ Size = UDim2.new(1,0,0,50), Position = UDim2.new(0,0,0,20), Text = "😔", TextSize = 42, ZIndex = 6, Parent = Content })
-label({ Size = UDim2.new(1,0,0,24), Position = UDim2.new(0,0,0,78), Text = "Game Not Supported", TextColor3 = C.text, TextSize = 18, Font = Enum.Font.GothamBold, ZIndex = 6, Parent = Content })
-label({ Size = UDim2.new(1,0,0,32), Position = UDim2.new(0,0,0,108), Text = "IBdihP Hub doesn't support this game yet.\nJoin our Discord to request it!", TextColor3 = C.textS, TextSize = 11, TextWrapped = true, ZIndex = 6, Parent = Content })
-label({ Size = UDim2.new(1,0,0,14), Position = UDim2.new(0,0,0,148), Text = "Place ID: " .. tostring(game.PlaceId), TextColor3 = C.textM, TextSize = 10, ZIndex = 6, Parent = Content })
+local function closeThenLaunch(scriptData)
+    tween(Card, { Size = UDim2.new(0,CW,0,0), BackgroundTransparency = 1 }, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+    tween(Backdrop, { BackgroundTransparency = 1 }, 0.4)
+    task.wait(0.5); Gui:Destroy(); launch(scriptData)
+end
 
-local UnsupDiscord = makeBtn({ size = UDim2.new(0,180,0,42), pos = UDim2.new(0.5,-90,1,-44), col = C.discord, hov = C.discordH, press = C.discordP, text = "💬  Join Discord", ts = 13, z = 7 }, Content)
+-- ══════════════════════════════════════════
+--   KEY PAGE
+-- ══════════════════════════════════════════
+local KeyPage = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Visible = true, ZIndex = 5, Parent = Content })
+
+-- Header
+local LogoMark = new("Frame", { Size = UDim2.new(0,40,0,40), Position = UDim2.new(0,0,0,2), BackgroundColor3 = C.accentGhost, ZIndex = 6, Parent = KeyPage })
+corner(LogoMark, 12); stroke(LogoMark, C.accent, 1)
+label({ Size = UDim2.new(1,0,1,0), Text = "✦", TextColor3 = C.accent, TextSize = 20, Font = Enum.Font.GothamBold, ZIndex = 7, Parent = LogoMark })
+label({ Size = UDim2.new(0,200,0,20), Position = UDim2.new(0,52,0,3), Text = "IBdihP Hub", TextColor3 = C.textB, TextSize = 18, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6, Parent = KeyPage })
+label({ Size = UDim2.new(0,200,0,14), Position = UDim2.new(0,52,0,25), Text = "script loader  v3.0", TextColor3 = C.textS, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6, Parent = KeyPage })
+
+new("Frame", { Size = UDim2.new(1,0,0,1), Position = UDim2.new(0,0,0,54), BackgroundColor3 = C.border, BorderSizePixel = 0, ZIndex = 5, Parent = KeyPage })
+
+label({ Size = UDim2.new(1,0,0,16), Position = UDim2.new(0,0,0,68), Text = "Welcome, " .. LocalPlayer.Name .. " 👋", TextColor3 = C.text, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
+label({ Size = UDim2.new(1,0,0,14), Position = UDim2.new(0,0,0,87), Text = gameScript and ("✓  " .. gameScript.Name) or "⚠  This game is not supported", TextColor3 = gameScript and C.success or C.warning, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
+
+-- Input
+label({ Size = UDim2.new(1,0,0,12), Position = UDim2.new(0,0,0,114), Text = "ENTER KEY", TextColor3 = C.textM, TextSize = 9, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
+
+local InputWrap = new("Frame", { Size = UDim2.new(1,0,0,44), Position = UDim2.new(0,0,0,132), BackgroundColor3 = C.inputBg, ZIndex = 6, Parent = KeyPage })
+corner(InputWrap, 10)
+local inputStroke = stroke(InputWrap, C.border, 1.5)
+label({ Size = UDim2.new(0,34,1,0), Position = UDim2.new(0,4,0,0), Text = "🔑", TextSize = 14, ZIndex = 7, Parent = InputWrap })
+local KeyInput = new("TextBox", { Size = UDim2.new(1,-48,1,0), Position = UDim2.new(0,38,0,0), BackgroundTransparency = 1, Text = "", PlaceholderText = "enter your key here...", PlaceholderColor3 = C.textM, TextColor3 = C.textB, TextSize = 13, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, ZIndex = 7, Parent = InputWrap })
+
+KeyInput.Focused:Connect(function() tween(inputStroke, { Color = C.borderF }, 0.2); tween(InputWrap, { BackgroundColor3 = C.inputBgF }, 0.2) end)
+KeyInput.FocusLost:Connect(function() tween(inputStroke, { Color = C.border }, 0.25); tween(InputWrap, { BackgroundColor3 = C.inputBg }, 0.25) end)
+
+local StatusMsg = label({ Size = UDim2.new(1,0,0,16), Position = UDim2.new(0,0,0,184), Text = "", TextColor3 = C.error, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
+label({ Size = UDim2.new(1,0,0,14), Position = UDim2.new(0,0,0,204), Text = "free permanent key in our discord — saves automatically ♡", TextColor3 = C.textM, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 5, Parent = KeyPage })
+
+-- Buttons
+local BtnRow = new("Frame", { Size = UDim2.new(1,0,0,44), Position = UDim2.new(0,0,1,-44), BackgroundTransparency = 1, ZIndex = 6, Parent = KeyPage })
+local DiscordBtn = makeBtn({ size = UDim2.new(0,108,1,0), pos = UDim2.new(0,0,0,0), col = C.discord, hov = C.discordH, press = C.discordP, text = "💬  Get Key", ts = 12 }, BtnRow)
+local PasteBtn   = makeBtn({ size = UDim2.new(0,76,1,0),  pos = UDim2.new(0,116,0,0), col = C.surface, hov = C.surfaceL, text = "📋 Paste",   ts = 11 }, BtnRow)
+local VerifyBtn  = makeBtn({ size = UDim2.new(1,-200,1,0), pos = UDim2.new(0,200,0,0), col = C.accent, hov = C.accentH, press = C.accentP, text = "Verify & Launch  →", ts = 13 }, BtnRow)
+local VerifyLabel = VerifyBtn:FindFirstChildWhichIsA("TextLabel")
+
+-- ══════════════════════════════════════════
+--   UNSUPPORTED PAGE
+-- ══════════════════════════════════════════
+local UnsupportedPage = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Visible = false, ZIndex = 5, Parent = Content })
+
+label({ Size = UDim2.new(1,0,0,50), Position = UDim2.new(0,0,0,20), Text = "😔", TextSize = 42, ZIndex = 6, Parent = UnsupportedPage })
+label({ Size = UDim2.new(1,0,0,24), Position = UDim2.new(0,0,0,78), Text = "Game Not Supported", TextColor3 = C.text, TextSize = 18, Font = Enum.Font.GothamBold, ZIndex = 6, Parent = UnsupportedPage })
+label({ Size = UDim2.new(1,0,0,16), Position = UDim2.new(0,0,0,108), Text = "IBdihP Hub doesn't support this game yet. Join our Discord to request it!", TextColor3 = C.textS, TextSize = 11, ZIndex = 6, Parent = UnsupportedPage })
+
+local UnsupDiscord = makeBtn({ size = UDim2.new(0,180,0,42), pos = UDim2.new(0.5,-90,1,-50), col = C.discord, hov = C.discordH, press = C.discordP, text = "💬  Join Discord", ts = 13, z = 7 }, UnsupportedPage)
 UnsupDiscord.MouseButton1Click:Connect(function()
     pcall(function() if setclipboard then setclipboard(DISCORD_LINK) end end)
     local lbl = UnsupDiscord:FindFirstChildWhichIsA("TextLabel")
     if lbl then
         lbl.Text = "✓  Copied!"
-        task.delay(2, function()
-            if lbl and lbl.Parent then lbl.Text = "💬  Join Discord" end
-        end)
+        task.delay(2, function() if lbl and lbl.Parent then lbl.Text = "💬  Join Discord" end end)
     end
 end)
+
+-- ══════════════════════════════════════════
+--   LAUNCH PAGE
+-- ══════════════════════════════════════════
+local LaunchPage = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Visible = false, ZIndex = 5, Parent = Content })
+
+local spinnerDots = {}
+local SpinnerWrap = new("Frame", { Size = UDim2.new(0,50,0,50), Position = UDim2.new(0.5,-25,0,40), BackgroundTransparency = 1, ZIndex = 6, Parent = LaunchPage })
+for i = 1, 3 do
+    local dot = new("Frame", { Size = UDim2.new(0,10,0,10), Position = UDim2.new(0,(i-1)*18+2,0.5,-5), BackgroundColor3 = ({Color3.fromRGB(140,120,255), Color3.fromRGB(180,140,255), Color3.fromRGB(100,180,255)})[i], ZIndex = 7, Parent = SpinnerWrap })
+    corner(dot, 5); spinnerDots[i] = dot
+end
+task.spawn(function()
+    while SpinnerWrap and SpinnerWrap.Parent do
+        for i, dot in ipairs(spinnerDots) do
+            task.delay((i-1)*0.15, function()
+                if dot and dot.Parent then
+                    tween(dot, { Position = dot.Position - UDim2.new(0,0,0,12) }, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+                    task.wait(0.2)
+                    if dot and dot.Parent then tween(dot, { Position = dot.Position + UDim2.new(0,0,0,12) }, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In) end
+                end
+            end)
+        end
+        task.wait(0.9)
+    end
+end)
+
+local LaunchTitle = label({ Size = UDim2.new(1,0,0,22), Position = UDim2.new(0,0,0,105), Text = "Launching Script...", TextColor3 = C.text, TextSize = 17, Font = Enum.Font.GothamBold, ZIndex = 6, Parent = LaunchPage })
+local LaunchSub   = label({ Size = UDim2.new(1,0,0,16), Position = UDim2.new(0,0,0,132), Text = "", TextColor3 = C.textS, TextSize = 12, ZIndex = 6, Parent = LaunchPage })
+label({ Size = UDim2.new(1,0,0,14), Position = UDim2.new(0,0,1,-30), Text = "key saved — you won't need to enter it again ✓", TextColor3 = C.success, TextSize = 10, ZIndex = 6, Parent = LaunchPage })
+
+-- ══════════════════════════════════════════
+--   BUTTON LOGIC
+-- ══════════════════════════════════════════
+DiscordBtn.MouseButton1Click:Connect(function()
+    pcall(function() if setclipboard then setclipboard(DISCORD_LINK) end end)
+    StatusMsg.Text = "🔗  Discord invite copied!"; StatusMsg.TextColor3 = C.discord
+    task.delay(3, function()
+        if StatusMsg and StatusMsg.Parent then
+            tween(StatusMsg, { TextTransparency = 1 }, 0.3)
+            task.wait(0.35)
+            if StatusMsg and StatusMsg.Parent then StatusMsg.Text = ""; StatusMsg.TextTransparency = 0 end
+        end
+    end)
+end)
+
+PasteBtn.MouseButton1Click:Connect(function()
+    pcall(function() if getclipboard then KeyInput.Text = getclipboard() end end)
+end)
+
+local function shakeInput()
+    local orig = InputWrap.Position
+    for _ = 1, 4 do
+        tween(InputWrap, { Position = orig + UDim2.new(0,6,0,0) }, 0.035, Enum.EasingStyle.Linear)
+        task.wait(0.04)
+        tween(InputWrap, { Position = orig - UDim2.new(0,6,0,0) }, 0.035, Enum.EasingStyle.Linear)
+        task.wait(0.04)
+    end
+    tween(InputWrap, { Position = orig }, 0.06)
+end
+
+local function showStatus(msg, col)
+    StatusMsg.Text = msg; StatusMsg.TextColor3 = col; StatusMsg.TextTransparency = 0
+end
+
+local function transitionTo(fromPage, toPage)
+    tween(fromPage, { Position = UDim2.new(-1.2,0,0,0) }, 0.4)
+    task.wait(0.1)
+    toPage.Visible = true
+    toPage.Position = UDim2.new(1.2,0,0,0)
+    tween(toPage, { Position = UDim2.new(0,0,0,0) }, 0.4)
+end
+
+local verifying = false
+local function doVerify()
+    if verifying then return end
+    local key = trim(KeyInput.Text)
+
+    if key == "" then
+        showStatus("⚠  please enter a key", C.warning)
+        shakeInput(); return
+    end
+
+    verifying = true
+    VerifyLabel.Text = "Verifying..."
+    tween(VerifyBtn, { BackgroundColor3 = C.accentSoft }, 0.15)
+    task.wait(0.6)
+
+    if isKeyValid(key) then
+        saveKey(key)
+        showStatus("✓  Key verified!", C.success)
+        tween(VerifyBtn, { BackgroundColor3 = C.success }, 0.2)
+        tween(inputStroke, { Color = C.success }, 0.2)
+        VerifyLabel.Text = "✓  Verified!"
+        task.wait(0.7)
+
+        if gameScript then
+            LaunchSub.Text = gameScript.Icon .. "  " .. gameScript.Name
+            transitionTo(KeyPage, LaunchPage)
+            task.wait(1.5)
+            closeThenLaunch(gameScript)
+        else
+            transitionTo(KeyPage, UnsupportedPage)
+        end
+    else
+        showStatus("✗  Invalid key — join Discord for a free key", C.error)
+        tween(inputStroke, { Color = C.error }, 0.15)
+        shakeInput()
+        task.delay(3.5, function()
+            tween(inputStroke, { Color = C.border }, 0.3)
+            if StatusMsg and StatusMsg.Parent then
+                tween(StatusMsg, { TextTransparency = 1 }, 0.4)
+                task.wait(0.4)
+                if StatusMsg and StatusMsg.Parent then StatusMsg.Text = ""; StatusMsg.TextTransparency = 0 end
+            end
+        end)
+        VerifyLabel.Text = "Verify & Launch  →"
+        tween(VerifyBtn, { BackgroundColor3 = C.accent }, 0.2)
+        verifying = false
+    end
+end
+
+VerifyBtn.MouseButton1Click:Connect(doVerify)
+KeyInput.FocusLost:Connect(function(enter) if enter then doVerify() end end)
 
 -- ═══ DRAGGING ═══
 local dragging, dragInput, dragStart, startPos
@@ -688,5 +894,15 @@ UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
         local d = input.Position - dragStart
         Card.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
+    end
+end)
+
+-- ═══ LOGO PULSE ═══
+task.spawn(function()
+    while LogoMark and LogoMark.Parent do
+        tween(LogoMark, { BackgroundColor3 = C.accentSoft }, 1.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        task.wait(1.8)
+        tween(LogoMark, { BackgroundColor3 = C.accentGhost }, 1.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+        task.wait(1.8)
     end
 end)
