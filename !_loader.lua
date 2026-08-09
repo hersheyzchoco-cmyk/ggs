@@ -30,6 +30,7 @@ local SCRIPTS = {
     { Name = "1 Keyboard = 1$/s", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/1keyboard%3D1%24s.lua", GameId = 121003786627094 },
     { Name = "Anime Astral Simulator", Icon = "🔥", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-astral-simulator.lua", GameId = 102072869879193 },
     { Name = "Anime Battles", Icon = "🤺", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-battles.lua", GameId = 126229277218112 },
+    { Name = "Anime Capture", Icon = "🖐", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-capture.lua", GameId = 94717504417144 },
     { Name = "Anime Card Farm", Icon = "🃏", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-card-farm.lua", GameId = 125039473548047 },
     { Name = "Anime Duelists", Icon = "⚔️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-duelists.lua", GameId = 135858844777165 },
     { Name = "Anime Dungeons - Demon Train Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 127204771568038 },
