@@ -42,6 +42,7 @@ local SCRIPTS = {
     { Name = "Anime Dungeons - Boss Rush", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 71585686583516 },
     { Name = "Anime Powerscaling Card Collection", Icon = "🌟", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-powerscaling-card-collection.lua", GameId = 85580552562948 },
     { Name = "Anime RNG Defense", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-rng-defense.lua", GameId = 104693964860826 },
+    { Name = "Anime Stars", Icon = "🌠", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-stars.lua", GameId = 122553263569744 },
     { Name = "Anime Stars Card Collection", Icon = "🌸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-stars-card-collection.lua", GameId = 109715918987082 },
     { Name = "Anime Universe", Icon = "🌌", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-universe.lua", GameId = 95992966043247 },
     { Name = "Become an Anime Billionaire", Icon = "💸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/become-an-anime-billionaire.lua", GameId = 96891089305948 },
