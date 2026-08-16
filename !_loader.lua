@@ -12,7 +12,7 @@ local BASE_URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/
 
 local BANNED_USERS = {"8kruo"}
 
-local LOBBY_PLACE_IDS = {70863683083739}
+local LOBBY_PLACE_IDS = {87810101348327}
 
 local SCRIPTS = {
     { Name = "+1 Wood per Click", Icon = "🪵", File = "1wood-per-click.lua", GameId = 112231208081788 },
@@ -22,6 +22,7 @@ local SCRIPTS = {
     { Name = "Anime Capture", Icon = "🖐", File = "anime-capture.lua", GameId = 94717504417144 },
     { Name = "Anime Card Farm", Icon = "🃏", File = "anime-card-farm.lua", GameId = 125039473548047 },
     { Name = "Anime Duelists", Icon = "⚔️", File = "anime-duelists.lua", GameId = 135858844777165 },
+    { Name = "Anime Dungeons - Lobby", Icon = "🏰", File = "anime-dungeons-lobby.lua", GameId = 70863683083739 },
     { Name = "Anime Dungeons - Demon Train Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 127204771568038 },
     { Name = "Anime Dungeons - Frozen Forest Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 123509790592616 },
     { Name = "Anime Dungeons - Ninja Village Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 109955310601194 },
