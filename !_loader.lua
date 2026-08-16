@@ -59,7 +59,7 @@ local SCRIPTS = {
     { Name = "My Giant Sandwich", Icon = "🥪", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/my-giant-sandwich.lua", GameId = 139546619723000 },
     { Name = "My Wood Farm", Icon = "🪵", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/my-wood-farm.lua", GameId = 79267089300389 },
     { Name = "Own a Cafe", Icon = "☕️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/own-a-cafe.lua", GameId = 131906518201863 },
-    { Name = "Penguin Tycoon", Icon = "🐧", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/penguin-tycoon.lua", GameId = 89561601601392 },
+    { Name = "Penguin Tycoon", Icon = "🐧", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/penguin-tycoon.lua", GameId = 89561601601392 },
     { Name = "Place the Keycaps", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/place-the-keycaps.lua", GameId = 103984418130080 },
     { Name = "RNG Heroes", Icon = "🦸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/rng-heroes.lua", GameId = 108307565942574 },
     { Name = "Roll Anime", Icon = "🎲", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/roll-anime.lua", GameId = 107706720875645 },
