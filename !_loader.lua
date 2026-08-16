@@ -8,75 +8,76 @@ local LocalPlayer = Players.LocalPlayer
 local DISCORD_LINK = "https://discord.gg/DHeCNzTypH"
 local VALID_KEYS = {"ilyguys"}
 local KEY_FILE = "IBdihPHub_SavedKey.txt"
+local BASE_URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/"
 
 local BANNED_USERS = {"8kruo"}
 
 local LOBBY_PLACE_IDS = {70863683083739}
 
 local SCRIPTS = {
-    { Name = "+1 Wood per Click", Icon = "🪵", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/1wood-per-click.lua", GameId = 112231208081788 },
-    { Name = "1 Keyboard = 1$/s", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/1keyboard%3D1%24s.lua", GameId = 121003786627094 },
-    { Name = "Anime Astral Simulator", Icon = "🔥", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-astral-simulator.lua", GameId = 102072869879193 },
-    { Name = "Anime Battles", Icon = "🤺", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-battles.lua", GameId = 126229277218112 },
-    { Name = "Anime Capture", Icon = "🖐", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-capture.lua", GameId = 94717504417144 },
-    { Name = "Anime Card Farm", Icon = "🃏", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-card-farm.lua", GameId = 125039473548047 },
-    { Name = "Anime Duelists", Icon = "⚔️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-duelists.lua", GameId = 135858844777165 },
-    { Name = "Anime Dungeons - Demon Train Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 127204771568038 },
-    { Name = "Anime Dungeons - Frozen Forest Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 123509790592616 },
-    { Name = "Anime Dungeons - Ninja Village Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 109955310601194 },
-    { Name = "Anime Dungeons - Soul Valley Dungeon", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 82475659339476 },
-    { Name = "Anime Dungeons - Trials", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 70972455539417 },
-    { Name = "Anime Dungeons - Raids", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 122377279703567 },
-    { Name = "Anime Dungeons - Boss Rush", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-dungeons.lua", GameId = 71585686583516 },
-    { Name = "Anime Powerscaling Card Collection", Icon = "🌟", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-powerscaling-card-collection.lua", GameId = 85580552562948 },
-    { Name = "Anime RNG Defense", Icon = "🏰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-rng-defense.lua", GameId = 104693964860826 },
-    { Name = "Anime Stars", Icon = "🌠", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-stars.lua", GameId = 122553263569744 },
-    { Name = "Anime Stars Card Collection", Icon = "🌸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-stars-card-collection.lua", GameId = 109715918987082 },
-    { Name = "Anime Universe", Icon = "🌌", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/anime-universe.lua", GameId = 95992966043247 },
-    { Name = "Become an Anime Billionaire", Icon = "💸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/become-an-anime-billionaire.lua", GameId = 96891089305948 },
-    { Name = "Bomb Fishing", Icon = "🎣", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/bomb-fishing.lua", GameId = 118677256126351 },
-    { Name = "Build a Base and Steal", Icon = "🏯", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/build-a-base-and-steal.lua", GameId = 132016691802922 },
-    { Name = "Build a Base and Steal", Icon = "🏯", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/build-a-base-and-steal.lua", GameId = 82441325527385 },
-    { Name = "Build a Keyboard", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/build-a-keyboard.lua", GameId = 91679585668032 },
-    { Name = "Catch and Tame", Icon = "🐒", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/catch-and-tame.lua", GameId = 96645548064314 },
-    { Name = "Chicken Farm", Icon = "🐓", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/chicken-farm.lua", GameId = 137233438285284 },
-    { Name = "Clean the Squishies", Icon = "😻", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/clean-the-squishies.lua", GameId = 84016394196827 },
-    { Name = "Crab Tycoon", Icon = "🦀", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/crab-tycoon.lua", GameId = 92605157087535 },
-    { Name = "Crunch my Butter", Icon = "🧈", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/crunch-my-butter.lua", GameId = 87555052900625 },
-    { Name = "Digimon Era", Icon = "🦖", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/digimon-era.lua", GameId = 77192431769439 },
-    { Name = "Egg Case Farm", Icon = "🥚", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/egg-case-farm.lua", GameId = 74144293690546 },
-    { Name = "Farm an Island", Icon = "🧑‍🌾", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/farm-an-island.lua", GameId = 78769336859161 },
-    { Name = "Grow it RNG", Icon = "🪴", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/grow-it-rng.lua", GameId = 78292727217500 },
-    { Name = "Jump to Steal Soccer Legends", Icon = "⚽️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/jump-to-steal-soccer-legends.lua", GameId = 121474715335865 },
-    { Name = "Loot RNG", Icon = "🗡️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/loot-rng.lua", GameId = 118575129990331 },
-    { Name = "Make a Drill Farm", Icon = "⛏️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/make-a-drill-farm.lua", GameId = 79315121100812 },
-    { Name = "Make Hotsauce", Icon = "🌶️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/make-hotsauce.lua", GameId = 122391683154858 },
-    { Name = "Merge a Blackhole", Icon = "🪐", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/merge-a-blackhole.lua", GameId = 118605709428489 },
-    { Name = "Mine a Mountain", Icon = "🏔️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/mine-a-mountain.lua", GameId = 125927821145949 },
-    { Name = "Mine a Planet", Icon = "🌎", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/mine-a-planet.lua", GameId = 121125129560252 },
-    { Name = "Missiles vs Cities", Icon = "🚀", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/missiles-vs-cities.lua", GameId = 112641748896693 },
-    { Name = "My Fishing Anime", Icon = "🪝", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/my-fishing-anime.lua", GameId = 112244246405144 },
-    { Name = "My Giant Sandwich", Icon = "🥪", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/my-giant-sandwich.lua", GameId = 139546619723000 },
-    { Name = "My Wood Farm", Icon = "🪵", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/my-wood-farm.lua", GameId = 79267089300389 },
-    { Name = "Own a Cafe", Icon = "☕️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/own-a-cafe.lua", GameId = 131906518201863 },
-    { Name = "Penguin Tycoon", Icon = "🐧", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/penguin-tycoon.lua", GameId = 89561601601392 },
-    { Name = "Place the Keycaps", Icon = "⌨️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/place-the-keycaps.lua", GameId = 103984418130080 },
-    { Name = "RNG Heroes", Icon = "🦸", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/rng-heroes.lua", GameId = 108307565942574 },
-    { Name = "Roll Anime", Icon = "🎲", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/roll-anime.lua", GameId = 107706720875645 },
-    { Name = "Roll to Defend", Icon = "🛡️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/roll-to-defend.lua", GameId = 129559579789369 },
-    { Name = "Scratchy Loot", Icon = "🎰", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/scratchy-loot.lua", GameId = 78105732598311 },
-    { Name = "Snowcone Stand", Icon = "❄️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/snowcone-stand.lua", GameId = 76113971506717 },
-    { Name = "Soccer Manager", Icon = "🏟️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/soccer-manager.lua", GameId = 83988958116126 },
-    { Name = "Spin a Car", Icon = "🏎️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/spin-a-car.lua", GameId = 136758055891411 },
-    { Name = "Spin a Duel Monster", Icon = "🧌", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/spin-a-duel-monster.lua", GameId = 86789126516616 },
-    { Name = "Tap Incremental", Icon = "👆", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/tap-incremental.lua", GameId = 82103875404639 },
-    { Name = "Throw a Coin - World 1", Icon = "🪙", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/throw-a-coin.lua", GameId = 115681808123944 },
-    { Name = "Throw a Coin - World 2", Icon = "🪙", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/throw-a-coin.lua", GameId = 72042130041700 },
-    { Name = "Throw a Coin - World 3", Icon = "🪙", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/throw-a-coin.lua", GameId = 100875131717601 },
-    { Name = "Throw a Coin - World 4", Icon = "🪙", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/throw-a-coin.lua", GameId = 81335362752013 },
-    { Name = "World Cup Album", Icon = "🏆", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/world-cup-album.lua", GameId = 71724366181884 },
-    { Name = "Youtuber Card Collection", Icon = "💻", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/youtuber-card-collection.lua", GameId = 81440501385895 },
-    { Name = "Zombie Turret Farm", Icon = "🧟‍♂️", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/awcc/refs/heads/main/games/zombie-turret-farm.lua", GameId = 70790155462881 },
+    { Name = "+1 Wood per Click", Icon = "🪵", File = "1wood-per-click.lua", GameId = 112231208081788 },
+    { Name = "1 Keyboard = 1$/s", Icon = "⌨️", File = "1keyboard%3D1%24s.lua", GameId = 121003786627094 },
+    { Name = "Anime Astral Simulator", Icon = "🔥", File = "anime-astral-simulator.lua", GameId = 102072869879193 },
+    { Name = "Anime Battles", Icon = "🤺", File = "anime-battles.lua", GameId = 126229277218112 },
+    { Name = "Anime Capture", Icon = "🖐", File = "anime-capture.lua", GameId = 94717504417144 },
+    { Name = "Anime Card Farm", Icon = "🃏", File = "anime-card-farm.lua", GameId = 125039473548047 },
+    { Name = "Anime Duelists", Icon = "⚔️", File = "anime-duelists.lua", GameId = 135858844777165 },
+    { Name = "Anime Dungeons - Demon Train Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 127204771568038 },
+    { Name = "Anime Dungeons - Frozen Forest Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 123509790592616 },
+    { Name = "Anime Dungeons - Ninja Village Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 109955310601194 },
+    { Name = "Anime Dungeons - Soul Valley Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 82475659339476 },
+    { Name = "Anime Dungeons - Trials", Icon = "🏰", File = "anime-dungeons.lua", GameId = 70972455539417 },
+    { Name = "Anime Dungeons - Raids", Icon = "🏰", File = "anime-dungeons.lua", GameId = 122377279703567 },
+    { Name = "Anime Dungeons - Boss Rush", Icon = "🏰", File = "anime-dungeons.lua", GameId = 71585686583516 },
+    { Name = "Anime Powerscaling Card Collection", Icon = "🌟", File = "anime-powerscaling-card-collection.lua", GameId = 85580552562948 },
+    { Name = "Anime RNG Defense", Icon = "🏰", File = "anime-rng-defense.lua", GameId = 104693964860826 },
+    { Name = "Anime Stars", Icon = "🌠", File = "anime-stars.lua", GameId = 122553263569744 },
+    { Name = "Anime Stars Card Collection", Icon = "🌸", File = "anime-stars-card-collection.lua", GameId = 109715918987082 },
+    { Name = "Anime Universe", Icon = "🌌", File = "anime-universe.lua", GameId = 95992966043247 },
+    { Name = "Become an Anime Billionaire", Icon = "💸", File = "become-an-anime-billionaire.lua", GameId = 96891089305948 },
+    { Name = "Bomb Fishing", Icon = "🎣", File = "bomb-fishing.lua", GameId = 118677256126351 },
+    { Name = "Build a Base and Steal", Icon = "🏯", File = "build-a-base-and-steal.lua", GameId = 132016691802922 },
+    { Name = "Build a Base and Steal", Icon = "🏯", File = "build-a-base-and-steal.lua", GameId = 82441325527385 },
+    { Name = "Build a Keyboard", Icon = "⌨️", File = "build-a-keyboard.lua", GameId = 91679585668032 },
+    { Name = "Catch and Tame", Icon = "🐒", File = "catch-and-tame.lua", GameId = 96645548064314 },
+    { Name = "Chicken Farm", Icon = "🐓", File = "chicken-farm.lua", GameId = 137233438285284 },
+    { Name = "Clean the Squishies", Icon = "😻", File = "clean-the-squishies.lua", GameId = 84016394196827 },
+    { Name = "Crab Tycoon", Icon = "🦀", File = "crab-tycoon.lua", GameId = 92605157087535 },
+    { Name = "Crunch my Butter", Icon = "🧈", File = "crunch-my-butter.lua", GameId = 87555052900625 },
+    { Name = "Digimon Era", Icon = "🦖", File = "digimon-era.lua", GameId = 77192431769439 },
+    { Name = "Egg Case Farm", Icon = "🥚", File = "egg-case-farm.lua", GameId = 74144293690546 },
+    { Name = "Farm an Island", Icon = "🧑‍🌾", File = "farm-an-island.lua", GameId = 78769336859161 },
+    { Name = "Grow it RNG", Icon = "🪴", File = "grow-it-rng.lua", GameId = 78292727217500 },
+    { Name = "Jump to Steal Soccer Legends", Icon = "⚽️", File = "jump-to-steal-soccer-legends.lua", GameId = 121474715335865 },
+    { Name = "Loot RNG", Icon = "🗡️", File = "loot-rng.lua", GameId = 118575129990331 },
+    { Name = "Make a Drill Farm", Icon = "⛏️", File = "make-a-drill-farm.lua", GameId = 79315121100812 },
+    { Name = "Make Hotsauce", Icon = "🌶️", File = "make-hotsauce.lua", GameId = 122391683154858 },
+    { Name = "Merge a Blackhole", Icon = "🪐", File = "merge-a-blackhole.lua", GameId = 118605709428489 },
+    { Name = "Mine a Mountain", Icon = "🏔️", File = "mine-a-mountain.lua", GameId = 125927821145949 },
+    { Name = "Mine a Planet", Icon = "🌎", File = "mine-a-planet.lua", GameId = 121125129560252 },
+    { Name = "Missiles vs Cities", Icon = "🚀", File = "missiles-vs-cities.lua", GameId = 112641748896693 },
+    { Name = "My Fishing Anime", Icon = "🪝", File = "my-fishing-anime.lua", GameId = 112244246405144 },
+    { Name = "My Giant Sandwich", Icon = "🥪", File = "my-giant-sandwich.lua", GameId = 139546619723000 },
+    { Name = "My Wood Farm", Icon = "🪵", File = "my-wood-farm.lua", GameId = 79267089300389 },
+    { Name = "Own a Cafe", Icon = "☕️", File = "own-a-cafe.lua", GameId = 131906518201863 },
+    { Name = "Penguin Tycoon", Icon = "🐧", File = "penguin-tycoon.lua", GameId = 89561601601392 },
+    { Name = "Place the Keycaps", Icon = "⌨️", File = "place-the-keycaps.lua", GameId = 103984418130080 },
+    { Name = "RNG Heroes", Icon = "🦸", File = "rng-heroes.lua", GameId = 108307565942574 },
+    { Name = "Roll Anime", Icon = "🎲", File = "roll-anime.lua", GameId = 107706720875645 },
+    { Name = "Roll to Defend", Icon = "🛡️", File = "roll-to-defend.lua", GameId = 129559579789369 },
+    { Name = "Scratchy Loot", Icon = "🎰", File = "scratchy-loot.lua", GameId = 78105732598311 },
+    { Name = "Snowcone Stand", Icon = "❄️", File = "snowcone-stand.lua", GameId = 76113971506717 },
+    { Name = "Soccer Manager", Icon = "🏟️", File = "soccer-manager.lua", GameId = 83988958116126 },
+    { Name = "Spin a Car", Icon = "🏎️", File = "spin-a-car.lua", GameId = 136758055891411 },
+    { Name = "Spin a Duel Monster", Icon = "🧌", File = "spin-a-duel-monster.lua", GameId = 86789126516616 },
+    { Name = "Tap Incremental", Icon = "👆", File = "tap-incremental.lua", GameId = 82103875404639 },
+    { Name = "Throw a Coin - World 1", Icon = "🪙", File = "throw-a-coin.lua", GameId = 115681808123944 },
+    { Name = "Throw a Coin - World 2", Icon = "🪙", File = "throw-a-coin.lua", GameId = 72042130041700 },
+    { Name = "Throw a Coin - World 3", Icon = "🪙", File = "throw-a-coin.lua", GameId = 100875131717601 },
+    { Name = "Throw a Coin - World 4", Icon = "🪙", File = "throw-a-coin.lua", GameId = 81335362752013 },
+    { Name = "World Cup Album", Icon = "🏆", File = "world-cup-album.lua", GameId = 71724366181884 },
+    { Name = "Youtuber Card Collection", Icon = "💻", File = "youtuber-card-collection.lua", GameId = 81440501385895 },
+    { Name = "Zombie Turret Farm", Icon = "🧟‍♂️", File = "zombie-turret-farm.lua", GameId = 70790155462881 },
 }
 
 -- ═══ HELPERS ═══
@@ -122,7 +123,7 @@ local function getGameScript()
 end
 
 local function launch(scriptData)
-    pcall(function() loadstring(game:HttpGet(scriptData.URL))() end)
+    pcall(function() loadstring(game:HttpGet(BASE_URL .. scriptData.File))() end)
 end
 
 -- ═══ UI HELPERS ═══
@@ -149,7 +150,6 @@ local function label(props)
     return new("TextLabel", props)
 end
 
--- animates a gradient bar's offset forever
 local function animateGradient(grad, bar)
     task.spawn(function()
         local t = 0
@@ -161,7 +161,6 @@ local function animateGradient(grad, bar)
     end)
 end
 
--- pulses a stroke color back and forth
 local function pulseStroke(s, col1, col2)
     task.spawn(function()
         while s and s.Parent do
@@ -173,7 +172,6 @@ local function pulseStroke(s, col1, col2)
     end)
 end
 
--- flickers a text label randomly
 local function flickerLabel(lbl)
     task.spawn(function()
         while lbl and lbl.Parent do
@@ -185,7 +183,6 @@ local function flickerLabel(lbl)
     end)
 end
 
--- shows a card with animation
 local function animateCardIn(backdrop, card, cardStroke)
     task.wait(0.2)
     tween(backdrop, { BackgroundTransparency = 0.3 }, 0.6, Enum.EasingStyle.Quart)
@@ -195,9 +192,6 @@ local function animateCardIn(backdrop, card, cardStroke)
     task.wait(0.8)
 end
 
--- ═══ BAN / INFO CARD BUILDER ═══
--- accentColor: the color used for the top bar and stroke
--- returns nothing, just builds and shows the card
 local function buildInfoCard(guiName, accentColor, icon, title, titleColor, message, subText, subColor, buttonText, buttonColor, buttonHover, buttonAction, footerText)
     for _, name in ipairs({"IBdihPLoader", guiName}) do
         if CoreGui:FindFirstChild(name) then CoreGui[name]:Destroy() end
@@ -216,26 +210,22 @@ local function buildInfoCard(guiName, accentColor, icon, title, titleColor, mess
     local cardStroke = stroke(Card, accentColor, 2)
     cardStroke.Transparency = 1
 
-    -- top accent bar
     local Bar = new("Frame", { Size = UDim2.new(1,0,0,4), BackgroundColor3 = accentColor, BorderSizePixel = 0, ZIndex = 15, Parent = Card })
     local barGrad = new("UIGradient", { Parent = Bar })
     animateGradient(barGrad, Bar)
 
-    -- icon, title, separator, message, sub text
     label({ Size = UDim2.new(1,0,0,60), Position = UDim2.new(0,0,0,18), Text = icon, TextColor3 = Color3.fromRGB(255,255,255), TextSize = 42, Font = Enum.Font.GothamBold, ZIndex = 6, Parent = Card })
     local titleLabel = label({ Size = UDim2.new(1,-40,0,30), Position = UDim2.new(0,20,0,82), Text = title, TextColor3 = titleColor, TextSize = 22, Font = Enum.Font.GothamBold, ZIndex = 6, Parent = Card })
     new("Frame", { Size = UDim2.new(0.6,0,0,1), Position = UDim2.new(0.2,0,0,118), BackgroundColor3 = accentColor, BackgroundTransparency = 0.5, BorderSizePixel = 0, ZIndex = 6, Parent = Card })
     label({ Size = UDim2.new(1,-60,0,40), Position = UDim2.new(0,30,0,128), Text = message, TextColor3 = Color3.fromRGB(220,220,220), TextSize = 14, Font = Enum.Font.GothamMedium, TextWrapped = true, ZIndex = 6, Parent = Card })
     label({ Size = UDim2.new(1,-60,0,20), Position = UDim2.new(0,30,0,172), Text = subText, TextColor3 = subColor, TextSize = 11, Font = Enum.Font.GothamMedium, ZIndex = 6, Parent = Card })
 
-    -- action button
     local Btn = new("TextButton", { Size = UDim2.new(0,180,0,36), Position = UDim2.new(0.5,-90,0,200), BackgroundColor3 = buttonColor, Text = buttonText, TextColor3 = Color3.fromRGB(255,255,255), TextSize = 13, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 8, Parent = Card })
     corner(Btn, 10)
     Btn.MouseEnter:Connect(function() tween(Btn, { BackgroundColor3 = buttonHover }, 0.15) end)
     Btn.MouseLeave:Connect(function() tween(Btn, { BackgroundColor3 = buttonColor }, 0.2) end)
     Btn.MouseButton1Click:Connect(function() buttonAction(Btn, Card, Backdrop, cardStroke) end)
 
-    -- footer
     label({ Size = UDim2.new(1,-40,0,16), Position = UDim2.new(0,20,1,-26), Text = footerText, TextColor3 = Color3.fromRGB(80,50,50), TextSize = 10, Font = Enum.Font.GothamMedium, ZIndex = 6, Parent = Card })
 
     animateCardIn(Backdrop, Card, cardStroke)
@@ -246,7 +236,6 @@ local function buildInfoCard(guiName, accentColor, icon, title, titleColor, mess
     )
 end
 
--- ═══ SPECIFIC CARDS ═══
 local function buildBanScreen()
     buildInfoCard(
         "IBdihPBanned",
@@ -363,7 +352,6 @@ corner(Card, 16)
 local cardStroke = stroke(Card, C.border, 1)
 cardStroke.Transparency = 1
 
--- accent bar
 local AccentBar = new("Frame", { Size = UDim2.new(1,0,0,3), BackgroundColor3 = C.accent, BorderSizePixel = 0, ZIndex = 15, Parent = Card })
 local accentGrad = new("UIGradient", {
     Color = ColorSequence.new({
@@ -383,7 +371,6 @@ task.spawn(function()
     end
 end)
 
--- intro animation
 task.wait(0.15)
 tween(Backdrop, { BackgroundTransparency = 0.5 }, 0.5)
 task.wait(0.05)
@@ -391,7 +378,6 @@ tween(Card, { Size = UDim2.new(0,CW,0,CH), BackgroundTransparency = 0 }, 0.55, E
 tween(cardStroke, { Transparency = 0 }, 0.4)
 task.wait(0.55)
 
--- close button
 local CloseBtn = new("TextButton", { Size = UDim2.new(0,30,0,30), Position = UDim2.new(1,-40,0,10), BackgroundColor3 = C.surface, BackgroundTransparency = 0.4, Text = "✕", TextColor3 = C.textM, TextSize = 15, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 20, Parent = Card })
 corner(CloseBtn, 8)
 CloseBtn.MouseEnter:Connect(function() tween(CloseBtn, { BackgroundTransparency = 0, BackgroundColor3 = C.errorBg, TextColor3 = C.error }, 0.15) end)
@@ -421,7 +407,6 @@ end
 -- ═══ KEY PAGE ═══
 local KeyPage = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Visible = true, ZIndex = 5, Parent = Content })
 
--- header
 local LogoMark = new("Frame", { Size = UDim2.new(0,40,0,40), Position = UDim2.new(0,0,0,2), BackgroundColor3 = C.accentGhost, ZIndex = 6, Parent = KeyPage })
 corner(LogoMark, 12); stroke(LogoMark, C.accent, 1)
 label({ Size = UDim2.new(1,0,1,0), Text = "✦", TextColor3 = C.accent, TextSize = 20, Font = Enum.Font.GothamBold, ZIndex = 7, Parent = LogoMark })
@@ -431,7 +416,6 @@ new("Frame", { Size = UDim2.new(1,0,0,1), Position = UDim2.new(0,0,0,54), Backgr
 label({ Size = UDim2.new(1,0,0,16), Position = UDim2.new(0,0,0,68), Text = "Welcome, " .. LocalPlayer.Name .. " 👋", TextColor3 = C.text, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
 label({ Size = UDim2.new(1,0,0,14), Position = UDim2.new(0,0,0,87), Text = gameScript and ("✓  " .. gameScript.Name) or "⚠  This game is not supported", TextColor3 = gameScript and C.success or C.warning, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
 
--- key input
 label({ Size = UDim2.new(1,0,0,12), Position = UDim2.new(0,0,0,114), Text = "ENTER KEY", TextColor3 = C.textM, TextSize = 9, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
 local InputWrap = new("Frame", { Size = UDim2.new(1,0,0,44), Position = UDim2.new(0,0,0,132), BackgroundColor3 = C.inputBg, ZIndex = 6, Parent = KeyPage })
 corner(InputWrap, 10)
@@ -445,7 +429,6 @@ KeyInput.FocusLost:Connect(function() tween(inputStroke, { Color = C.border }, 0
 local StatusMsg = label({ Size = UDim2.new(1,0,0,16), Position = UDim2.new(0,0,0,184), Text = "", TextColor3 = C.error, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
 label({ Size = UDim2.new(1,0,0,14), Position = UDim2.new(0,0,0,204), Text = "free permanent key in our discord — saves automatically ♡", TextColor3 = C.textM, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 5, Parent = KeyPage })
 
--- buttons
 local BtnRow = new("Frame", { Size = UDim2.new(1,0,0,44), Position = UDim2.new(0,0,1,-44), BackgroundTransparency = 1, ZIndex = 6, Parent = KeyPage })
 local DiscordBtn = makeBtn({ size = UDim2.new(0,108,1,0), pos = UDim2.new(0,0,0,0),   col = C.discord, hov = C.discordH, press = C.discordP, text = "💬  Get Key",        ts = 12 }, BtnRow)
 local PasteBtn   = makeBtn({ size = UDim2.new(0,76,1,0),  pos = UDim2.new(0,116,0,0), col = C.surface, hov = C.surfaceL,                     text = "📋 Paste",          ts = 11 }, BtnRow)
