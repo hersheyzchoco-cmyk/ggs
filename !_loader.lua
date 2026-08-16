@@ -9,21 +9,9 @@ local DISCORD_LINK = "https://discord.gg/DHeCNzTypH"
 local VALID_KEYS = {"ilyguys"}
 local KEY_FILE = "IBdihPHub_SavedKey.txt"
 
-local BANNED_SLOPS = {
-    "8kruo",
-    "PlaceholderUsername2",
-    "PlaceholderUsername3",
-}
+local BANNED_USERS = {"8kruo"}
 
-local BANNED_EXECUTORS = {
-    "PlaceholderExecutor1",
-    "PlaceholderExecutor2",
-    "PlaceholderExecutor3",
-}
-
-local LOBBY_PLACE_IDS = {
-    70863683083739,
-}
+local LOBBY_PLACE_IDS = {70863683083739}
 
 local SCRIPTS = {
     { Name = "+1 Wood per Click", Icon = "🪵", URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/1wood-per-click.lua", GameId = 112231208081788 },
@@ -120,23 +108,10 @@ end
 
 local function isUserBanned()
     local name = LocalPlayer.Name:lower()
-    for _, banned in ipairs(BANNED_SLOPS) do
+    for _, banned in ipairs(BANNED_USERS) do
         if name == banned:lower() then return true end
     end
     return false
-end
-
-local function isExecutorBanned()
-    local executorName = (identifyexecutor and identifyexecutor()) or
-                         (getexecutorname and getexecutorname()) or
-                         ""
-    executorName = executorName:lower()
-    for _, banned in ipairs(BANNED_EXECUTORS) do
-        if executorName:find(banned:lower(), 1, true) then
-            return true, executorName
-        end
-    end
-    return false, executorName
 end
 
 local function getGameScript()
@@ -149,420 +124,176 @@ local function launch(scriptData)
     pcall(function() loadstring(game:HttpGet(scriptData.URL))() end)
 end
 
--- ═══ SHARED BAN CARD BUILDER ═══
-local function buildBanScreen(guiName, icon, title, message, footerText)
-    if CoreGui:FindFirstChild("IBdihPLoader") then CoreGui.IBdihPLoader:Destroy() end
-    if CoreGui:FindFirstChild(guiName) then CoreGui[guiName]:Destroy() end
+-- ═══ UI HELPERS ═══
+local function new(class, props)
+    local inst = Instance.new(class)
+    for k, v in pairs(props) do
+        if k ~= "Parent" then pcall(function() inst[k] = v end) end
+    end
+    if props.Parent then inst.Parent = props.Parent end
+    return inst
+end
 
-    local BanGui = Instance.new("ScreenGui")
-    BanGui.Name = guiName
-    BanGui.ResetOnSpawn = false
-    BanGui.IgnoreGuiInset = true
-    BanGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    BanGui.Parent = CoreGui
+local function corner(p, r) return new("UICorner", { CornerRadius = UDim.new(0, r or 8), Parent = p }) end
+local function stroke(p, col, thick) return new("UIStroke", { Color = col or Color3.fromRGB(55,55,78), Thickness = thick or 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = p }) end
 
-    local Backdrop = Instance.new("Frame")
-    Backdrop.Size = UDim2.new(1, 0, 1, 0)
-    Backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    Backdrop.BackgroundTransparency = 1
-    Backdrop.ZIndex = 1
-    Backdrop.Parent = BanGui
+local function tween(obj, props, dur, style, dir)
+    if not obj or not obj.Parent then return end
+    TweenService:Create(obj, TweenInfo.new(dur or 0.25, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out), props):Play()
+end
 
-    local Card = Instance.new("Frame")
-    Card.Name = "BanCard"
-    Card.Size = UDim2.new(0, 480, 0, 0)
-    Card.Position = UDim2.new(0.5, 0, 0.5, 0)
-    Card.AnchorPoint = Vector2.new(0.5, 0.5)
-    Card.BackgroundColor3 = Color3.fromRGB(15, 10, 10)
-    Card.BackgroundTransparency = 1
-    Card.ClipsDescendants = true
-    Card.ZIndex = 2
-    Card.Parent = BanGui
+local function label(props)
+    props.BackgroundTransparency = 1
+    props.Font = props.Font or Enum.Font.GothamMedium
+    return new("TextLabel", props)
+end
 
-    local cardCorner = Instance.new("UICorner")
-    cardCorner.CornerRadius = UDim.new(0, 16)
-    cardCorner.Parent = Card
-
-    local cardStroke = Instance.new("UIStroke")
-    cardStroke.Color = Color3.fromRGB(255, 50, 50)
-    cardStroke.Thickness = 2
-    cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    cardStroke.Transparency = 1
-    cardStroke.Parent = Card
-
-    local RedBar = Instance.new("Frame")
-    RedBar.Size = UDim2.new(1, 0, 0, 4)
-    RedBar.BackgroundColor3 = Color3.fromRGB(255, 40, 40)
-    RedBar.BorderSizePixel = 0
-    RedBar.ZIndex = 15
-    RedBar.Parent = Card
-
-    local redBarCorner = Instance.new("UICorner")
-    redBarCorner.CornerRadius = UDim.new(0, 0)
-    redBarCorner.Parent = RedBar
-
-    local redGrad = Instance.new("UIGradient")
-    redGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 30, 30)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(200, 0, 0)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 60, 30)),
-    })
-    redGrad.Parent = RedBar
-
+-- animates a gradient bar's offset forever
+local function animateGradient(grad, bar)
     task.spawn(function()
         local t = 0
-        while RedBar and RedBar.Parent do
+        while bar and bar.Parent do
             t += 0.03
-            redGrad.Offset = Vector2.new(math.sin(t) * 0.4, 0)
+            grad.Offset = Vector2.new(math.sin(t) * 0.4, 0)
             RunService.RenderStepped:Wait()
         end
     end)
+end
 
-    local IconLabel = Instance.new("TextLabel")
-    IconLabel.Size = UDim2.new(1, 0, 0, 60)
-    IconLabel.Position = UDim2.new(0, 0, 0, 18)
-    IconLabel.BackgroundTransparency = 1
-    IconLabel.Text = icon
-    IconLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    IconLabel.TextSize = 42
-    IconLabel.Font = Enum.Font.GothamBold
-    IconLabel.ZIndex = 6
-    IconLabel.Parent = Card
-
-    local BanTitle = Instance.new("TextLabel")
-    BanTitle.Size = UDim2.new(1, -40, 0, 30)
-    BanTitle.Position = UDim2.new(0, 20, 0, 82)
-    BanTitle.BackgroundTransparency = 1
-    BanTitle.Text = title
-    BanTitle.TextColor3 = Color3.fromRGB(255, 60, 60)
-    BanTitle.TextSize = 22
-    BanTitle.Font = Enum.Font.GothamBold
-    BanTitle.ZIndex = 6
-    BanTitle.Parent = Card
-
-    local Sep = Instance.new("Frame")
-    Sep.Size = UDim2.new(0.6, 0, 0, 1)
-    Sep.Position = UDim2.new(0.2, 0, 0, 118)
-    Sep.BackgroundColor3 = Color3.fromRGB(255, 50, 50)
-    Sep.BackgroundTransparency = 0.5
-    Sep.BorderSizePixel = 0
-    Sep.ZIndex = 6
-    Sep.Parent = Card
-
-    local BanMsg = Instance.new("TextLabel")
-    BanMsg.Size = UDim2.new(1, -60, 0, 40)
-    BanMsg.Position = UDim2.new(0, 30, 0, 128)
-    BanMsg.BackgroundTransparency = 1
-    BanMsg.Text = message
-    BanMsg.TextColor3 = Color3.fromRGB(220, 220, 220)
-    BanMsg.TextSize = 14
-    BanMsg.Font = Enum.Font.GothamMedium
-    BanMsg.TextWrapped = true
-    BanMsg.ZIndex = 6
-    BanMsg.Parent = Card
-
-    local BanUser = Instance.new("TextLabel")
-    BanUser.Size = UDim2.new(1, -60, 0, 20)
-    BanUser.Position = UDim2.new(0, 30, 0, 172)
-    BanUser.BackgroundTransparency = 1
-    BanUser.Text = "account: " .. LocalPlayer.Name .. " (" .. tostring(LocalPlayer.UserId) .. ")"
-    BanUser.TextColor3 = Color3.fromRGB(120, 80, 80)
-    BanUser.TextSize = 11
-    BanUser.Font = Enum.Font.GothamMedium
-    BanUser.ZIndex = 6
-    BanUser.Parent = Card
-
-    local DiscordBtn = Instance.new("TextButton")
-    DiscordBtn.Size = UDim2.new(0, 180, 0, 36)
-    DiscordBtn.Position = UDim2.new(0.5, -90, 0, 200)
-    DiscordBtn.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
-    DiscordBtn.Text = "💬  Join Discord"
-    DiscordBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    DiscordBtn.TextSize = 13
-    DiscordBtn.Font = Enum.Font.GothamBold
-    DiscordBtn.AutoButtonColor = false
-    DiscordBtn.ZIndex = 8
-    DiscordBtn.Parent = Card
-
-    local discordCorner = Instance.new("UICorner")
-    discordCorner.CornerRadius = UDim.new(0, 10)
-    discordCorner.Parent = DiscordBtn
-
-    DiscordBtn.MouseEnter:Connect(function()
-        TweenService:Create(DiscordBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(110, 122, 255) }):Play()
-    end)
-    DiscordBtn.MouseLeave:Connect(function()
-        TweenService:Create(DiscordBtn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(88, 101, 242) }):Play()
-    end)
-    DiscordBtn.MouseButton1Click:Connect(function()
-        pcall(function() if setclipboard then setclipboard(DISCORD_LINK) end end)
-        DiscordBtn.Text = "✓  Copied!"
-        task.delay(2, function()
-            if DiscordBtn and DiscordBtn.Parent then
-                DiscordBtn.Text = "💬  Join Discord"
-            end
-        end)
-    end)
-
-    local BanFooter = Instance.new("TextLabel")
-    BanFooter.Size = UDim2.new(1, -40, 0, 16)
-    BanFooter.Position = UDim2.new(0, 20, 1, -26)
-    BanFooter.BackgroundTransparency = 1
-    BanFooter.Text = footerText
-    BanFooter.TextColor3 = Color3.fromRGB(80, 50, 50)
-    BanFooter.TextSize = 10
-    BanFooter.Font = Enum.Font.GothamMedium
-    BanFooter.ZIndex = 6
-    BanFooter.Parent = Card
-
-    task.wait(0.2)
-    TweenService:Create(Backdrop, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 0.3 }):Play()
-    task.wait(0.1)
-    TweenService:Create(Card, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.new(0, 480, 0, 268), BackgroundTransparency = 0 }):Play()
-    TweenService:Create(cardStroke, TweenInfo.new(0.5), { Transparency = 0 }):Play()
-    task.wait(0.8)
-
+-- pulses a stroke color back and forth
+local function pulseStroke(s, col1, col2)
     task.spawn(function()
-        while BanTitle and BanTitle.Parent do
-            TweenService:Create(BanTitle, TweenInfo.new(0.08), { TextTransparency = 0.6 }):Play()
-            task.wait(0.1)
-            TweenService:Create(BanTitle, TweenInfo.new(0.08), { TextTransparency = 0 }):Play()
-            task.wait(math.random(20, 60) / 10)
-        end
-    end)
-
-    task.spawn(function()
-        while cardStroke and cardStroke.Parent do
-            TweenService:Create(cardStroke, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Color = Color3.fromRGB(180, 20, 20) }):Play()
+        while s and s.Parent do
+            tween(s, { Color = col1 }, 1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
             task.wait(1.2)
-            TweenService:Create(cardStroke, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Color = Color3.fromRGB(255, 50, 50) }):Play()
+            tween(s, { Color = col2 }, 1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
             task.wait(1.2)
         end
     end)
 end
 
--- ═══ LOBBY SCREEN ═══
-local function buildLobbyScreen()
-    if CoreGui:FindFirstChild("IBdihPLoader") then CoreGui.IBdihPLoader:Destroy() end
-    if CoreGui:FindFirstChild("IBdihPLobby") then CoreGui.IBdihPLobby:Destroy() end
-
-    local LobbyGui = Instance.new("ScreenGui")
-    LobbyGui.Name = "IBdihPLobby"
-    LobbyGui.ResetOnSpawn = false
-    LobbyGui.IgnoreGuiInset = true
-    LobbyGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    LobbyGui.Parent = CoreGui
-
-    local Backdrop = Instance.new("Frame")
-    Backdrop.Size = UDim2.new(1, 0, 1, 0)
-    Backdrop.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-    Backdrop.BackgroundTransparency = 1
-    Backdrop.ZIndex = 1
-    Backdrop.Parent = LobbyGui
-
-    local Card = Instance.new("Frame")
-    Card.Name = "LobbyCard"
-    Card.Size = UDim2.new(0, 480, 0, 0)
-    Card.Position = UDim2.new(0.5, 0, 0.5, 0)
-    Card.AnchorPoint = Vector2.new(0.5, 0.5)
-    Card.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
-    Card.BackgroundTransparency = 1
-    Card.ClipsDescendants = true
-    Card.ZIndex = 2
-    Card.Parent = LobbyGui
-
-    local cardCorner = Instance.new("UICorner")
-    cardCorner.CornerRadius = UDim.new(0, 16)
-    cardCorner.Parent = Card
-
-    local cardStroke = Instance.new("UIStroke")
-    cardStroke.Color = Color3.fromRGB(255, 200, 60)
-    cardStroke.Thickness = 2
-    cardStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    cardStroke.Transparency = 1
-    cardStroke.Parent = Card
-
-    local YellowBar = Instance.new("Frame")
-    YellowBar.Size = UDim2.new(1, 0, 0, 4)
-    YellowBar.BackgroundColor3 = Color3.fromRGB(255, 200, 60)
-    YellowBar.BorderSizePixel = 0
-    YellowBar.ZIndex = 15
-    YellowBar.Parent = Card
-
-    local yellowGrad = Instance.new("UIGradient")
-    yellowGrad.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 200, 60)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 160, 30)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 220, 80)),
-    })
-    yellowGrad.Parent = YellowBar
-
+-- flickers a text label randomly
+local function flickerLabel(lbl)
     task.spawn(function()
-        local t = 0
-        while YellowBar and YellowBar.Parent do
-            t += 0.03
-            yellowGrad.Offset = Vector2.new(math.sin(t) * 0.4, 0)
-            RunService.RenderStepped:Wait()
-        end
-    end)
-
-    local IconLabel = Instance.new("TextLabel")
-    IconLabel.Size = UDim2.new(1, 0, 0, 60)
-    IconLabel.Position = UDim2.new(0, 0, 0, 18)
-    IconLabel.BackgroundTransparency = 1
-    IconLabel.Text = "⚠️"
-    IconLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    IconLabel.TextSize = 42
-    IconLabel.Font = Enum.Font.GothamBold
-    IconLabel.ZIndex = 6
-    IconLabel.Parent = Card
-
-    local LobbyTitle = Instance.new("TextLabel")
-    LobbyTitle.Size = UDim2.new(1, -40, 0, 30)
-    LobbyTitle.Position = UDim2.new(0, 20, 0, 82)
-    LobbyTitle.BackgroundTransparency = 1
-    LobbyTitle.Text = "YOU'RE IN THE LOBBY"
-    LobbyTitle.TextColor3 = Color3.fromRGB(255, 200, 60)
-    LobbyTitle.TextSize = 22
-    LobbyTitle.Font = Enum.Font.GothamBold
-    LobbyTitle.ZIndex = 6
-    LobbyTitle.Parent = Card
-
-    local Sep = Instance.new("Frame")
-    Sep.Size = UDim2.new(0.6, 0, 0, 1)
-    Sep.Position = UDim2.new(0.2, 0, 0, 118)
-    Sep.BackgroundColor3 = Color3.fromRGB(255, 200, 60)
-    Sep.BackgroundTransparency = 0.5
-    Sep.BorderSizePixel = 0
-    Sep.ZIndex = 6
-    Sep.Parent = Card
-
-    local LobbyMsg = Instance.new("TextLabel")
-    LobbyMsg.Size = UDim2.new(1, -60, 0, 40)
-    LobbyMsg.Position = UDim2.new(0, 30, 0, 128)
-    LobbyMsg.BackgroundTransparency = 1
-    LobbyMsg.Text = "Please execute inside one of the gamemodes!\nThe script cannot run from the lobby."
-    LobbyMsg.TextColor3 = Color3.fromRGB(220, 220, 220)
-    LobbyMsg.TextSize = 14
-    LobbyMsg.Font = Enum.Font.GothamMedium
-    LobbyMsg.TextWrapped = true
-    LobbyMsg.ZIndex = 6
-    LobbyMsg.Parent = Card
-
-    local LobbyPlace = Instance.new("TextLabel")
-    LobbyPlace.Size = UDim2.new(1, -60, 0, 20)
-    LobbyPlace.Position = UDim2.new(0, 30, 0, 172)
-    LobbyPlace.BackgroundTransparency = 1
-    LobbyPlace.Text = "current place: " .. tostring(game.PlaceId) .. " (lobby)"
-    LobbyPlace.TextColor3 = Color3.fromRGB(120, 110, 60)
-    LobbyPlace.TextSize = 11
-    LobbyPlace.Font = Enum.Font.GothamMedium
-    LobbyPlace.ZIndex = 6
-    LobbyPlace.Parent = Card
-
-    local CloseBtn = Instance.new("TextButton")
-    CloseBtn.Size = UDim2.new(0, 180, 0, 36)
-    CloseBtn.Position = UDim2.new(0.5, -90, 0, 200)
-    CloseBtn.BackgroundColor3 = Color3.fromRGB(60, 55, 30)
-    CloseBtn.Text = "✕  Close"
-    CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    CloseBtn.TextSize = 13
-    CloseBtn.Font = Enum.Font.GothamBold
-    CloseBtn.AutoButtonColor = false
-    CloseBtn.ZIndex = 8
-    CloseBtn.Parent = Card
-
-    local closeBtnCorner = Instance.new("UICorner")
-    closeBtnCorner.CornerRadius = UDim.new(0, 10)
-    closeBtnCorner.Parent = CloseBtn
-
-    CloseBtn.MouseEnter:Connect(function()
-        TweenService:Create(CloseBtn, TweenInfo.new(0.15), { BackgroundColor3 = Color3.fromRGB(80, 75, 40) }):Play()
-    end)
-    CloseBtn.MouseLeave:Connect(function()
-        TweenService:Create(CloseBtn, TweenInfo.new(0.2), { BackgroundColor3 = Color3.fromRGB(60, 55, 30) }):Play()
-    end)
-    CloseBtn.MouseButton1Click:Connect(function()
-        TweenService:Create(Card, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Size = UDim2.new(0, 480, 0, 0), BackgroundTransparency = 1 }):Play()
-        TweenService:Create(Backdrop, TweenInfo.new(0.35), { BackgroundTransparency = 1 }):Play()
-        TweenService:Create(cardStroke, TweenInfo.new(0.3), { Transparency = 1 }):Play()
-        task.wait(0.4)
-        LobbyGui:Destroy()
-    end)
-
-    local LobbyFooter = Instance.new("TextLabel")
-    LobbyFooter.Size = UDim2.new(1, -40, 0, 16)
-    LobbyFooter.Position = UDim2.new(0, 20, 1, -26)
-    LobbyFooter.BackgroundTransparency = 1
-    LobbyFooter.Text = "select a gamemode first, then re-execute the script"
-    LobbyFooter.TextColor3 = Color3.fromRGB(80, 75, 50)
-    LobbyFooter.TextSize = 10
-    LobbyFooter.Font = Enum.Font.GothamMedium
-    LobbyFooter.ZIndex = 6
-    LobbyFooter.Parent = Card
-
-    task.wait(0.2)
-    TweenService:Create(Backdrop, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), { BackgroundTransparency = 0.3 }):Play()
-    task.wait(0.1)
-    TweenService:Create(Card, TweenInfo.new(0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.new(0, 480, 0, 268), BackgroundTransparency = 0 }):Play()
-    TweenService:Create(cardStroke, TweenInfo.new(0.5), { Transparency = 0 }):Play()
-    task.wait(0.8)
-
-    task.spawn(function()
-        while LobbyTitle and LobbyTitle.Parent do
-            TweenService:Create(LobbyTitle, TweenInfo.new(0.08), { TextTransparency = 0.6 }):Play()
+        while lbl and lbl.Parent do
+            tween(lbl, { TextTransparency = 0.6 }, 0.08)
             task.wait(0.1)
-            TweenService:Create(LobbyTitle, TweenInfo.new(0.08), { TextTransparency = 0 }):Play()
+            tween(lbl, { TextTransparency = 0 }, 0.08)
             task.wait(math.random(20, 60) / 10)
         end
     end)
+end
 
-    task.spawn(function()
-        while cardStroke and cardStroke.Parent do
-            TweenService:Create(cardStroke, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Color = Color3.fromRGB(200, 150, 20) }):Play()
-            task.wait(1.2)
-            TweenService:Create(cardStroke, TweenInfo.new(1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut), { Color = Color3.fromRGB(255, 200, 60) }):Play()
-            task.wait(1.2)
-        end
-    end)
+-- shows a card with animation
+local function animateCardIn(backdrop, card, cardStroke)
+    task.wait(0.2)
+    tween(backdrop, { BackgroundTransparency = 0.3 }, 0.6, Enum.EasingStyle.Quart)
+    task.wait(0.1)
+    tween(card, { Size = UDim2.new(0, 480, 0, 268), BackgroundTransparency = 0 }, 0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    tween(cardStroke, { Transparency = 0 }, 0.5)
+    task.wait(0.8)
+end
+
+-- ═══ BAN / INFO CARD BUILDER ═══
+-- accentColor: the color used for the top bar and stroke
+-- returns nothing, just builds and shows the card
+local function buildInfoCard(guiName, accentColor, icon, title, titleColor, message, subText, subColor, buttonText, buttonColor, buttonHover, buttonAction, footerText)
+    for _, name in ipairs({"IBdihPLoader", guiName}) do
+        if CoreGui:FindFirstChild(name) then CoreGui[name]:Destroy() end
+    end
+
+    local Gui = new("ScreenGui", { Name = guiName, ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, Parent = CoreGui })
+    local Backdrop = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundColor3 = Color3.fromRGB(0,0,0), BackgroundTransparency = 1, ZIndex = 1, Parent = Gui })
+
+    local Card = new("Frame", {
+        Name = "Card", Size = UDim2.new(0,480,0,0),
+        Position = UDim2.new(0.5,0,0.5,0), AnchorPoint = Vector2.new(0.5,0.5),
+        BackgroundColor3 = Color3.fromRGB(15,10,10), BackgroundTransparency = 1,
+        ClipsDescendants = true, ZIndex = 2, Parent = Gui,
+    })
+    corner(Card, 16)
+    local cardStroke = stroke(Card, accentColor, 2)
+    cardStroke.Transparency = 1
+
+    -- top accent bar
+    local Bar = new("Frame", { Size = UDim2.new(1,0,0,4), BackgroundColor3 = accentColor, BorderSizePixel = 0, ZIndex = 15, Parent = Card })
+    local barGrad = new("UIGradient", { Parent = Bar })
+    animateGradient(barGrad, Bar)
+
+    -- icon, title, separator, message, sub text
+    label({ Size = UDim2.new(1,0,0,60), Position = UDim2.new(0,0,0,18), Text = icon, TextColor3 = Color3.fromRGB(255,255,255), TextSize = 42, Font = Enum.Font.GothamBold, ZIndex = 6, Parent = Card })
+    local titleLabel = label({ Size = UDim2.new(1,-40,0,30), Position = UDim2.new(0,20,0,82), Text = title, TextColor3 = titleColor, TextSize = 22, Font = Enum.Font.GothamBold, ZIndex = 6, Parent = Card })
+    new("Frame", { Size = UDim2.new(0.6,0,0,1), Position = UDim2.new(0.2,0,0,118), BackgroundColor3 = accentColor, BackgroundTransparency = 0.5, BorderSizePixel = 0, ZIndex = 6, Parent = Card })
+    label({ Size = UDim2.new(1,-60,0,40), Position = UDim2.new(0,30,0,128), Text = message, TextColor3 = Color3.fromRGB(220,220,220), TextSize = 14, Font = Enum.Font.GothamMedium, TextWrapped = true, ZIndex = 6, Parent = Card })
+    label({ Size = UDim2.new(1,-60,0,20), Position = UDim2.new(0,30,0,172), Text = subText, TextColor3 = subColor, TextSize = 11, Font = Enum.Font.GothamMedium, ZIndex = 6, Parent = Card })
+
+    -- action button
+    local Btn = new("TextButton", { Size = UDim2.new(0,180,0,36), Position = UDim2.new(0.5,-90,0,200), BackgroundColor3 = buttonColor, Text = buttonText, TextColor3 = Color3.fromRGB(255,255,255), TextSize = 13, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 8, Parent = Card })
+    corner(Btn, 10)
+    Btn.MouseEnter:Connect(function() tween(Btn, { BackgroundColor3 = buttonHover }, 0.15) end)
+    Btn.MouseLeave:Connect(function() tween(Btn, { BackgroundColor3 = buttonColor }, 0.2) end)
+    Btn.MouseButton1Click:Connect(function() buttonAction(Btn, Card, Backdrop, cardStroke) end)
+
+    -- footer
+    label({ Size = UDim2.new(1,-40,0,16), Position = UDim2.new(0,20,1,-26), Text = footerText, TextColor3 = Color3.fromRGB(80,50,50), TextSize = 10, Font = Enum.Font.GothamMedium, ZIndex = 6, Parent = Card })
+
+    animateCardIn(Backdrop, Card, cardStroke)
+    flickerLabel(titleLabel)
+    pulseStroke(cardStroke,
+        Color3.fromRGB(accentColor.R*180, accentColor.G*20, accentColor.B*20),
+        accentColor
+    )
+end
+
+-- ═══ SPECIFIC CARDS ═══
+local function buildBanScreen()
+    buildInfoCard(
+        "IBdihPBanned",
+        Color3.fromRGB(255, 50, 50),
+        "❗️", "BANNED!", Color3.fromRGB(255, 60, 60),
+        "early christmas gift! 🎁💞",
+        "account: " .. LocalPlayer.Name .. " (" .. tostring(LocalPlayer.UserId) .. ")",
+        Color3.fromRGB(120, 80, 80),
+        "💬  Join Discord", Color3.fromRGB(88, 101, 242), Color3.fromRGB(110, 122, 255),
+        function(btn)
+            pcall(function() if setclipboard then setclipboard(DISCORD_LINK) end end)
+            btn.Text = "✓  Copied!"
+            task.delay(2, function() if btn and btn.Parent then btn.Text = "💬  Join Discord" end end)
+        end,
+        "access permanently revoked — appeals will not be accepted"
+    )
+end
+
+local function buildLobbyScreen()
+    buildInfoCard(
+        "IBdihPLobby",
+        Color3.fromRGB(255, 200, 60),
+        "⚠️", "YOU'RE IN THE LOBBY", Color3.fromRGB(255, 200, 60),
+        "Please execute inside one of the gamemodes!\nThe script cannot run from the lobby.",
+        "current place: " .. tostring(game.PlaceId) .. " (lobby)",
+        Color3.fromRGB(120, 110, 60),
+        "✕  Close", Color3.fromRGB(60, 55, 30), Color3.fromRGB(80, 75, 40),
+        function(_, card, backdrop, cardStroke)
+            tween(card, { Size = UDim2.new(0,480,0,0), BackgroundTransparency = 1 }, 0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+            tween(backdrop, { BackgroundTransparency = 1 }, 0.35)
+            tween(cardStroke, { Transparency = 1 }, 0.3)
+            task.wait(0.4)
+            if CoreGui:FindFirstChild("IBdihPLobby") then CoreGui.IBdihPLobby:Destroy() end
+        end,
+        "select a gamemode first, then re-execute the script"
+    )
 end
 
 -- ═══ CHECKS ═══
-if isUserBanned() then
-    buildBanScreen(
-        "IBdihPBanned",
-        "❗️",
-        "BANNED!",
-        "early christmas gift! 🎁💞",
-        "access permanently revoked — appeals will not be accepted"
-    )
-    return
-end
+if isUserBanned() then buildBanScreen(); return end
+if isLobbyPlace() then buildLobbyScreen(); return end
 
-local execBanned, execName = isExecutorBanned()
-if execBanned then
-    buildBanScreen(
-        "IBdihPExecBanned",
-        "🚫",
-        "EXECUTOR IS HORRIBLE",
-        "stop using bad executors 🛑\n\"" .. execName .. "\" is not supported.",
-        "switch to a better executor — join discord for more info"
-    )
-    return
-end
-
-if isLobbyPlace() then
-    buildLobbyScreen()
-    return
-end
-
--- ═══ AUTO-LAUNCH IF KEY SAVED AND GAME SUPPORTED ═══
+-- ═══ AUTO-LAUNCH ═══
 local savedKey = loadKey()
 local gameScript = getGameScript()
 
 if isKeyValid(savedKey) and gameScript then
-    launch(gameScript)
-    return
+    launch(gameScript); return
 end
 
 -- ═══ COLORS ═══
@@ -591,38 +322,14 @@ local C = {
     borderF     = Color3.fromRGB(140, 120, 255),
     inputBg     = Color3.fromRGB(24, 24, 38),
     inputBgF    = Color3.fromRGB(30, 28, 48),
-    black       = Color3.fromRGB(0, 0, 0),
-    white       = Color3.fromRGB(255, 255, 255),
 }
 
--- ═══ UI FACTORY ═══
-local function new(class, props)
-    local inst = Instance.new(class)
-    for k, v in pairs(props) do
-        if k ~= "Parent" then pcall(function() inst[k] = v end) end
-    end
-    if props.Parent then inst.Parent = props.Parent end
-    return inst
-end
-
-local function corner(p, r) return new("UICorner", { CornerRadius = UDim.new(0, r or 8), Parent = p }) end
-local function stroke(p, col, thick) return new("UIStroke", { Color = col or C.border, Thickness = thick or 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = p }) end
-local function tween(obj, props, dur, style, dir)
-    if not obj or not obj.Parent then return end
-    TweenService:Create(obj, TweenInfo.new(dur or 0.25, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out), props):Play()
-end
-
-local function label(props)
-    props.BackgroundTransparency = 1
-    props.Font = props.Font or Enum.Font.GothamMedium
-    return new("TextLabel", props)
-end
-
-local function setupHover(btn, n, h, p)
-    btn.MouseEnter:Connect(function() tween(btn, { BackgroundColor3 = h }, 0.15) end)
-    btn.MouseLeave:Connect(function() tween(btn, { BackgroundColor3 = n }, 0.2) end)
-    btn.MouseButton1Down:Connect(function() tween(btn, { BackgroundColor3 = p or h }, 0.05) end)
-    btn.MouseButton1Up:Connect(function() tween(btn, { BackgroundColor3 = h }, 0.1) end)
+-- ═══ MORE UI HELPERS ═══
+local function setupHover(btn, normal, hover, press)
+    btn.MouseEnter:Connect(function() tween(btn, { BackgroundColor3 = hover }, 0.15) end)
+    btn.MouseLeave:Connect(function() tween(btn, { BackgroundColor3 = normal }, 0.2) end)
+    btn.MouseButton1Down:Connect(function() tween(btn, { BackgroundColor3 = press or hover }, 0.05) end)
+    btn.MouseButton1Up:Connect(function() tween(btn, { BackgroundColor3 = hover }, 0.1) end)
 end
 
 local function makeBtn(props, parent)
@@ -633,17 +340,16 @@ local function makeBtn(props, parent)
         ClipsDescendants = true, Parent = parent,
     })
     corner(btn, 10)
-    label({ Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Text = props.text,
-        TextColor3 = C.textB, TextSize = props.ts or 12, Font = Enum.Font.GothamBold, ZIndex = (props.z or 7)+1, Parent = btn })
+    label({ Size = UDim2.new(1,0,1,0), Text = props.text, TextColor3 = C.textB, TextSize = props.ts or 12, Font = Enum.Font.GothamBold, ZIndex = (props.z or 7)+1, Parent = btn })
     setupHover(btn, props.col, props.hov, props.press)
     return btn
 end
 
--- ═══ BUILD GUI ═══
+-- ═══ BUILD MAIN GUI ═══
 if CoreGui:FindFirstChild("IBdihPLoader") then CoreGui.IBdihPLoader:Destroy() end
 
 local Gui = new("ScreenGui", { Name = "IBdihPLoader", ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, Parent = CoreGui })
-local Backdrop = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundColor3 = C.black, BackgroundTransparency = 1, ZIndex = 1, Parent = Gui })
+local Backdrop = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundColor3 = Color3.fromRGB(0,0,0), BackgroundTransparency = 1, ZIndex = 1, Parent = Gui })
 
 local CW, CH = 520, 330
 local Card = new("Frame", {
@@ -656,10 +362,14 @@ corner(Card, 16)
 local cardStroke = stroke(Card, C.border, 1)
 cardStroke.Transparency = 1
 
--- Accent bar
+-- accent bar
 local AccentBar = new("Frame", { Size = UDim2.new(1,0,0,3), BackgroundColor3 = C.accent, BorderSizePixel = 0, ZIndex = 15, Parent = Card })
 local accentGrad = new("UIGradient", {
-    Color = ColorSequence.new({ ColorSequenceKeypoint.new(0, Color3.fromRGB(140,120,255)), ColorSequenceKeypoint.new(0.5, Color3.fromRGB(200,140,255)), ColorSequenceKeypoint.new(1, Color3.fromRGB(100,180,255)) }),
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(140,120,255)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(200,140,255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(100,180,255)),
+    }),
     Parent = AccentBar,
 })
 task.spawn(function()
@@ -672,7 +382,7 @@ task.spawn(function()
     end
 end)
 
--- Intro animation
+-- intro animation
 task.wait(0.15)
 tween(Backdrop, { BackgroundTransparency = 0.5 }, 0.5)
 task.wait(0.05)
@@ -680,7 +390,7 @@ tween(Card, { Size = UDim2.new(0,CW,0,CH), BackgroundTransparency = 0 }, 0.55, E
 tween(cardStroke, { Transparency = 0 }, 0.4)
 task.wait(0.55)
 
--- Close button
+-- close button
 local CloseBtn = new("TextButton", { Size = UDim2.new(0,30,0,30), Position = UDim2.new(1,-40,0,10), BackgroundColor3 = C.surface, BackgroundTransparency = 0.4, Text = "✕", TextColor3 = C.textM, TextSize = 15, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 20, Parent = Card })
 corner(CloseBtn, 8)
 CloseBtn.MouseEnter:Connect(function() tween(CloseBtn, { BackgroundTransparency = 0, BackgroundColor3 = C.errorBg, TextColor3 = C.error }, 0.15) end)
@@ -691,7 +401,6 @@ CloseBtn.MouseButton1Click:Connect(function()
     task.wait(0.4); Gui:Destroy()
 end)
 
--- Content area
 local Content = new("Frame", { Size = UDim2.new(1,-68,1,-56), Position = UDim2.new(0,34,0,28), BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 4, Parent = Card })
 
 local function closeThenLaunch(scriptData)
@@ -700,26 +409,29 @@ local function closeThenLaunch(scriptData)
     task.wait(0.5); Gui:Destroy(); launch(scriptData)
 end
 
--- ══════════════════════════════════════════
---   KEY PAGE
--- ══════════════════════════════════════════
+local function transitionTo(fromPage, toPage)
+    tween(fromPage, { Position = UDim2.new(-1.2,0,0,0) }, 0.4)
+    task.wait(0.1)
+    toPage.Visible = true
+    toPage.Position = UDim2.new(1.2,0,0,0)
+    tween(toPage, { Position = UDim2.new(0,0,0,0) }, 0.4)
+end
+
+-- ═══ KEY PAGE ═══
 local KeyPage = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Visible = true, ZIndex = 5, Parent = Content })
 
--- Header
+-- header
 local LogoMark = new("Frame", { Size = UDim2.new(0,40,0,40), Position = UDim2.new(0,0,0,2), BackgroundColor3 = C.accentGhost, ZIndex = 6, Parent = KeyPage })
 corner(LogoMark, 12); stroke(LogoMark, C.accent, 1)
 label({ Size = UDim2.new(1,0,1,0), Text = "✦", TextColor3 = C.accent, TextSize = 20, Font = Enum.Font.GothamBold, ZIndex = 7, Parent = LogoMark })
 label({ Size = UDim2.new(0,200,0,20), Position = UDim2.new(0,52,0,3), Text = "IBdihP Hub", TextColor3 = C.textB, TextSize = 18, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6, Parent = KeyPage })
 label({ Size = UDim2.new(0,200,0,14), Position = UDim2.new(0,52,0,25), Text = "script loader  v3.0", TextColor3 = C.textS, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6, Parent = KeyPage })
-
 new("Frame", { Size = UDim2.new(1,0,0,1), Position = UDim2.new(0,0,0,54), BackgroundColor3 = C.border, BorderSizePixel = 0, ZIndex = 5, Parent = KeyPage })
-
 label({ Size = UDim2.new(1,0,0,16), Position = UDim2.new(0,0,0,68), Text = "Welcome, " .. LocalPlayer.Name .. " 👋", TextColor3 = C.text, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
 label({ Size = UDim2.new(1,0,0,14), Position = UDim2.new(0,0,0,87), Text = gameScript and ("✓  " .. gameScript.Name) or "⚠  This game is not supported", TextColor3 = gameScript and C.success or C.warning, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
 
--- Input
+-- key input
 label({ Size = UDim2.new(1,0,0,12), Position = UDim2.new(0,0,0,114), Text = "ENTER KEY", TextColor3 = C.textM, TextSize = 9, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
-
 local InputWrap = new("Frame", { Size = UDim2.new(1,0,0,44), Position = UDim2.new(0,0,0,132), BackgroundColor3 = C.inputBg, ZIndex = 6, Parent = KeyPage })
 corner(InputWrap, 10)
 local inputStroke = stroke(InputWrap, C.border, 1.5)
@@ -732,52 +444,43 @@ KeyInput.FocusLost:Connect(function() tween(inputStroke, { Color = C.border }, 0
 local StatusMsg = label({ Size = UDim2.new(1,0,0,16), Position = UDim2.new(0,0,0,184), Text = "", TextColor3 = C.error, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
 label({ Size = UDim2.new(1,0,0,14), Position = UDim2.new(0,0,0,204), Text = "free permanent key in our discord — saves automatically ♡", TextColor3 = C.textM, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 5, Parent = KeyPage })
 
--- Buttons
+-- buttons
 local BtnRow = new("Frame", { Size = UDim2.new(1,0,0,44), Position = UDim2.new(0,0,1,-44), BackgroundTransparency = 1, ZIndex = 6, Parent = KeyPage })
-local DiscordBtn = makeBtn({ size = UDim2.new(0,108,1,0), pos = UDim2.new(0,0,0,0), col = C.discord, hov = C.discordH, press = C.discordP, text = "💬  Get Key", ts = 12 }, BtnRow)
-local PasteBtn   = makeBtn({ size = UDim2.new(0,76,1,0),  pos = UDim2.new(0,116,0,0), col = C.surface, hov = C.surfaceL, text = "📋 Paste",   ts = 11 }, BtnRow)
-local VerifyBtn  = makeBtn({ size = UDim2.new(1,-200,1,0), pos = UDim2.new(0,200,0,0), col = C.accent, hov = C.accentH, press = C.accentP, text = "Verify & Launch  →", ts = 13 }, BtnRow)
+local DiscordBtn = makeBtn({ size = UDim2.new(0,108,1,0), pos = UDim2.new(0,0,0,0),   col = C.discord, hov = C.discordH, press = C.discordP, text = "💬  Get Key",        ts = 12 }, BtnRow)
+local PasteBtn   = makeBtn({ size = UDim2.new(0,76,1,0),  pos = UDim2.new(0,116,0,0), col = C.surface, hov = C.surfaceL,                     text = "📋 Paste",          ts = 11 }, BtnRow)
+local VerifyBtn  = makeBtn({ size = UDim2.new(1,-200,1,0),pos = UDim2.new(0,200,0,0), col = C.accent,  hov = C.accentH,  press = C.accentP,   text = "Verify & Launch  →", ts = 13 }, BtnRow)
 local VerifyLabel = VerifyBtn:FindFirstChildWhichIsA("TextLabel")
 
--- ══════════════════════════════════════════
---   UNSUPPORTED PAGE
--- ══════════════════════════════════════════
+-- ═══ UNSUPPORTED PAGE ═══
 local UnsupportedPage = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Visible = false, ZIndex = 5, Parent = Content })
-
 label({ Size = UDim2.new(1,0,0,50), Position = UDim2.new(0,0,0,20), Text = "😔", TextSize = 42, ZIndex = 6, Parent = UnsupportedPage })
 label({ Size = UDim2.new(1,0,0,24), Position = UDim2.new(0,0,0,78), Text = "Game Not Supported", TextColor3 = C.text, TextSize = 18, Font = Enum.Font.GothamBold, ZIndex = 6, Parent = UnsupportedPage })
 label({ Size = UDim2.new(1,0,0,16), Position = UDim2.new(0,0,0,108), Text = "IBdihP Hub doesn't support this game yet. Join our Discord to request it!", TextColor3 = C.textS, TextSize = 11, ZIndex = 6, Parent = UnsupportedPage })
-
 local UnsupDiscord = makeBtn({ size = UDim2.new(0,180,0,42), pos = UDim2.new(0.5,-90,1,-50), col = C.discord, hov = C.discordH, press = C.discordP, text = "💬  Join Discord", ts = 13, z = 7 }, UnsupportedPage)
 UnsupDiscord.MouseButton1Click:Connect(function()
     pcall(function() if setclipboard then setclipboard(DISCORD_LINK) end end)
     local lbl = UnsupDiscord:FindFirstChildWhichIsA("TextLabel")
-    if lbl then
-        lbl.Text = "✓  Copied!"
-        task.delay(2, function() if lbl and lbl.Parent then lbl.Text = "💬  Join Discord" end end)
-    end
+    if lbl then lbl.Text = "✓  Copied!"; task.delay(2, function() if lbl and lbl.Parent then lbl.Text = "💬  Join Discord" end end) end
 end)
 
--- ══════════════════════════════════════════
---   LAUNCH PAGE
--- ══════════════════════════════════════════
+-- ═══ LAUNCH PAGE ═══
 local LaunchPage = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Visible = false, ZIndex = 5, Parent = Content })
 
 local spinnerDots = {}
 local SpinnerWrap = new("Frame", { Size = UDim2.new(0,50,0,50), Position = UDim2.new(0.5,-25,0,40), BackgroundTransparency = 1, ZIndex = 6, Parent = LaunchPage })
+local dotColors = { Color3.fromRGB(140,120,255), Color3.fromRGB(180,140,255), Color3.fromRGB(100,180,255) }
 for i = 1, 3 do
-    local dot = new("Frame", { Size = UDim2.new(0,10,0,10), Position = UDim2.new(0,(i-1)*18+2,0.5,-5), BackgroundColor3 = ({Color3.fromRGB(140,120,255), Color3.fromRGB(180,140,255), Color3.fromRGB(100,180,255)})[i], ZIndex = 7, Parent = SpinnerWrap })
+    local dot = new("Frame", { Size = UDim2.new(0,10,0,10), Position = UDim2.new(0,(i-1)*18+2,0.5,-5), BackgroundColor3 = dotColors[i], ZIndex = 7, Parent = SpinnerWrap })
     corner(dot, 5); spinnerDots[i] = dot
 end
 task.spawn(function()
     while SpinnerWrap and SpinnerWrap.Parent do
         for i, dot in ipairs(spinnerDots) do
             task.delay((i-1)*0.15, function()
-                if dot and dot.Parent then
-                    tween(dot, { Position = dot.Position - UDim2.new(0,0,0,12) }, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-                    task.wait(0.2)
-                    if dot and dot.Parent then tween(dot, { Position = dot.Position + UDim2.new(0,0,0,12) }, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In) end
-                end
+                if not (dot and dot.Parent) then return end
+                tween(dot, { Position = dot.Position - UDim2.new(0,0,0,12) }, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+                task.wait(0.2)
+                if dot and dot.Parent then tween(dot, { Position = dot.Position + UDim2.new(0,0,0,12) }, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In) end
             end)
         end
         task.wait(0.9)
@@ -788,18 +491,15 @@ local LaunchTitle = label({ Size = UDim2.new(1,0,0,22), Position = UDim2.new(0,0
 local LaunchSub   = label({ Size = UDim2.new(1,0,0,16), Position = UDim2.new(0,0,0,132), Text = "", TextColor3 = C.textS, TextSize = 12, ZIndex = 6, Parent = LaunchPage })
 label({ Size = UDim2.new(1,0,0,14), Position = UDim2.new(0,0,1,-30), Text = "key saved — you won't need to enter it again ✓", TextColor3 = C.success, TextSize = 10, ZIndex = 6, Parent = LaunchPage })
 
--- ══════════════════════════════════════════
---   BUTTON LOGIC
--- ══════════════════════════════════════════
+-- ═══ BUTTON LOGIC ═══
 DiscordBtn.MouseButton1Click:Connect(function()
     pcall(function() if setclipboard then setclipboard(DISCORD_LINK) end end)
     StatusMsg.Text = "🔗  Discord invite copied!"; StatusMsg.TextColor3 = C.discord
     task.delay(3, function()
-        if StatusMsg and StatusMsg.Parent then
-            tween(StatusMsg, { TextTransparency = 1 }, 0.3)
-            task.wait(0.35)
-            if StatusMsg and StatusMsg.Parent then StatusMsg.Text = ""; StatusMsg.TextTransparency = 0 end
-        end
+        if not (StatusMsg and StatusMsg.Parent) then return end
+        tween(StatusMsg, { TextTransparency = 1 }, 0.3)
+        task.wait(0.35)
+        if StatusMsg and StatusMsg.Parent then StatusMsg.Text = ""; StatusMsg.TextTransparency = 0 end
     end)
 end)
 
@@ -820,14 +520,6 @@ end
 
 local function showStatus(msg, col)
     StatusMsg.Text = msg; StatusMsg.TextColor3 = col; StatusMsg.TextTransparency = 0
-end
-
-local function transitionTo(fromPage, toPage)
-    tween(fromPage, { Position = UDim2.new(-1.2,0,0,0) }, 0.4)
-    task.wait(0.1)
-    toPage.Visible = true
-    toPage.Position = UDim2.new(1.2,0,0,0)
-    tween(toPage, { Position = UDim2.new(0,0,0,0) }, 0.4)
 end
 
 local verifying = false
@@ -867,11 +559,10 @@ local function doVerify()
         shakeInput()
         task.delay(3.5, function()
             tween(inputStroke, { Color = C.border }, 0.3)
-            if StatusMsg and StatusMsg.Parent then
-                tween(StatusMsg, { TextTransparency = 1 }, 0.4)
-                task.wait(0.4)
-                if StatusMsg and StatusMsg.Parent then StatusMsg.Text = ""; StatusMsg.TextTransparency = 0 end
-            end
+            if not (StatusMsg and StatusMsg.Parent) then return end
+            tween(StatusMsg, { TextTransparency = 1 }, 0.4)
+            task.wait(0.4)
+            if StatusMsg and StatusMsg.Parent then StatusMsg.Text = ""; StatusMsg.TextTransparency = 0 end
         end)
         VerifyLabel.Text = "Verify & Launch  →"
         tween(VerifyBtn, { BackgroundColor3 = C.accent }, 0.2)
@@ -892,7 +583,9 @@ Card.InputBegan:Connect(function(input)
     end
 end)
 Card.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then dragInput = input end
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
 end)
 UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
