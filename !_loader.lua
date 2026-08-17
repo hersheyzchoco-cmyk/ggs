@@ -9,13 +9,11 @@ local DISCORD_LINK = "https://discord.gg/DHeCNzTypH"
 local VALID_KEYS = {"ilyguys"}
 local KEY_FILE = "IBdihPHub_SavedKey.txt"
 local BASE_URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/"
-
 local BANNED_USERS = {"8kruo"}
-
 local LOBBY_PLACE_IDS = {87810101348327}
 
 local SCRIPTS = {
-    { Name = "+1 Wood per Click", Icon = "🪵", File = "1wood-per-click.lua", GameId = 112231208081788 },
+    { Name = "+1 Wood per Click", Icon = "🪵", File = "%2B1wood-per-click.lua", GameId = 112231208081788 },
     { Name = "1 Keyboard = 1$/s", Icon = "⌨️", File = "1keyboard%3D1%24s.lua", GameId = 121003786627094 },
     { Name = "Anime Astral Simulator", Icon = "🔥", File = "anime-astral-simulator.lua", GameId = 102072869879193 },
     { Name = "Anime Battles", Icon = "🤺", File = "anime-battles.lua", GameId = 126229277218112 },
