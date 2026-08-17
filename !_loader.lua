@@ -19,6 +19,7 @@ local SCRIPTS = {
     { Name = "Anime Battles", Icon = "🤺", File = "anime-battles.lua", GameId = 126229277218112 },
     { Name = "Anime Capture", Icon = "🖐", File = "anime-capture.lua", GameId = 94717504417144 },
     { Name = "Anime Card Farm", Icon = "🃏", File = "anime-card-farm.lua", GameId = 125039473548047 },
+    { Name = "Anime Dimensions Simulator", Icon = "⚔️", File = "anime-dimensions-simulator.lua", GameId = 6938803436 },
     { Name = "Anime Duelists", Icon = "⚔️", File = "anime-duelists.lua", GameId = 135858844777165 },
     { Name = "Anime Dungeons - Lobby", Icon = "🏰", File = "anime-dungeons-lobby.lua", GameId = 70863683083739 },
     { Name = "Anime Dungeons - Demon Train Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 127204771568038 },
