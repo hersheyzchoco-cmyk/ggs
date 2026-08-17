@@ -46,6 +46,7 @@ local SCRIPTS = {
     { Name = "Crunch my Butter", Icon = "🧈", File = "crunch-my-butter.lua", GameId = 87555052900625 },
     { Name = "Digimon Era", Icon = "🦖", File = "digimon-era.lua", GameId = 77192431769439 },
     { Name = "Egg Case Farm", Icon = "🥚", File = "egg-case-farm.lua", GameId = 74144293690546 },
+    { Name = "Fantasy RNG", Icon = "🧚‍♂️", File = "fantasy-rng.lua", GameId = 85167011669131 },
     { Name = "Farm an Island", Icon = "🧑‍🌾", File = "farm-an-island.lua", GameId = 78769336859161 },
     { Name = "Grow it RNG", Icon = "🪴", File = "grow-it-rng.lua", GameId = 78292727217500 },
     { Name = "Hatch a Dragon", Icon = "🐲", File = "hatch-a-dragon.lua", GameId = 105420216739306 },
