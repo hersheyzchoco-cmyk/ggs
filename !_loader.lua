@@ -64,7 +64,7 @@ local SCRIPTS = {
     { Name = "My Fishing Anime", Icon = "🪝", File = "my-fishing-anime.lua", GameId = 112244246405144 },
     { Name = "My Giant Sandwich", Icon = "🥪", File = "my-giant-sandwich.lua", GameId = 139546619723000 },
     { Name = "My Wood Farm", Icon = "🪵", File = "my-wood-farm.lua", GameId = 79267089300389 },
-    { Name = "Own a Cafe", Icon = "☕️", File = "own-a-cafe.lua", GameId = 131906518201863 },
+    { Name = "Own a Cafe", Icon = "🍵", File = "own-a-cafe.lua", GameId = 131906518201863 },
     { Name = "Penguin Tycoon", Icon = "🐧", File = "penguin-tycoon.lua", GameId = 89561601601392 },
     { Name = "Place the Keycaps", Icon = "⌨️", File = "place-the-keycaps.lua", GameId = 103984418130080 },
     { Name = "RNG Heroes", Icon = "🦸", File = "rng-heroes.lua", GameId = 108307565942574 },
