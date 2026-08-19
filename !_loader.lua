@@ -15,7 +15,7 @@ local LOBBY_PLACE_IDS = {87810101348327}
 local SCRIPTS = {
     { Name = "+1 Wood per Click", Icon = "🪵", File = "%2B1wood-per-click.lua", GameId = 112231208081788 },
     { Name = "1 Keyboard = 1$/s", Icon = "⌨️", File = "1keyboard%3D1%24s.lua", GameId = 121003786627094 },
-    { Name = "Airline Idle", Icon = "🛩️", File = "airline-idle.lua", GameId = 102072869879193 },
+    { Name = "Airline Idle", Icon = "🛩️", File = "airline-idle.lua", GameId = 70437719899064 },
     { Name = "Anime Astral Simulator", Icon = "🔥", File = "anime-astral-simulator.lua", GameId = 102072869879193 },
     { Name = "Anime Battles", Icon = "🤺", File = "anime-battles.lua", GameId = 126229277218112 },
     { Name = "Anime Capture", Icon = "🖐", File = "anime-capture.lua", GameId = 94717504417144 },
