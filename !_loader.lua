@@ -41,6 +41,7 @@ local SCRIPTS = {
     { Name = "Bomb Fishing", Icon = "🎣", File = "bomb-fishing.lua", GameId = 118677256126351 },
     { Name = "Build a Base and Steal", Icon = "🏯", File = "build-a-base-and-steal.lua", GameId = 132016691802922 },
     { Name = "Build a Base and Steal", Icon = "🏯", File = "build-a-base-and-steal.lua", GameId = 82441325527385 },
+    { Name = "Build a Gun Army", Icon = "🔫", File = "build-a-gun-army.lua", GameId = 134162299584012 },
     { Name = "Catch and Tame", Icon = "🐒", File = "catch-and-tame.lua", GameId = 96645548064314 },
     { Name = "Chicken Farm", Icon = "🐓", File = "chicken-farm.lua", GameId = 137233438285284 },
     { Name = "Clean the Squishies", Icon = "😻", File = "clean-the-squishies.lua", GameId = 84016394196827 },
