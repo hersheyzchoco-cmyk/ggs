@@ -14,6 +14,8 @@ local LOBBY_PLACE_IDS = {87810101348327}
 
 local SCRIPTS = {
     { Name = "+1 Wood per Click", Icon = "🪵", File = "%2B1wood-per-click.lua", GameId = 112231208081788 },
+    { Name = "+1 Slayer Blade", Icon = "🗡️", File = "%2B1-slayer-blade.lua", GameId = 15744137588 },
+    
     { Name = "1 Keyboard = 1$/s", Icon = "⌨️", File = "1keyboard%3D1%24s.lua", GameId = 121003786627094 },
     
     { Name = "Airline Idle", Icon = "🛩️", File = "airline-idle.lua", GameId = 70437719899064 },
