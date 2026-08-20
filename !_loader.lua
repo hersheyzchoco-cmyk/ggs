@@ -11,6 +11,8 @@ local KEY_FILE = "IBdihPHub_SavedKey.txt"
 local BASE_URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/"
 local BANNED_USERS = {"8kruo"}
 local LOBBY_PLACE_IDS = {87810101348327}
+local HUB_ICON = "rbxassetid://86226894545369"
+local GAME_COUNT = 66
 
 local SCRIPTS = {
     { Name = "+1 Wood per Click", Icon = "🪵", File = "%2B1wood-per-click.lua", GameId = 112231208081788 },
@@ -41,37 +43,37 @@ local SCRIPTS = {
     { Name = "Anime Stars", Icon = "🌠", File = "anime-stars.lua", GameId = 122553263569744 },
     { Name = "Anime Stars Card Collection", Icon = "🌸", File = "anime-stars-card-collection.lua", GameId = 109715918987082 },
     { Name = "Anime Universe", Icon = "🌌", File = "anime-universe.lua", GameId = 95992966043247 },
-
+    
     { Name = "Become an Anime Billionaire", Icon = "💸", File = "become-an-anime-billionaire.lua", GameId = 96891089305948 },
     { Name = "Bomb Fishing", Icon = "🎣", File = "bomb-fishing.lua", GameId = 118677256126351 },
     { Name = "Build a Base and Steal", Icon = "🏯", File = "build-a-base-and-steal.lua", GameId = 132016691802922 },
     { Name = "Build a Base and Steal", Icon = "🏯", File = "build-a-base-and-steal.lua", GameId = 82441325527385 },
     { Name = "Build a Gun Army", Icon = "🔫", File = "build-a-gun-army.lua", GameId = 134162299584012 },
-
+    
     { Name = "Catch and Tame", Icon = "🐒", File = "catch-and-tame.lua", GameId = 96645548064314 },
     { Name = "Chicken Farm", Icon = "🐓", File = "chicken-farm.lua", GameId = 137233438285284 },
     { Name = "Clean the Squishies", Icon = "😻", File = "clean-the-squishies.lua", GameId = 84016394196827 },
     { Name = "Crab Tycoon", Icon = "🦀", File = "crab-tycoon.lua", GameId = 92605157087535 },
     { Name = "Crunch my Butter", Icon = "🧈", File = "crunch-my-butter.lua", GameId = 87555052900625 },
-
+    
     { Name = "Digimon Era", Icon = "🦖", File = "digimon-era.lua", GameId = 77192431769439 },
     { Name = "Dungeon Leveling Origin", Icon = "🏰", File = "dungeon-leveling-origin.lua", GameId = 113526284476060 },
-
+    
     { Name = "Egg Case Farm", Icon = "🥚", File = "egg-case-farm.lua", GameId = 74144293690546 },
     { Name = "Elemental Dungeons - Dungeon", Icon = "🏰", File = "elemental-dungeons.lua", GameId = 10771129745 },
     { Name = "Elemental Dungeons - Raids", Icon = "🏰", File = "elemental-dungeons.lua", GameId = 15278089327 },
-
+    
     { Name = "Fantasy RNG", Icon = "🧚‍♂️", File = "fantasy-rng.lua", GameId = 85167011669131 },
     { Name = "Farm an Island", Icon = "🧑‍🌾", File = "farm-an-island.lua", GameId = 78769336859161 },
     
     { Name = "Grow it RNG", Icon = "🪴", File = "grow-it-rng.lua", GameId = 78292727217500 },
-
+    
     { Name = "Hatch a Dragon", Icon = "🐲", File = "hatch-a-dragon.lua", GameId = 105420216739306 },
-
+    
     { Name = "Jump to Steal Soccer Players", Icon = "⚽️", File = "jump-to-steal-soccer-players.lua", GameId = 133294838637122 },
-
+    
     { Name = "Loot RNG", Icon = "🗡️", File = "loot-rng.lua", GameId = 118575129990331 },
-
+    
     { Name = "Make a Drill Farm", Icon = "⛏️", File = "make-a-drill-farm.lua", GameId = 79315121100812 },
     { Name = "Make Hotsauce", Icon = "🌶️", File = "make-hotsauce.lua", GameId = 122391683154858 },
     { Name = "Merge a Blackhole", Icon = "🪐", File = "merge-a-blackhole.lua", GameId = 118605709428489 },
@@ -84,39 +86,41 @@ local SCRIPTS = {
     { Name = "My Shrimp Farm", Icon = "🦐", File = "my-shrimp-farm.lua", GameId = 104065269680557 },
     { Name = "My Sword Empire", Icon = "🗡️", File = "my-sword-empire.lua", GameId = 108364799245223 },
     { Name = "My Wood Farm", Icon = "🪵", File = "my-wood-farm.lua", GameId = 79267089300389 },
-
+    
     { Name = "Own a Cafe", Icon = "🍵", File = "own-a-cafe.lua", GameId = 131906518201863 },
-
+    
     { Name = "Pack RNG", Icon = "📦", File = "pack-rng.lua", GameId = 117752943664280 },
     { Name = "Penguin Tycoon", Icon = "🐧", File = "penguin-tycoon.lua", GameId = 89561601601392 },
     { Name = "Place the Keycaps", Icon = "⌨️", File = "place-the-keycaps.lua", GameId = 103984418130080 },
-
+    
     { Name = "RNG Heroes", Icon = "🦸", File = "rng-heroes.lua", GameId = 108307565942574 },
     { Name = "Roll a Keycap", Icon = "⌨️", File = "roll-a-keycap.lua", GameId = 91679585668032 },
     { Name = "Roll Anime", Icon = "🎲", File = "roll-anime.lua", GameId = 107706720875645 },
     { Name = "Roll Anime Fighters", Icon = "🎲", File = "roll-anime-fighters.lua", GameId = 115113242795436 },
     { Name = "Roll to Defend", Icon = "🛡️", File = "roll-to-defend.lua", GameId = 129559579789369 },
-
+    
     { Name = "Scratchy Loot", Icon = "🎰", File = "scratchy-loot.lua", GameId = 78105732598311 },
     { Name = "Snowcone Stand", Icon = "❄️", File = "snowcone-stand.lua", GameId = 76113971506717 },
     { Name = "Soccer Manager", Icon = "🏟️", File = "soccer-manager.lua", GameId = 83988958116126 },
     { Name = "Spin a Car", Icon = "🏎️", File = "spin-a-car.lua", GameId = 136758055891411 },
     { Name = "Spin a Duel Monster", Icon = "🧌", File = "spin-a-duel-monster.lua", GameId = 86789126516616 },
-
+    
     { Name = "Tap Incremental", Icon = "👆", File = "tap-incremental.lua", GameId = 82103875404639 },
     { Name = "Throw a Coin - World 1", Icon = "🪙", File = "throw-a-coin.lua", GameId = 115681808123944 },
     { Name = "Throw a Coin - World 2", Icon = "🪙", File = "throw-a-coin.lua", GameId = 72042130041700 },
     { Name = "Throw a Coin - World 3", Icon = "🪙", File = "throw-a-coin.lua", GameId = 100875131717601 },
     { Name = "Throw a Coin - World 4", Icon = "🪙", File = "throw-a-coin.lua", GameId = 81335362752013 },
-
+    
     { Name = "World Cup Album", Icon = "🏆", File = "world-cup-album.lua", GameId = 71724366181884 },
-
+    
     { Name = "Youtuber Card Collection", Icon = "💻", File = "youtuber-card-collection.lua", GameId = 81440501385895 },
-
+    
     { Name = "Zombie Turret Farm", Icon = "🧟‍♂️", File = "zombie-turret-farm.lua", GameId = 70790155462881 },
 }
 
--- ═══ HELPERS ═══
+-- ═══════════════════════════════════════════════════════════
+--  HELPERS
+-- ═══════════════════════════════════════════════════════════
 local function trim(s) return s:gsub("^%s+", ""):gsub("%s+$", "") end
 
 local function isKeyValid(key)
@@ -162,7 +166,9 @@ local function launch(scriptData)
     pcall(function() loadstring(game:HttpGet(BASE_URL .. scriptData.File))() end)
 end
 
--- ═══ UI HELPERS ═══
+-- ═══════════════════════════════════════════════════════════
+--  UI HELPERS
+-- ═══════════════════════════════════════════════════════════
 local function new(class, props)
     local inst = Instance.new(class)
     for k, v in pairs(props) do
@@ -173,61 +179,15 @@ local function new(class, props)
 end
 
 local function corner(p, r) return new("UICorner", { CornerRadius = UDim.new(0, r or 8), Parent = p }) end
-local function stroke(p, col, thick) return new("UIStroke", { Color = col or Color3.fromRGB(55,55,78), Thickness = thick or 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = p }) end
 
 local function tween(obj, props, dur, style, dir)
     if not obj or not obj.Parent then return end
     TweenService:Create(obj, TweenInfo.new(dur or 0.25, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out), props):Play()
 end
 
-local function label(props)
-    props.BackgroundTransparency = 1
-    props.Font = props.Font or Enum.Font.GothamMedium
-    return new("TextLabel", props)
-end
-
-local function animateGradient(grad, bar)
-    task.spawn(function()
-        local t = 0
-        while bar and bar.Parent do
-            t += 0.03
-            grad.Offset = Vector2.new(math.sin(t) * 0.4, 0)
-            RunService.RenderStepped:Wait()
-        end
-    end)
-end
-
-local function pulseStroke(s, col1, col2)
-    task.spawn(function()
-        while s and s.Parent do
-            tween(s, { Color = col1 }, 1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-            task.wait(1.2)
-            tween(s, { Color = col2 }, 1.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-            task.wait(1.2)
-        end
-    end)
-end
-
-local function flickerLabel(lbl)
-    task.spawn(function()
-        while lbl and lbl.Parent do
-            tween(lbl, { TextTransparency = 0.6 }, 0.08)
-            task.wait(0.1)
-            tween(lbl, { TextTransparency = 0 }, 0.08)
-            task.wait(math.random(20, 60) / 10)
-        end
-    end)
-end
-
-local function animateCardIn(backdrop, card, cardStroke)
-    task.wait(0.2)
-    tween(backdrop, { BackgroundTransparency = 0.3 }, 0.6, Enum.EasingStyle.Quart)
-    task.wait(0.1)
-    tween(card, { Size = UDim2.new(0, 480, 0, 268), BackgroundTransparency = 0 }, 0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-    tween(cardStroke, { Transparency = 0 }, 0.5)
-    task.wait(0.8)
-end
-
+-- ═══════════════════════════════════════════════════════════
+--  INFO CARD (ban / lobby screens)
+-- ═══════════════════════════════════════════════════════════
 local function buildInfoCard(guiName, accentColor, icon, title, titleColor, message, subText, subColor, buttonText, buttonColor, buttonHover, buttonAction, footerText)
     for _, name in ipairs({"IBdihPLoader", guiName}) do
         if CoreGui:FindFirstChild(name) then CoreGui[name]:Destroy() end
@@ -237,39 +197,53 @@ local function buildInfoCard(guiName, accentColor, icon, title, titleColor, mess
     local Backdrop = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundColor3 = Color3.fromRGB(0,0,0), BackgroundTransparency = 1, ZIndex = 1, Parent = Gui })
 
     local Card = new("Frame", {
-        Name = "Card", Size = UDim2.new(0,480,0,0),
+        Size = UDim2.new(0,480,0,0),
         Position = UDim2.new(0.5,0,0.5,0), AnchorPoint = Vector2.new(0.5,0.5),
         BackgroundColor3 = Color3.fromRGB(15,10,10), BackgroundTransparency = 1,
         ClipsDescendants = true, ZIndex = 2, Parent = Gui,
     })
     corner(Card, 16)
-    local cardStroke = stroke(Card, accentColor, 2)
-    cardStroke.Transparency = 1
+    local cardStroke = new("UIStroke", { Color = accentColor, Thickness = 2, Transparency = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = Card })
 
     local Bar = new("Frame", { Size = UDim2.new(1,0,0,4), BackgroundColor3 = accentColor, BorderSizePixel = 0, ZIndex = 15, Parent = Card })
     local barGrad = new("UIGradient", { Parent = Bar })
-    animateGradient(barGrad, Bar)
+    task.spawn(function()
+        local t = 0
+        while Bar and Bar.Parent do
+            t += 0.03
+            barGrad.Offset = Vector2.new(math.sin(t) * 0.4, 0)
+            RunService.RenderStepped:Wait()
+        end
+    end)
 
-    label({ Size = UDim2.new(1,0,0,60), Position = UDim2.new(0,0,0,18), Text = icon, TextColor3 = Color3.fromRGB(255,255,255), TextSize = 42, Font = Enum.Font.GothamBold, ZIndex = 6, Parent = Card })
-    local titleLabel = label({ Size = UDim2.new(1,-40,0,30), Position = UDim2.new(0,20,0,82), Text = title, TextColor3 = titleColor, TextSize = 22, Font = Enum.Font.GothamBold, ZIndex = 6, Parent = Card })
+    new("TextLabel", { Size = UDim2.new(1,0,0,60), Position = UDim2.new(0,0,0,18), BackgroundTransparency = 1, Text = icon, TextColor3 = Color3.fromRGB(255,255,255), TextSize = 44, Font = Enum.Font.GothamBold, ZIndex = 6, Parent = Card })
+    local titleLabel = new("TextLabel", { Size = UDim2.new(1,-40,0,30), Position = UDim2.new(0,20,0,82), BackgroundTransparency = 1, Text = title, TextColor3 = titleColor, TextSize = 24, Font = Enum.Font.GothamBold, ZIndex = 6, Parent = Card })
     new("Frame", { Size = UDim2.new(0.6,0,0,1), Position = UDim2.new(0.2,0,0,118), BackgroundColor3 = accentColor, BackgroundTransparency = 0.5, BorderSizePixel = 0, ZIndex = 6, Parent = Card })
-    label({ Size = UDim2.new(1,-60,0,40), Position = UDim2.new(0,30,0,128), Text = message, TextColor3 = Color3.fromRGB(220,220,220), TextSize = 14, Font = Enum.Font.GothamMedium, TextWrapped = true, ZIndex = 6, Parent = Card })
-    label({ Size = UDim2.new(1,-60,0,20), Position = UDim2.new(0,30,0,172), Text = subText, TextColor3 = subColor, TextSize = 11, Font = Enum.Font.GothamMedium, ZIndex = 6, Parent = Card })
+    new("TextLabel", { Size = UDim2.new(1,-60,0,40), Position = UDim2.new(0,30,0,128), BackgroundTransparency = 1, Text = message, TextColor3 = Color3.fromRGB(220,220,220), TextSize = 15, Font = Enum.Font.GothamMedium, TextWrapped = true, ZIndex = 6, Parent = Card })
+    new("TextLabel", { Size = UDim2.new(1,-60,0,20), Position = UDim2.new(0,30,0,172), BackgroundTransparency = 1, Text = subText, TextColor3 = subColor, TextSize = 12, Font = Enum.Font.GothamMedium, ZIndex = 6, Parent = Card })
 
-    local Btn = new("TextButton", { Size = UDim2.new(0,180,0,36), Position = UDim2.new(0.5,-90,0,200), BackgroundColor3 = buttonColor, Text = buttonText, TextColor3 = Color3.fromRGB(255,255,255), TextSize = 13, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 8, Parent = Card })
+    local Btn = new("TextButton", { Size = UDim2.new(0,190,0,38), Position = UDim2.new(0.5,-95,0,200), BackgroundColor3 = buttonColor, Text = buttonText, TextColor3 = Color3.fromRGB(255,255,255), TextSize = 14, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 8, Parent = Card })
     corner(Btn, 10)
     Btn.MouseEnter:Connect(function() tween(Btn, { BackgroundColor3 = buttonHover }, 0.15) end)
     Btn.MouseLeave:Connect(function() tween(Btn, { BackgroundColor3 = buttonColor }, 0.2) end)
     Btn.MouseButton1Click:Connect(function() buttonAction(Btn, Card, Backdrop, cardStroke) end)
 
-    label({ Size = UDim2.new(1,-40,0,16), Position = UDim2.new(0,20,1,-26), Text = footerText, TextColor3 = Color3.fromRGB(80,50,50), TextSize = 10, Font = Enum.Font.GothamMedium, ZIndex = 6, Parent = Card })
+    new("TextLabel", { Size = UDim2.new(1,-40,0,16), Position = UDim2.new(0,20,1,-26), BackgroundTransparency = 1, Text = footerText, TextColor3 = Color3.fromRGB(80,50,50), TextSize = 11, Font = Enum.Font.GothamMedium, ZIndex = 6, Parent = Card })
 
-    animateCardIn(Backdrop, Card, cardStroke)
-    flickerLabel(titleLabel)
-    pulseStroke(cardStroke,
-        Color3.fromRGB(accentColor.R*180, accentColor.G*20, accentColor.B*20),
-        accentColor
-    )
+    task.wait(0.2)
+    tween(Backdrop, { BackgroundTransparency = 0.3 }, 0.6)
+    task.wait(0.1)
+    tween(Card, { Size = UDim2.new(0, 480, 0, 268), BackgroundTransparency = 0 }, 0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    tween(cardStroke, { Transparency = 0 }, 0.5)
+
+    -- Flicker title
+    task.spawn(function()
+        while titleLabel and titleLabel.Parent do
+            tween(titleLabel, { TextTransparency = 0.6 }, 0.08); task.wait(0.1)
+            tween(titleLabel, { TextTransparency = 0 }, 0.08)
+            task.wait(math.random(20, 60) / 10)
+        end
+    end)
 end
 
 local function buildBanScreen()
@@ -295,7 +269,7 @@ local function buildLobbyScreen()
         "IBdihPLobby",
         Color3.fromRGB(255, 200, 60),
         "⚠️", "YOU'RE IN THE LOBBY", Color3.fromRGB(255, 200, 60),
-        "Please execute inside one of the gamemodes!\nThe script cannot run from the lobby.",
+        "please execute inside one of the gamemodes!\nthe script cannot run from the lobby.",
         "current place: " .. tostring(game.PlaceId) .. " (lobby)",
         Color3.fromRGB(120, 110, 60),
         "✕  Close", Color3.fromRGB(60, 55, 30), Color3.fromRGB(80, 75, 40),
@@ -310,11 +284,12 @@ local function buildLobbyScreen()
     )
 end
 
--- ═══ CHECKS ═══
+-- ═══════════════════════════════════════════════════════════
+--  CHECKS
+-- ═══════════════════════════════════════════════════════════
 if isUserBanned() then buildBanScreen(); return end
 if isLobbyPlace() then buildLobbyScreen(); return end
 
--- ═══ AUTO-LAUNCH ═══
 local savedKey = loadKey()
 local gameScript = getGameScript()
 
@@ -322,224 +297,696 @@ if isKeyValid(savedKey) and gameScript then
     launch(gameScript); return
 end
 
--- ═══ COLORS ═══
-local C = {
-    bg          = Color3.fromRGB(20, 20, 30),
-    card        = Color3.fromRGB(32, 32, 48),
-    surface     = Color3.fromRGB(36, 36, 52),
-    surfaceL    = Color3.fromRGB(44, 44, 62),
-    accent      = Color3.fromRGB(140, 120, 255),
-    accentH     = Color3.fromRGB(160, 142, 255),
-    accentP     = Color3.fromRGB(120, 100, 230),
-    accentGhost = Color3.fromRGB(50, 42, 85),
-    accentSoft  = Color3.fromRGB(65, 55, 110),
-    discord     = Color3.fromRGB(88, 101, 242),
-    discordH    = Color3.fromRGB(110, 122, 255),
-    discordP    = Color3.fromRGB(72, 84, 220),
-    success     = Color3.fromRGB(70, 220, 130),
-    error       = Color3.fromRGB(255, 90, 90),
-    errorBg     = Color3.fromRGB(60, 25, 25),
-    warning     = Color3.fromRGB(255, 200, 60),
-    text        = Color3.fromRGB(250, 250, 255),
-    textB       = Color3.fromRGB(255, 255, 255),
-    textS       = Color3.fromRGB(185, 185, 210),
-    textM       = Color3.fromRGB(120, 120, 150),
-    border      = Color3.fromRGB(55, 55, 78),
-    borderF     = Color3.fromRGB(140, 120, 255),
-    inputBg     = Color3.fromRGB(24, 24, 38),
-    inputBgF    = Color3.fromRGB(30, 28, 48),
-}
-
--- ═══ MORE UI HELPERS ═══
-local function setupHover(btn, normal, hover, press)
-    btn.MouseEnter:Connect(function() tween(btn, { BackgroundColor3 = hover }, 0.15) end)
-    btn.MouseLeave:Connect(function() tween(btn, { BackgroundColor3 = normal }, 0.2) end)
-    btn.MouseButton1Down:Connect(function() tween(btn, { BackgroundColor3 = press or hover }, 0.05) end)
-    btn.MouseButton1Up:Connect(function() tween(btn, { BackgroundColor3 = hover }, 0.1) end)
-end
-
-local function makeBtn(props, parent)
-    local btn = new("TextButton", {
-        Size = props.size, Position = props.pos,
-        BackgroundColor3 = props.col, Text = "",
-        AutoButtonColor = false, ZIndex = props.z or 7,
-        ClipsDescendants = true, Parent = parent,
-    })
-    corner(btn, 10)
-    label({ Size = UDim2.new(1,0,1,0), Text = props.text, TextColor3 = C.textB, TextSize = props.ts or 12, Font = Enum.Font.GothamBold, ZIndex = (props.z or 7)+1, Parent = btn })
-    setupHover(btn, props.col, props.hov, props.press)
-    return btn
-end
-
--- ═══ BUILD MAIN GUI ═══
+-- ═══════════════════════════════════════════════════════════
+--  MAIN KEY SYSTEM UI
+-- ═══════════════════════════════════════════════════════════
 if CoreGui:FindFirstChild("IBdihPLoader") then CoreGui.IBdihPLoader:Destroy() end
 
 local Gui = new("ScreenGui", { Name = "IBdihPLoader", ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, Parent = CoreGui })
 local Backdrop = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundColor3 = Color3.fromRGB(0,0,0), BackgroundTransparency = 1, ZIndex = 1, Parent = Gui })
 
-local CW, CH = 520, 330
-local Card = new("Frame", {
-    Name = "Card", Size = UDim2.new(0,CW,0,0),
-    Position = UDim2.new(0.5,0,0.5,0), AnchorPoint = Vector2.new(0.5,0.5),
-    BackgroundColor3 = C.bg, BackgroundTransparency = 1,
-    ClipsDescendants = true, ZIndex = 2, Parent = Gui,
+local Board = new("Frame", {
+    Size = UDim2.new(0, 560, 0, 0), Position = UDim2.new(0.5,0,0.5,0), AnchorPoint = Vector2.new(0.5,0.5),
+    BackgroundColor3 = Color3.fromRGB(45,35,28), BackgroundTransparency = 1,
+    ClipsDescendants = true, ZIndex = 10, Parent = Gui,
 })
-corner(Card, 16)
-local cardStroke = stroke(Card, C.border, 1)
-cardStroke.Transparency = 1
+corner(Board, 14)
+local boardStroke = new("UIStroke", { Color = Color3.fromRGB(70,55,38), Thickness = 3, Transparency = 1, ApplyStrokeMode = Enum.ApplyStrokeMode.Border, Parent = Board })
 
-local AccentBar = new("Frame", { Size = UDim2.new(1,0,0,3), BackgroundColor3 = C.accent, BorderSizePixel = 0, ZIndex = 15, Parent = Card })
-local accentGrad = new("UIGradient", {
+-- Cork texture
+local Cork = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundColor3 = Color3.fromRGB(160,125,80), ZIndex = 11, Parent = Board })
+corner(Cork, 14)
+new("UIGradient", {
     Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(140,120,255)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(200,140,255)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(100,180,255)),
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(170,135,85)),
+        ColorSequenceKeypoint.new(0.3, Color3.fromRGB(155,120,75)),
+        ColorSequenceKeypoint.new(0.7, Color3.fromRGB(165,130,82)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(150,115,70)),
     }),
-    Parent = AccentBar,
+    Rotation = 25, Parent = Cork,
+})
+
+-- ═══ ANIMATE BOARD IN ═══
+task.wait(0.15)
+tween(Backdrop, { BackgroundTransparency = 0.45 }, 0.5)
+task.wait(0.1)
+tween(Board, { Size = UDim2.new(0, 560, 0, 410), BackgroundTransparency = 0 }, 0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+tween(boardStroke, { Transparency = 0 }, 0.5)
+task.wait(0.5)
+
+-- ═══ COFFEE STAIN ═══
+task.spawn(function()
+    task.wait(1.5)
+    local stain = new("Frame", {
+        Size = UDim2.new(0, 55, 0, 55),
+        Position = UDim2.new(0.88, -28, 0.92, -28),
+        BackgroundColor3 = Color3.fromRGB(120, 90, 55),
+        BackgroundTransparency = 1,
+        ZIndex = 12, Parent = Board,
+    })
+    corner(stain, 28)
+    local stainStroke = new("UIStroke", { Color = Color3.fromRGB(105, 75, 45), Thickness = 4, Transparency = 1, Parent = stain })
+
+    local inner = new("Frame", {
+        Size = UDim2.new(0, 38, 0, 38),
+        Position = UDim2.new(0.5, -19, 0.5, -19),
+        BackgroundColor3 = Color3.fromRGB(160, 125, 80),
+        BackgroundTransparency = 1,
+        ZIndex = 13, Parent = stain,
+    })
+    corner(inner, 19)
+
+    tween(stain, { BackgroundTransparency = 0.75 }, 2, Enum.EasingStyle.Sine)
+    tween(stainStroke, { Transparency = 0.6 }, 2, Enum.EasingStyle.Sine)
+    tween(inner, { BackgroundTransparency = 0.15 }, 2, Enum.EasingStyle.Sine)
+end)
+
+-- ═══ LAVA LAMP BLOBS ═══
+local function createBlob(color, size, startX, startY)
+    local blob = new("Frame", {
+        Size = UDim2.new(0, size, 0, size),
+        Position = UDim2.new(startX, -size/2, startY, -size/2),
+        BackgroundColor3 = color, BackgroundTransparency = 0.6,
+        ZIndex = 12, Parent = Board,
+    })
+    corner(blob, size/2)
+    task.spawn(function()
+        while blob and blob.Parent do
+            local tx = startX + math.random(-8, 8) / 100
+            local ty = startY + math.random(-8, 8) / 100
+            local ns = size + math.random(-15, 15)
+            tween(blob, {
+                Position = UDim2.new(tx, -ns/2, ty, -ns/2),
+                Size = UDim2.new(0, ns, 0, ns),
+                BackgroundTransparency = 0.5 + math.random() * 0.3,
+            }, 3 + math.random() * 2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
+            task.wait(3 + math.random() * 2)
+        end
+    end)
+end
+
+createBlob(Color3.fromRGB(255, 120, 180), 65, 0.2, 0.3)
+createBlob(Color3.fromRGB(120, 180, 255), 55, 0.75, 0.6)
+createBlob(Color3.fromRGB(180, 255, 120), 50, 0.5, 0.8)
+createBlob(Color3.fromRGB(255, 200, 100), 60, 0.85, 0.25)
+
+-- ═══ FLOATING SPARKLES ═══
+task.spawn(function()
+    while Board and Board.Parent do
+        local sparkle = new("TextLabel", {
+            Size = UDim2.new(0, 16, 0, 16),
+            Position = UDim2.new(math.random() * 0.9 + 0.05, 0, math.random() * 0.9 + 0.05, 0),
+            BackgroundTransparency = 1, Text = "✦",
+            TextColor3 = Color3.fromRGB(255, 220 + math.random(35), 100 + math.random(100)),
+            TextSize = math.random(10, 16), TextTransparency = 1,
+            Rotation = math.random(-30, 30), ZIndex = 22, Parent = Board,
+        })
+        tween(sparkle, { TextTransparency = 0.3, Rotation = sparkle.Rotation + 90 }, 0.4)
+        task.wait(0.5)
+        tween(sparkle, { TextTransparency = 1, Rotation = sparkle.Rotation + 180 }, 0.6)
+        task.wait(0.7)
+        if sparkle and sparkle.Parent then sparkle:Destroy() end
+        task.wait(math.random(5, 15) / 10)
+    end
+end)
+
+-- ═══ DUST PARTICLES ═══
+task.spawn(function()
+    while Board and Board.Parent do
+        local dust = new("Frame", {
+            Size = UDim2.new(0, math.random(2, 4), 0, math.random(2, 4)),
+            Position = UDim2.new(math.random() * 0.9 + 0.05, 0, math.random() * 0.3 + 0.65, 0),
+            BackgroundColor3 = Color3.fromRGB(200 + math.random(55), 180 + math.random(50), 130 + math.random(50)),
+            BackgroundTransparency = 0.5 + math.random() * 0.3,
+            ZIndex = 12, Parent = Board,
+        })
+        corner(dust, 2)
+
+        local driftX = (math.random() - 0.5) * 0.1
+        tween(dust, {
+            Position = UDim2.new(dust.Position.X.Scale + driftX, 0, dust.Position.Y.Scale - 0.3 - math.random() * 0.2, 0),
+            BackgroundTransparency = 1,
+            Size = UDim2.new(0, 1, 0, 1),
+        }, 4 + math.random() * 3, Enum.EasingStyle.Sine)
+
+        task.delay(8, function() if dust and dust.Parent then dust:Destroy() end end)
+        task.wait(math.random(3, 8) / 10)
+    end
+end)
+
+-- ═══ PAPER AIRPLANE ═══
+task.spawn(function()
+    while Board and Board.Parent do
+        task.wait(math.random(8, 16))
+        if not (Board and Board.Parent) then break end
+
+        local plane = new("TextLabel", {
+            Size = UDim2.new(0, 24, 0, 24),
+            Position = UDim2.new(-0.1, 0, math.random() * 0.6 + 0.1, 0),
+            BackgroundTransparency = 1,
+            Text = "✈️", TextSize = 18,
+            Rotation = -15, ZIndex = 23, Parent = Board,
+        })
+
+        local startY = plane.Position.Y.Scale
+        task.spawn(function()
+            local t = 0
+            while plane and plane.Parent and t < 3 do
+                t += RunService.RenderStepped:Wait()
+                local progress = t / 3
+                local waveY = startY + math.sin(progress * math.pi * 3) * 0.04
+                plane.Position = UDim2.new(-0.1 + progress * 1.3, 0, waveY, 0)
+                plane.Rotation = -15 + math.sin(progress * math.pi * 4) * 10
+            end
+            if plane and plane.Parent then plane:Destroy() end
+        end)
+    end
+end)
+
+-- ═══════════════════════════════════════════════════════════
+--  MAIN YELLOW STICKY NOTE
+-- ═══════════════════════════════════════════════════════════
+local MainNote = new("Frame", {
+    Size = UDim2.new(0, 305, 0, 330),
+    Position = UDim2.new(0, 20, 0, 42),
+    BackgroundColor3 = Color3.fromRGB(255, 245, 157),
+    Rotation = -1.5, ZIndex = 15, Parent = Board,
+})
+corner(MainNote, 3)
+new("Frame", { Size = UDim2.new(1, 6, 1, 6), Position = UDim2.new(0, 4, 0, 4), BackgroundColor3 = Color3.fromRGB(0,0,0), BackgroundTransparency = 0.82, ZIndex = 14, Parent = MainNote })
+
+-- Tape
+local Tape = new("Frame", { Size = UDim2.new(0, 70, 0, 20), Position = UDim2.new(0.5, -35, 0, -10), BackgroundColor3 = Color3.fromRGB(200,200,175), BackgroundTransparency = 0.25, ZIndex = 18, Rotation = 2, Parent = MainNote })
+corner(Tape, 3)
+task.spawn(function()
+    while Tape and Tape.Parent do
+        tween(Tape, { BackgroundTransparency = 0.35 }, 2, Enum.EasingStyle.Sine); task.wait(2)
+        tween(Tape, { BackgroundTransparency = 0.2 }, 2, Enum.EasingStyle.Sine); task.wait(2)
+    end
+end)
+
+-- Tape peel on hover
+MainNote.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        tween(Tape, { Rotation = 8, Position = UDim2.new(0.5, -35, 0, -14) }, 0.3, Enum.EasingStyle.Back)
+    end
+end)
+MainNote.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        tween(Tape, { Rotation = 2, Position = UDim2.new(0.5, -35, 0, -10) }, 0.4, Enum.EasingStyle.Elastic)
+    end
+end)
+
+-- Note wobble
+task.spawn(function()
+    while MainNote and MainNote.Parent do
+        tween(MainNote, { Rotation = -2.5 }, 3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut); task.wait(3)
+        tween(MainNote, { Rotation = -0.5 }, 3, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut); task.wait(3)
+    end
+end)
+
+-- Greeting
+local Greeting = new("TextLabel", {
+    Size = UDim2.new(1, -20, 0, 26), Position = UDim2.new(0, 12, 0, 16),
+    BackgroundTransparency = 1, Text = "heyyy " .. LocalPlayer.Name .. " 👋",
+    TextColor3 = Color3.fromRGB(50, 40, 20), TextSize = 19, Font = Enum.Font.GothamBold,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16, Parent = MainNote,
+})
+
+-- Bouncing arrow
+local Arrow = new("TextLabel", {
+    Size = UDim2.new(0, 22, 0, 22), Position = UDim2.new(0, 12, 0, 46),
+    BackgroundTransparency = 1, Text = "↓", TextColor3 = Color3.fromRGB(220, 60, 60),
+    TextSize = 20, Font = Enum.Font.GothamBold, ZIndex = 16, Parent = MainNote,
 })
 task.spawn(function()
-    local t = 0
-    while AccentBar and AccentBar.Parent do
-        t += 0.02
-        accentGrad.Offset = Vector2.new(math.sin(t) * 0.4, 0)
-        accentGrad.Rotation = math.sin(t * 0.5) * 25
-        RunService.RenderStepped:Wait()
+    while Arrow and Arrow.Parent do
+        tween(Arrow, { Position = UDim2.new(0, 12, 0, 54) }, 0.5, Enum.EasingStyle.Sine); task.wait(0.5)
+        tween(Arrow, { Position = UDim2.new(0, 12, 0, 46) }, 0.5, Enum.EasingStyle.Sine); task.wait(0.5)
     end
 end)
 
-task.wait(0.15)
-tween(Backdrop, { BackgroundTransparency = 0.5 }, 0.5)
-task.wait(0.05)
-tween(Card, { Size = UDim2.new(0,CW,0,CH), BackgroundTransparency = 0 }, 0.55, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
-tween(cardStroke, { Transparency = 0 }, 0.4)
-task.wait(0.55)
+local SubGreeting = new("TextLabel", {
+    Size = UDim2.new(1, -42, 0, 18), Position = UDim2.new(0, 34, 0, 48),
+    BackgroundTransparency = 1, Text = "drop ur key to get in!",
+    TextColor3 = Color3.fromRGB(90, 75, 40), TextSize = 13, Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16, Parent = MainNote,
+})
 
-local CloseBtn = new("TextButton", { Size = UDim2.new(0,30,0,30), Position = UDim2.new(1,-40,0,10), BackgroundColor3 = C.surface, BackgroundTransparency = 0.4, Text = "✕", TextColor3 = C.textM, TextSize = 15, Font = Enum.Font.GothamBold, AutoButtonColor = false, ZIndex = 20, Parent = Card })
-corner(CloseBtn, 8)
-CloseBtn.MouseEnter:Connect(function() tween(CloseBtn, { BackgroundTransparency = 0, BackgroundColor3 = C.errorBg, TextColor3 = C.error }, 0.15) end)
-CloseBtn.MouseLeave:Connect(function() tween(CloseBtn, { BackgroundTransparency = 0.4, BackgroundColor3 = C.surface, TextColor3 = C.textM }, 0.2) end)
-CloseBtn.MouseButton1Click:Connect(function()
-    tween(Card, { Size = UDim2.new(0,CW,0,0), BackgroundTransparency = 1 }, 0.35, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-    tween(Backdrop, { BackgroundTransparency = 1 }, 0.35)
-    task.wait(0.4); Gui:Destroy()
+-- Ruled lines
+for i = 0, 5 do
+    new("Frame", {
+        Size = UDim2.new(1, -20, 0, 1), Position = UDim2.new(0, 10, 0, 80 + i * 42),
+        BackgroundColor3 = Color3.fromRGB(200, 190, 140), BackgroundTransparency = 0.5,
+        BorderSizePixel = 0, ZIndex = 16, Parent = MainNote,
+    })
+end
+
+-- Key input
+local InputBg = new("Frame", {
+    Size = UDim2.new(1, -20, 0, 42), Position = UDim2.new(0, 10, 0, 86),
+    BackgroundColor3 = Color3.fromRGB(248, 238, 145), ZIndex = 16, Parent = MainNote,
+})
+corner(InputBg, 6)
+new("Frame", { Size = UDim2.new(1, -8, 0, 2), Position = UDim2.new(0, 4, 1, -4), BackgroundColor3 = Color3.fromRGB(180, 170, 115), BorderSizePixel = 0, ZIndex = 17, Parent = InputBg })
+
+local KeyInput = new("TextBox", {
+    Size = UDim2.new(1, -16, 1, 0), Position = UDim2.new(0, 8, 0, 0),
+    BackgroundTransparency = 1, Text = "",
+    PlaceholderText = "type key here...", PlaceholderColor3 = Color3.fromRGB(165, 155, 105),
+    TextColor3 = Color3.fromRGB(40, 30, 10), TextSize = 15, Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, ZIndex = 17, Parent = InputBg,
+})
+
+-- Pencil scratch effect while typing
+KeyInput:GetPropertyChangedSignal("Text"):Connect(function()
+    if not (InputBg and InputBg.Parent) then return end
+    if #KeyInput.Text == 0 then return end
+
+    local scratch = new("Frame", {
+        Size = UDim2.new(0, math.random(8, 16), 0, 2),
+        Position = UDim2.new(math.random() * 0.6 + 0.05, 0, 0.8 + math.random() * 0.15, 0),
+        BackgroundColor3 = Color3.fromRGB(160, 150, 110),
+        BackgroundTransparency = 0.5,
+        Rotation = math.random(-15, 15),
+        ZIndex = 17, Parent = InputBg,
+    })
+    corner(scratch, 1)
+    tween(scratch, { BackgroundTransparency = 1 }, 1.5, Enum.EasingStyle.Sine)
+    task.delay(1.6, function() if scratch and scratch.Parent then scratch:Destroy() end end)
 end)
 
-local Content = new("Frame", { Size = UDim2.new(1,-68,1,-56), Position = UDim2.new(0,34,0,28), BackgroundTransparency = 1, ClipsDescendants = true, ZIndex = 4, Parent = Card })
+-- Status
+local StatusLbl = new("TextLabel", {
+    Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 134),
+    BackgroundTransparency = 1, Text = "",
+    TextColor3 = Color3.fromRGB(200, 60, 60), TextSize = 12, Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16, Parent = MainNote,
+})
 
-local function closeThenLaunch(scriptData)
-    tween(Card, { Size = UDim2.new(0,CW,0,0), BackgroundTransparency = 1 }, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In)
-    tween(Backdrop, { BackgroundTransparency = 1 }, 0.4)
-    task.wait(0.5); Gui:Destroy(); launch(scriptData)
-end
+-- Go button
+local GoBtn = new("TextButton", {
+    Size = UDim2.new(1, -20, 0, 42), Position = UDim2.new(0, 10, 0, 156),
+    BackgroundColor3 = Color3.fromRGB(100, 185, 100), Text = "",
+    AutoButtonColor = false, ZIndex = 17, Parent = MainNote,
+})
+corner(GoBtn, 8)
+local GoLbl = new("TextLabel", {
+    Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
+    Text = "let me in! →", TextColor3 = Color3.fromRGB(255, 255, 255),
+    TextSize = 15, Font = Enum.Font.GothamBold, ZIndex = 18, Parent = GoBtn,
+})
+GoBtn.MouseEnter:Connect(function() tween(GoBtn, { BackgroundColor3 = Color3.fromRGB(120, 210, 120) }, 0.15) end)
+GoBtn.MouseLeave:Connect(function() tween(GoBtn, { BackgroundColor3 = Color3.fromRGB(100, 185, 100) }, 0.2) end)
 
-local function transitionTo(fromPage, toPage)
-    tween(fromPage, { Position = UDim2.new(-1.2,0,0,0) }, 0.4)
-    task.wait(0.1)
-    toPage.Visible = true
-    toPage.Position = UDim2.new(1.2,0,0,0)
-    tween(toPage, { Position = UDim2.new(0,0,0,0) }, 0.4)
-end
-
--- ═══ KEY PAGE ═══
-local KeyPage = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Visible = true, ZIndex = 5, Parent = Content })
-
-local LogoMark = new("Frame", { Size = UDim2.new(0,40,0,40), Position = UDim2.new(0,0,0,2), BackgroundColor3 = C.accentGhost, ZIndex = 6, Parent = KeyPage })
-corner(LogoMark, 12); stroke(LogoMark, C.accent, 1)
-label({ Size = UDim2.new(1,0,1,0), Text = "✦", TextColor3 = C.accent, TextSize = 20, Font = Enum.Font.GothamBold, ZIndex = 7, Parent = LogoMark })
-label({ Size = UDim2.new(0,200,0,20), Position = UDim2.new(0,52,0,3), Text = "IBdihP Hub", TextColor3 = C.textB, TextSize = 18, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6, Parent = KeyPage })
-label({ Size = UDim2.new(0,200,0,14), Position = UDim2.new(0,52,0,25), Text = "script loader  v3.0", TextColor3 = C.textS, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 6, Parent = KeyPage })
-new("Frame", { Size = UDim2.new(1,0,0,1), Position = UDim2.new(0,0,0,54), BackgroundColor3 = C.border, BorderSizePixel = 0, ZIndex = 5, Parent = KeyPage })
-label({ Size = UDim2.new(1,0,0,16), Position = UDim2.new(0,0,0,68), Text = "Welcome, " .. LocalPlayer.Name .. " 👋", TextColor3 = C.text, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
-label({ Size = UDim2.new(1,0,0,14), Position = UDim2.new(0,0,0,87), Text = gameScript and ("✓  " .. gameScript.Name) or "⚠  This game is not supported", TextColor3 = gameScript and C.success or C.warning, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
-
-label({ Size = UDim2.new(1,0,0,12), Position = UDim2.new(0,0,0,114), Text = "ENTER KEY", TextColor3 = C.textM, TextSize = 9, Font = Enum.Font.GothamBold, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
-local InputWrap = new("Frame", { Size = UDim2.new(1,0,0,44), Position = UDim2.new(0,0,0,132), BackgroundColor3 = C.inputBg, ZIndex = 6, Parent = KeyPage })
-corner(InputWrap, 10)
-local inputStroke = stroke(InputWrap, C.border, 1.5)
-label({ Size = UDim2.new(0,34,1,0), Position = UDim2.new(0,4,0,0), Text = "🔑", TextSize = 14, ZIndex = 7, Parent = InputWrap })
-local KeyInput = new("TextBox", { Size = UDim2.new(1,-48,1,0), Position = UDim2.new(0,38,0,0), BackgroundTransparency = 1, Text = "", PlaceholderText = "enter your key here...", PlaceholderColor3 = C.textM, TextColor3 = C.textB, TextSize = 13, Font = Enum.Font.GothamMedium, TextXAlignment = Enum.TextXAlignment.Left, ClearTextOnFocus = false, ZIndex = 7, Parent = InputWrap })
-
-KeyInput.Focused:Connect(function() tween(inputStroke, { Color = C.borderF }, 0.2); tween(InputWrap, { BackgroundColor3 = C.inputBgF }, 0.2) end)
-KeyInput.FocusLost:Connect(function() tween(inputStroke, { Color = C.border }, 0.25); tween(InputWrap, { BackgroundColor3 = C.inputBg }, 0.25) end)
-
-local StatusMsg = label({ Size = UDim2.new(1,0,0,16), Position = UDim2.new(0,0,0,184), Text = "", TextColor3 = C.error, TextSize = 11, TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 5, Parent = KeyPage })
-label({ Size = UDim2.new(1,0,0,14), Position = UDim2.new(0,0,0,204), Text = "free permanent key in our discord — saves automatically ♡", TextColor3 = C.textM, TextSize = 10, TextXAlignment = Enum.TextXAlignment.Center, ZIndex = 5, Parent = KeyPage })
-
-local BtnRow = new("Frame", { Size = UDim2.new(1,0,0,44), Position = UDim2.new(0,0,1,-44), BackgroundTransparency = 1, ZIndex = 6, Parent = KeyPage })
-local DiscordBtn = makeBtn({ size = UDim2.new(0,108,1,0), pos = UDim2.new(0,0,0,0),   col = C.discord, hov = C.discordH, press = C.discordP, text = "💬  Get Key",        ts = 12 }, BtnRow)
-local PasteBtn   = makeBtn({ size = UDim2.new(0,76,1,0),  pos = UDim2.new(0,116,0,0), col = C.surface, hov = C.surfaceL,                     text = "📋 Paste",          ts = 11 }, BtnRow)
-local VerifyBtn  = makeBtn({ size = UDim2.new(1,-200,1,0),pos = UDim2.new(0,200,0,0), col = C.accent,  hov = C.accentH,  press = C.accentP,   text = "Verify & Launch  →", ts = 13 }, BtnRow)
-local VerifyLabel = VerifyBtn:FindFirstChildWhichIsA("TextLabel")
-
--- ═══ UNSUPPORTED PAGE ═══
-local UnsupportedPage = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Visible = false, ZIndex = 5, Parent = Content })
-label({ Size = UDim2.new(1,0,0,50), Position = UDim2.new(0,0,0,20), Text = "😔", TextSize = 42, ZIndex = 6, Parent = UnsupportedPage })
-label({ Size = UDim2.new(1,0,0,24), Position = UDim2.new(0,0,0,78), Text = "Game Not Supported", TextColor3 = C.text, TextSize = 18, Font = Enum.Font.GothamBold, ZIndex = 6, Parent = UnsupportedPage })
-label({ Size = UDim2.new(1,0,0,16), Position = UDim2.new(0,0,0,108), Text = "IBdihP Hub doesn't support this game yet. Join our Discord to request it!", TextColor3 = C.textS, TextSize = 11, ZIndex = 6, Parent = UnsupportedPage })
-local UnsupDiscord = makeBtn({ size = UDim2.new(0,180,0,42), pos = UDim2.new(0.5,-90,1,-50), col = C.discord, hov = C.discordH, press = C.discordP, text = "💬  Join Discord", ts = 13, z = 7 }, UnsupportedPage)
-UnsupDiscord.MouseButton1Click:Connect(function()
-    pcall(function() if setclipboard then setclipboard(DISCORD_LINK) end end)
-    local lbl = UnsupDiscord:FindFirstChildWhichIsA("TextLabel")
-    if lbl then lbl.Text = "✓  Copied!"; task.delay(2, function() if lbl and lbl.Parent then lbl.Text = "💬  Join Discord" end end) end
-end)
-
--- ═══ LAUNCH PAGE ═══
-local LaunchPage = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Visible = false, ZIndex = 5, Parent = Content })
-
-local spinnerDots = {}
-local SpinnerWrap = new("Frame", { Size = UDim2.new(0,50,0,50), Position = UDim2.new(0.5,-25,0,40), BackgroundTransparency = 1, ZIndex = 6, Parent = LaunchPage })
-local dotColors = { Color3.fromRGB(140,120,255), Color3.fromRGB(180,140,255), Color3.fromRGB(100,180,255) }
-for i = 1, 3 do
-    local dot = new("Frame", { Size = UDim2.new(0,10,0,10), Position = UDim2.new(0,(i-1)*18+2,0.5,-5), BackgroundColor3 = dotColors[i], ZIndex = 7, Parent = SpinnerWrap })
-    corner(dot, 5); spinnerDots[i] = dot
-end
 task.spawn(function()
-    while SpinnerWrap and SpinnerWrap.Parent do
-        for i, dot in ipairs(spinnerDots) do
-            task.delay((i-1)*0.15, function()
-                if not (dot and dot.Parent) then return end
-                tween(dot, { Position = dot.Position - UDim2.new(0,0,0,12) }, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-                task.wait(0.2)
-                if dot and dot.Parent then tween(dot, { Position = dot.Position + UDim2.new(0,0,0,12) }, 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.In) end
-            end)
-        end
-        task.wait(0.9)
+    while GoBtn and GoBtn.Parent do
+        tween(GoBtn, { BackgroundColor3 = Color3.fromRGB(110, 200, 110) }, 1.2, Enum.EasingStyle.Sine); task.wait(1.2)
+        tween(GoBtn, { BackgroundColor3 = Color3.fromRGB(90, 170, 90) }, 1.2, Enum.EasingStyle.Sine); task.wait(1.2)
     end
 end)
 
-local LaunchTitle = label({ Size = UDim2.new(1,0,0,22), Position = UDim2.new(0,0,0,105), Text = "Launching Script...", TextColor3 = C.text, TextSize = 17, Font = Enum.Font.GothamBold, ZIndex = 6, Parent = LaunchPage })
-local LaunchSub   = label({ Size = UDim2.new(1,0,0,16), Position = UDim2.new(0,0,0,132), Text = "", TextColor3 = C.textS, TextSize = 12, ZIndex = 6, Parent = LaunchPage })
-label({ Size = UDim2.new(1,0,0,14), Position = UDim2.new(0,0,1,-30), Text = "key saved — you won't need to enter it again ✓", TextColor3 = C.success, TextSize = 10, ZIndex = 6, Parent = LaunchPage })
+-- Small buttons
+local SmallBtnRow = new("Frame", { Size = UDim2.new(1, -20, 0, 34), Position = UDim2.new(0, 10, 0, 206), BackgroundTransparency = 1, ZIndex = 16, Parent = MainNote })
 
--- ═══ BUTTON LOGIC ═══
-DiscordBtn.MouseButton1Click:Connect(function()
-    pcall(function() if setclipboard then setclipboard(DISCORD_LINK) end end)
-    StatusMsg.Text = "🔗  Discord invite copied!"; StatusMsg.TextColor3 = C.discord
-    task.delay(3, function()
-        if not (StatusMsg and StatusMsg.Parent) then return end
-        tween(StatusMsg, { TextTransparency = 1 }, 0.3)
-        task.wait(0.35)
-        if StatusMsg and StatusMsg.Parent then StatusMsg.Text = ""; StatusMsg.TextTransparency = 0 end
-    end)
-end)
-
+local PasteBtn = new("TextButton", { Size = UDim2.new(0.48, 0, 1, 0), Position = UDim2.new(0, 0, 0, 0), BackgroundColor3 = Color3.fromRGB(235, 225, 145), Text = "", AutoButtonColor = false, ZIndex = 17, Parent = SmallBtnRow })
+corner(PasteBtn, 6)
+new("TextLabel", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Text = "📋 paste", TextColor3 = Color3.fromRGB(80, 70, 35), TextSize = 12, Font = Enum.Font.GothamBold, ZIndex = 18, Parent = PasteBtn })
+PasteBtn.MouseEnter:Connect(function() tween(PasteBtn, { BackgroundColor3 = Color3.fromRGB(245, 235, 160) }, 0.15) end)
+PasteBtn.MouseLeave:Connect(function() tween(PasteBtn, { BackgroundColor3 = Color3.fromRGB(235, 225, 145) }, 0.2) end)
 PasteBtn.MouseButton1Click:Connect(function()
     pcall(function() if getclipboard then KeyInput.Text = getclipboard() end end)
 end)
 
-local function shakeInput()
-    local orig = InputWrap.Position
-    for _ = 1, 4 do
-        tween(InputWrap, { Position = orig + UDim2.new(0,6,0,0) }, 0.035, Enum.EasingStyle.Linear)
-        task.wait(0.04)
-        tween(InputWrap, { Position = orig - UDim2.new(0,6,0,0) }, 0.035, Enum.EasingStyle.Linear)
-        task.wait(0.04)
+local DiscBtn = new("TextButton", { Size = UDim2.new(0.48, 0, 1, 0), Position = UDim2.new(0.52, 0, 0, 0), BackgroundColor3 = Color3.fromRGB(130, 140, 230), Text = "", AutoButtonColor = false, ZIndex = 17, Parent = SmallBtnRow })
+corner(DiscBtn, 6)
+new("TextLabel", { Size = UDim2.new(1,0,1,0), BackgroundTransparency = 1, Text = "💬 get key", TextColor3 = Color3.fromRGB(255, 255, 255), TextSize = 12, Font = Enum.Font.GothamBold, ZIndex = 18, Parent = DiscBtn })
+DiscBtn.MouseEnter:Connect(function() tween(DiscBtn, { BackgroundColor3 = Color3.fromRGB(150, 160, 245) }, 0.15) end)
+DiscBtn.MouseLeave:Connect(function() tween(DiscBtn, { BackgroundColor3 = Color3.fromRGB(130, 140, 230) }, 0.2) end)
+DiscBtn.MouseButton1Click:Connect(function()
+    pcall(function() if setclipboard then setclipboard(DISCORD_LINK) end end)
+    StatusLbl.Text = "copied discord link! 💬"
+    StatusLbl.TextColor3 = Color3.fromRGB(100, 110, 200)
+    task.delay(3, function() if StatusLbl and StatusLbl.Parent then StatusLbl.Text = "" end end)
+end)
+
+-- Footer
+local FooterLbl = new("TextLabel", {
+    Size = UDim2.new(1, -20, 0, 38), Position = UDim2.new(0, 10, 1, -50),
+    BackgroundTransparency = 1,
+    Text = "(free permanent key from discord ♡)\n(saves automatically, u only do this once!)",
+    TextColor3 = Color3.fromRGB(155, 145, 100), TextSize = 12, Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16, Parent = MainNote,
+})
+
+-- ═══ SELF-DRAWING DOODLE ═══
+task.spawn(function()
+    task.wait(3)
+    local doodlePoints = {
+        {0.82, 0.72}, {0.85, 0.62}, {0.88, 0.72},
+        {0.93, 0.74}, {0.89, 0.78}, {0.91, 0.85},
+        {0.85, 0.80}, {0.79, 0.85}, {0.81, 0.78},
+        {0.77, 0.74}, {0.82, 0.72},
+    }
+    for i, pt in ipairs(doodlePoints) do
+        if not (MainNote and MainNote.Parent) then break end
+        local dot = new("Frame", {
+            Size = UDim2.new(0, 0, 0, 0),
+            Position = UDim2.new(pt[1], 0, pt[2], 0),
+            AnchorPoint = Vector2.new(0.5, 0.5),
+            BackgroundColor3 = Color3.fromRGB(180, 80, 80),
+            BackgroundTransparency = 0.3,
+            ZIndex = 17, Parent = MainNote,
+        })
+        corner(dot, 2)
+        tween(dot, { Size = UDim2.new(0, 4, 0, 4) }, 0.1, Enum.EasingStyle.Quad)
+
+        if i > 1 then
+            local prev = doodlePoints[i - 1]
+            local dx = (pt[1] - prev[1]) * MainNote.AbsoluteSize.X
+            local dy = (pt[2] - prev[2]) * MainNote.AbsoluteSize.Y
+            local dist = math.sqrt(dx * dx + dy * dy)
+            local angle = math.deg(math.atan2(dy, dx))
+
+            local line = new("Frame", {
+                Size = UDim2.new(0, 0, 0, 2),
+                Position = UDim2.new(prev[1], 0, prev[2], 0),
+                AnchorPoint = Vector2.new(0, 0.5),
+                Rotation = angle,
+                BackgroundColor3 = Color3.fromRGB(180, 80, 80),
+                BackgroundTransparency = 0.4,
+                ZIndex = 17, Parent = MainNote,
+            })
+            tween(line, { Size = UDim2.new(0, dist, 0, 2) }, 0.15, Enum.EasingStyle.Linear)
+        end
+        task.wait(0.12)
     end
-    tween(InputWrap, { Position = orig }, 0.06)
+end)
+
+-- ═══════════════════════════════════════════════════════════
+--  BLUE STICKY NOTE (stats)
+-- ═══════════════════════════════════════════════════════════
+local BlueNote = new("Frame", {
+    Size = UDim2.new(0, 200, 0, 160), Position = UDim2.new(0, 340, 0, 30),
+    BackgroundColor3 = Color3.fromRGB(155, 210, 255), Rotation = 2.5, ZIndex = 15, Parent = Board,
+})
+corner(BlueNote, 3)
+new("Frame", { Size = UDim2.new(1, 5, 1, 5), Position = UDim2.new(0, 3, 0, 3), BackgroundColor3 = Color3.fromRGB(0,0,0), BackgroundTransparency = 0.84, ZIndex = 14, Parent = BlueNote })
+local BlueTape = new("Frame", { Size = UDim2.new(0, 55, 0, 18), Position = UDim2.new(0.5, -28, 0, -9), BackgroundColor3 = Color3.fromRGB(200,200,175), BackgroundTransparency = 0.25, ZIndex = 18, Rotation = -4, Parent = BlueNote })
+corner(BlueTape, 3)
+
+BlueNote.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        tween(BlueTape, { Rotation = -12, Position = UDim2.new(0.5, -28, 0, -13) }, 0.3, Enum.EasingStyle.Back)
+    end
+end)
+BlueNote.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        tween(BlueTape, { Rotation = -4, Position = UDim2.new(0.5, -28, 0, -9) }, 0.4, Enum.EasingStyle.Elastic)
+    end
+end)
+
+task.spawn(function()
+    while BlueNote and BlueNote.Parent do
+        tween(BlueNote, { Rotation = 3.5 }, 2.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut); task.wait(2.5)
+        tween(BlueNote, { Rotation = 1.5 }, 2.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut); task.wait(2.5)
+    end
+end)
+
+local HubIcon = new("ImageLabel", {
+    Size = UDim2.new(0, 42, 0, 42), Position = UDim2.new(0.5, -21, 0, 12),
+    BackgroundTransparency = 1, Image = HUB_ICON, ZIndex = 16, Parent = BlueNote,
+})
+corner(HubIcon, 8)
+
+task.spawn(function()
+    while HubIcon and HubIcon.Parent do
+        tween(HubIcon, { Size = UDim2.new(0, 46, 0, 46), Position = UDim2.new(0.5, -23, 0, 10) }, 1, Enum.EasingStyle.Sine); task.wait(1)
+        tween(HubIcon, { Size = UDim2.new(0, 42, 0, 42), Position = UDim2.new(0.5, -21, 0, 12) }, 1, Enum.EasingStyle.Sine); task.wait(1)
+    end
+end)
+
+new("TextLabel", {
+    Size = UDim2.new(1, -12, 0, 16), Position = UDim2.new(0, 6, 0, 60),
+    BackgroundTransparency = 1, Text = "IBdihP Hub",
+    TextColor3 = Color3.fromRGB(25, 60, 100), TextSize = 15, Font = Enum.Font.GothamBold,
+    ZIndex = 16, Parent = BlueNote,
+})
+
+local CounterLbl = new("TextLabel", {
+    Size = UDim2.new(1, -12, 0, 16), Position = UDim2.new(0, 6, 0, 82),
+    BackgroundTransparency = 1, Text = "🎮 0 games",
+    TextColor3 = Color3.fromRGB(35, 70, 110), TextSize = 12, Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16, Parent = BlueNote,
+})
+
+task.spawn(function()
+    task.wait(1)
+    for i = 1, GAME_COUNT do
+        if not (CounterLbl and CounterLbl.Parent) then break end
+        CounterLbl.Text = "🎮 " .. tostring(i) .. " games"
+        task.wait(0.015)
+    end
+end)
+
+new("TextLabel", {
+    Size = UDim2.new(1, -12, 0, 16), Position = UDim2.new(0, 6, 0, 102),
+    BackgroundTransparency = 1, Text = "🔑 1 free universal key",
+    TextColor3 = Color3.fromRGB(35, 70, 110), TextSize = 12, Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16, Parent = BlueNote,
+})
+new("TextLabel", {
+    Size = UDim2.new(1, -12, 0, 16), Position = UDim2.new(0, 6, 0, 122),
+    BackgroundTransparency = 1, Text = "⚡ no hassle ever",
+    TextColor3 = Color3.fromRGB(35, 70, 110), TextSize = 12, Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16, Parent = BlueNote,
+})
+
+-- ═══ PINK STICKY NOTE (With Room for More Text) ═══
+local PinkNote = new("Frame", {
+    Size = UDim2.new(0, 200, 0, 145), Position = UDim2.new(0, 340, 0, 205), -- Height bumped to 145, position adjusted
+    BackgroundColor3 = Color3.fromRGB(255, 175, 195), Rotation = -2, ZIndex = 15, Parent = Board,
+})
+corner(PinkNote, 3)
+new("Frame", { Size = UDim2.new(1, 5, 1, 5), Position = UDim2.new(0, 3, 0, 3), BackgroundColor3 = Color3.fromRGB(0,0,0), BackgroundTransparency = 0.84, ZIndex = 14, Parent = PinkNote })
+local PinkTape = new("Frame", { Size = UDim2.new(0, 52, 0, 18), Position = UDim2.new(0.3, -12, 0, -9), BackgroundColor3 = Color3.fromRGB(200,200,175), BackgroundTransparency = 0.25, ZIndex = 18, Rotation = 6, Parent = PinkNote })
+corner(PinkTape, 3)
+
+PinkNote.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        tween(PinkTape, { Rotation = 14, Position = UDim2.new(0.3, -12, 0, -13) }, 0.3, Enum.EasingStyle.Back)
+    end
+end)
+PinkNote.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement then
+        tween(PinkTape, { Rotation = 6, Position = UDim2.new(0.3, -12, 0, -9) }, 0.4, Enum.EasingStyle.Elastic)
+    end
+end)
+
+task.spawn(function()
+    while PinkNote and PinkNote.Parent do
+        tween(PinkNote, { Rotation = -3 }, 2.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut); task.wait(2.8)
+        tween(PinkNote, { Rotation = -1 }, 2.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut); task.wait(2.8)
+    end
+end)
+
+local Heart = new("TextLabel", {
+    Size = UDim2.new(0, 22, 0, 22), Position = UDim2.new(1, -30, 0, 8),
+    BackgroundTransparency = 1, Text = "💜", TextSize = 16, ZIndex = 16, Parent = PinkNote,
+})
+task.spawn(function()
+    while Heart and Heart.Parent do
+        tween(Heart, { TextSize = 20 }, 0.4, Enum.EasingStyle.Sine); task.wait(0.4)
+        tween(Heart, { TextSize = 16 }, 0.4, Enum.EasingStyle.Sine); task.wait(1.5)
+    end
+end)
+
+-- Main text label (Height increased to 95 to fit all 6 lines)
+new("TextLabel", {
+    Size = UDim2.new(1, -14, 0, 95), Position = UDim2.new(0, 7, 0, 14),
+    BackgroundTransparency = 1,
+    Text = "ur key works everywhere\nforever. we don't do\nthat expiring stuff 💅\nnone of dat linkvertise,\nlootlabs or workink stuff.\npure free 💝",
+    TextColor3 = Color3.fromRGB(120, 45, 65), TextSize = 11, Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true, ZIndex = 16, Parent = PinkNote,
+})
+
+-- Made with love footer
+new("TextLabel", {
+    Size = UDim2.new(1, -14, 0, 16), Position = UDim2.new(0, 7, 1, -22),
+    BackgroundTransparency = 1, Text = "— with love, IBdihP team",
+    TextColor3 = Color3.fromRGB(160, 80, 100), TextSize = 11, Font = Enum.Font.GothamMedium,
+    TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16, Parent = PinkNote,
+})
+
+-- ═══════════════════════════════════════════════════════════
+--  NOTES FLY IN
+-- ═══════════════════════════════════════════════════════════
+task.spawn(function()
+    local mainTarget = UDim2.new(0, 20, 0, 42)
+    local blueTarget = UDim2.new(0, 340, 0, 30)
+    local pinkTarget = UDim2.new(0, 340, 0, 210)
+
+    MainNote.Position = UDim2.new(-0.7, 0, 0.3, 0); MainNote.Rotation = -25
+    BlueNote.Position = UDim2.new(1.4, 0, -0.3, 0); BlueNote.Rotation = 30
+    PinkNote.Position = UDim2.new(1.3, 0, 1.3, 0); PinkNote.Rotation = 20
+
+    task.wait(0.2)
+    tween(MainNote, { Position = mainTarget, Rotation = -1.5 }, 0.7, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    task.wait(0.22)
+    tween(BlueNote, { Position = blueTarget, Rotation = 2.5 }, 0.6, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+    task.wait(0.18)
+    tween(PinkNote, { Position = pinkTarget, Rotation = -2 }, 0.55, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+end)
+
+-- ═══════════════════════════════════════════════════════════
+--  PUSHPINS (with wobble)
+-- ═══════════════════════════════════════════════════════════
+local allPins = {}
+local function pushpin(x, y, col)
+    local shadow = new("Frame", { Size = UDim2.new(0, 12, 0, 5), Position = UDim2.new(x, 1, y, 7), BackgroundColor3 = Color3.fromRGB(0,0,0), BackgroundTransparency = 0.8, ZIndex = 20, Parent = Board })
+    corner(shadow, 2)
+    local pin = new("Frame", { Size = UDim2.new(0, 16, 0, 16), Position = UDim2.new(x, -8, y, -8), BackgroundColor3 = col, ZIndex = 21, Parent = Board })
+    corner(pin, 8)
+    new("UIStroke", { Color = Color3.fromRGB(0,0,0), Thickness = 1, Transparency = 0.7, Parent = pin })
+    local gleam = new("Frame", { Size = UDim2.new(0, 5, 0, 5), Position = UDim2.new(0, 3, 0, 2), BackgroundColor3 = Color3.fromRGB(255, 255, 255), BackgroundTransparency = 0.4, ZIndex = 22, Parent = pin })
+    corner(gleam, 2)
+    table.insert(allPins, pin)
 end
 
-local function showStatus(msg, col)
-    StatusMsg.Text = msg; StatusMsg.TextColor3 = col; StatusMsg.TextTransparency = 0
+pushpin(0.03, 0.04, Color3.fromRGB(230, 50, 50))
+pushpin(0.58, 0.04, Color3.fromRGB(50, 130, 230))
+pushpin(0.95, 0.88, Color3.fromRGB(50, 200, 80))
+
+local function wobblePins()
+    for _, pin in ipairs(allPins) do
+        if pin and pin.Parent then
+            task.spawn(function()
+                tween(pin, { Rotation = math.random(-20, 20) }, 0.15, Enum.EasingStyle.Quad); task.wait(0.15)
+                tween(pin, { Rotation = math.random(-15, 15) }, 0.12, Enum.EasingStyle.Quad); task.wait(0.12)
+                tween(pin, { Rotation = 0 }, 0.3, Enum.EasingStyle.Elastic)
+            end)
+        end
+    end
+end
+
+-- ═══════════════════════════════════════════════════════════
+--  MARCHING ANTS
+-- ═══════════════════════════════════════════════════════════
+task.spawn(function()
+    local ants = {}
+    for i = 1, 8 do
+        local ant = new("Frame", {
+            Size = UDim2.new(0, 5, 0, 5),
+            Position = UDim2.new(0, 0, 0, 0),
+            BackgroundColor3 = Color3.fromRGB(30, 25, 18),
+            BackgroundTransparency = 0.3,
+            ZIndex = 23, Parent = Board,
+        })
+        corner(ant, 3)
+        ants[i] = { frame = ant, progress = (i - 1) / 8 }
+    end
+
+    while Board and Board.Parent do
+        for _, ant in ipairs(ants) do
+            if not (ant.frame and ant.frame.Parent) then break end
+            ant.progress = (ant.progress + 0.002) % 1
+            local p = ant.progress
+            local x, y
+            if p < 0.25 then
+                x = p / 0.25; y = 0
+            elseif p < 0.5 then
+                x = 1; y = (p - 0.25) / 0.25
+            elseif p < 0.75 then
+                x = 1 - (p - 0.5) / 0.25; y = 1
+            else
+                x = 0; y = 1 - (p - 0.75) / 0.25
+            end
+            ant.frame.Position = UDim2.new(x, -3, y, -3)
+        end
+        RunService.RenderStepped:Wait()
+    end
+end)
+
+-- ═══════════════════════════════════════════════════════════
+--  CLOSE BUTTON
+-- ═══════════════════════════════════════════════════════════
+local CloseBtn = new("TextButton", {
+    Size = UDim2.new(0, 34, 0, 34), Position = UDim2.new(1, -44, 0, 8),
+    BackgroundColor3 = Color3.fromRGB(120, 95, 65), BackgroundTransparency = 0.5,
+    Text = "", AutoButtonColor = false, ZIndex = 26, Parent = Board,
+})
+corner(CloseBtn, 8)
+new("TextLabel", {
+    Size = UDim2.new(1, 0, 1, 0), BackgroundTransparency = 1,
+    Text = "✕", TextColor3 = Color3.fromRGB(60, 45, 30),
+    TextSize = 18, Font = Enum.Font.GothamBold, ZIndex = 27, Parent = CloseBtn,
+})
+CloseBtn.MouseEnter:Connect(function() tween(CloseBtn, { BackgroundTransparency = 0, BackgroundColor3 = Color3.fromRGB(200, 70, 70) }, 0.15) end)
+CloseBtn.MouseLeave:Connect(function() tween(CloseBtn, { BackgroundTransparency = 0.5, BackgroundColor3 = Color3.fromRGB(120, 95, 65) }, 0.2) end)
+
+local function closeUI()
+    tween(MainNote, { Position = UDim2.new(0, -400, 0, 50), Rotation = -25 }, 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+    tween(BlueNote, { Position = UDim2.new(0, 700, 0, 30), Rotation = 20 }, 0.45, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+    tween(PinkNote, { Position = UDim2.new(0, 700, 0, 400), Rotation = 15 }, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+    task.wait(0.3)
+    tween(Board, { BackgroundTransparency = 1 }, 0.3)
+    tween(Backdrop, { BackgroundTransparency = 1 }, 0.3)
+    task.wait(0.35)
+    Gui:Destroy()
+end
+
+CloseBtn.MouseButton1Click:Connect(closeUI)
+
+-- ═══════════════════════════════════════════════════════════
+--  VERIFY LOGIC
+-- ═══════════════════════════════════════════════════════════
+local function shakeInput()
+    local orig = InputBg.Position
+    for _ = 1, 4 do
+        tween(InputBg, { Position = orig + UDim2.new(0, 6, 0, 0) }, 0.035, Enum.EasingStyle.Linear); task.wait(0.04)
+        tween(InputBg, { Position = orig - UDim2.new(0, 6, 0, 0) }, 0.035, Enum.EasingStyle.Linear); task.wait(0.04)
+    end
+    tween(InputBg, { Position = orig }, 0.06)
+end
+
+local function celebrationSparkles()
+    task.spawn(function()
+        local emojis = {"✨","🎉","💜","⭐","🌟","🎊","💫","🥳"}
+        for _ = 1, 30 do
+            local startX = 0.5 + (math.random() - 0.5) * 0.1
+            local startY = 0.5 + (math.random() - 0.5) * 0.1
+            local endX = startX + (math.random() - 0.5) * 0.9
+            local endY = startY + (math.random() - 0.5) * 0.9
+            local s = new("TextLabel", {
+                Size = UDim2.new(0, 20, 0, 20),
+                Position = UDim2.new(startX, 0, startY, 0),
+                BackgroundTransparency = 1, Text = emojis[math.random(#emojis)],
+                TextSize = math.random(12, 28), TextTransparency = 0,
+                Rotation = math.random(-45, 45), ZIndex = 30, Parent = Board,
+            })
+            tween(s, {
+                TextTransparency = 1,
+                Position = UDim2.new(endX, 0, endY, 0),
+                Rotation = math.random(-360, 360),
+                TextSize = s.TextSize + math.random(5, 15),
+            }, 1.5 + math.random() * 0.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+            task.wait(0.03)
+            task.delay(2.2, function() if s and s.Parent then s:Destroy() end end)
+        end
+    end)
+
+    task.spawn(function()
+        for _, note in ipairs({MainNote, BlueNote, PinkNote}) do
+            if note and note.Parent then
+                local origR = note.Rotation
+                tween(note, { Rotation = origR + 5 }, 0.15, Enum.EasingStyle.Quad); task.wait(0.15)
+                tween(note, { Rotation = origR - 5 }, 0.15, Enum.EasingStyle.Quad); task.wait(0.15)
+                tween(note, { Rotation = origR }, 0.2, Enum.EasingStyle.Elastic)
+            end
+        end
+    end)
+
+    wobblePins()
 end
 
 local verifying = false
@@ -548,61 +995,115 @@ local function doVerify()
     local key = trim(KeyInput.Text)
 
     if key == "" then
-        showStatus("⚠  please enter a key", C.warning)
+        StatusLbl.Text = "psst... type the key first 😅"
+        StatusLbl.TextColor3 = Color3.fromRGB(180, 140, 40)
         shakeInput(); return
     end
 
     verifying = true
-    VerifyLabel.Text = "Verifying..."
-    tween(VerifyBtn, { BackgroundColor3 = C.accentSoft }, 0.15)
-    task.wait(0.6)
+    GoLbl.Text = "checking..."
+    tween(GoBtn, { BackgroundColor3 = Color3.fromRGB(160, 180, 100) }, 0.15)
+    task.wait(0.7)
 
     if isKeyValid(key) then
         saveKey(key)
-        showStatus("✓  Key verified!", C.success)
-        tween(VerifyBtn, { BackgroundColor3 = C.success }, 0.2)
-        tween(inputStroke, { Color = C.success }, 0.2)
-        VerifyLabel.Text = "✓  Verified!"
-        task.wait(0.7)
+        StatusLbl.Text = "yooo ur in!! ✓"
+        StatusLbl.TextColor3 = Color3.fromRGB(60, 160, 80)
+        GoLbl.Text = "ur in! ✓"
+        tween(GoBtn, { BackgroundColor3 = Color3.fromRGB(80, 210, 100) }, 0.2)
+        celebrationSparkles()
+        task.wait(1.4)
 
         if gameScript then
-            LaunchSub.Text = gameScript.Icon .. "  " .. gameScript.Name
-            transitionTo(KeyPage, LaunchPage)
-            task.wait(1.5)
-            closeThenLaunch(gameScript)
+            GoLbl.Text = "loading " .. gameScript.Icon .. " " .. gameScript.Name .. "..."
+            GoLbl.TextSize = 12
+            task.wait(0.7)
+            tween(MainNote, { Position = UDim2.new(0, -400, 0, 50), Rotation = -25 }, 0.5, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+            tween(BlueNote, { Position = UDim2.new(0, 700, 0, 30), Rotation = 20 }, 0.45, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+            tween(PinkNote, { Position = UDim2.new(0, 700, 0, 400), Rotation = 15 }, 0.4, Enum.EasingStyle.Back, Enum.EasingDirection.In)
+            task.wait(0.4)
+            tween(Board, { BackgroundTransparency = 1 }, 0.3)
+            tween(Backdrop, { BackgroundTransparency = 1 }, 0.3)
+            task.wait(0.4)
+            Gui:Destroy()
+            launch(gameScript)
         else
-            transitionTo(KeyPage, UnsupportedPage)
+            -- Unsupported game
+            StatusLbl.Text = ""
+            InputBg.Visible = false
+            Arrow.Visible = false
+            SmallBtnRow.Visible = false
+            Greeting.Visible = false
+            SubGreeting.Visible = false
+            FooterLbl.Visible = false
+
+            new("TextLabel", {
+                Size = UDim2.new(1, -20, 0, 46), Position = UDim2.new(0, 10, 0, 24),
+                BackgroundTransparency = 1, Text = "😔",
+                TextSize = 38, ZIndex = 19, Parent = MainNote,
+            })
+            new("TextLabel", {
+                Size = UDim2.new(1, -20, 0, 24), Position = UDim2.new(0, 10, 0, 76),
+                BackgroundTransparency = 1, Text = "this game isn't supported yet!",
+                TextColor3 = Color3.fromRGB(50, 40, 20), TextSize = 16, Font = Enum.Font.GothamBold,
+                ZIndex = 19, Parent = MainNote,
+            })
+            new("TextLabel", {
+                Size = UDim2.new(1, -30, 0, 52), Position = UDim2.new(0, 15, 0, 104),
+                BackgroundTransparency = 1,
+                Text = "join our discord to request it!\nwe add new games all the time ♡",
+                TextColor3 = Color3.fromRGB(90, 75, 40), TextSize = 13, Font = Enum.Font.GothamMedium,
+                TextWrapped = true, ZIndex = 19, Parent = MainNote,
+            })
+
+            GoLbl.Text = "💬  join discord"
+            GoLbl.TextSize = 15
+            tween(GoBtn, { BackgroundColor3 = Color3.fromRGB(130, 140, 230) }, 0.3)
+            GoBtn.MouseEnter:Connect(function() tween(GoBtn, { BackgroundColor3 = Color3.fromRGB(150, 160, 245) }, 0.15) end)
+            GoBtn.MouseLeave:Connect(function() tween(GoBtn, { BackgroundColor3 = Color3.fromRGB(130, 140, 230) }, 0.2) end)
+
+            GoBtn.MouseButton1Click:Connect(function()
+                pcall(function() if setclipboard then setclipboard(DISCORD_LINK) end end)
+                GoLbl.Text = "✓  discord copied!"
+                task.delay(2, function() if GoLbl and GoLbl.Parent then GoLbl.Text = "💬  join discord" end end)
+            end)
         end
     else
-        showStatus("✗  Invalid key — join Discord for a free key", C.error)
-        tween(inputStroke, { Color = C.error }, 0.15)
+        StatusLbl.Text = "nah that ain't it 😅"
+        StatusLbl.TextColor3 = Color3.fromRGB(200, 60, 60)
         shakeInput()
-        task.delay(3.5, function()
-            tween(inputStroke, { Color = C.border }, 0.3)
-            if not (StatusMsg and StatusMsg.Parent) then return end
-            tween(StatusMsg, { TextTransparency = 1 }, 0.4)
-            task.wait(0.4)
-            if StatusMsg and StatusMsg.Parent then StatusMsg.Text = ""; StatusMsg.TextTransparency = 0 end
-        end)
-        VerifyLabel.Text = "Verify & Launch  →"
-        tween(VerifyBtn, { BackgroundColor3 = C.accent }, 0.2)
+        local origR = MainNote.Rotation
+        tween(MainNote, { Rotation = origR + 4 }, 0.08); task.wait(0.1)
+        tween(MainNote, { Rotation = origR - 4 }, 0.08); task.wait(0.1)
+        tween(MainNote, { Rotation = origR }, 0.12)
+        wobblePins()
+        GoLbl.Text = "let me in! →"
+        tween(GoBtn, { BackgroundColor3 = Color3.fromRGB(100, 185, 100) }, 0.2)
+        task.delay(3, function() if StatusLbl and StatusLbl.Parent then StatusLbl.Text = "" end end)
         verifying = false
     end
 end
 
-VerifyBtn.MouseButton1Click:Connect(doVerify)
+GoBtn.MouseButton1Click:Connect(doVerify)
 KeyInput.FocusLost:Connect(function(enter) if enter then doVerify() end end)
 
--- ═══ DRAGGING ═══
+-- ═══════════════════════════════════════════════════════════
+--  DRAGGING
+-- ═══════════════════════════════════════════════════════════
 local dragging, dragInput, dragStart, startPos
-Card.InputBegan:Connect(function(input)
-    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch)
-    and (input.Position.Y - Card.AbsolutePosition.Y) <= 55 then
-        dragging = true; dragStart = input.Position; startPos = Card.Position
-        input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+Board.InputBegan:Connect(function(input)
+    if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) then
+        local relY = input.Position.Y - Board.AbsolutePosition.Y
+        local relX = input.Position.X - Board.AbsolutePosition.X
+        local onClose = (relX > Board.AbsoluteSize.X - 50 and relY < 46)
+        if relY <= 30 and not onClose then
+            dragging = true; dragStart = input.Position; startPos = Board.Position
+            wobblePins()
+            input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+        end
     end
 end)
-Card.InputChanged:Connect(function(input)
+Board.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         dragInput = input
     end
@@ -610,16 +1111,6 @@ end)
 UserInputService.InputChanged:Connect(function(input)
     if input == dragInput and dragging then
         local d = input.Position - dragStart
-        Card.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
-    end
-end)
-
--- ═══ LOGO PULSE ═══
-task.spawn(function()
-    while LogoMark and LogoMark.Parent do
-        tween(LogoMark, { BackgroundColor3 = C.accentSoft }, 1.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-        task.wait(1.8)
-        tween(LogoMark, { BackgroundColor3 = C.accentGhost }, 1.8, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut)
-        task.wait(1.8)
+        Board.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + d.X, startPos.Y.Scale, startPos.Y.Offset + d.Y)
     end
 end)
