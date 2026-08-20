@@ -15,50 +15,61 @@ local LOBBY_PLACE_IDS = {87810101348327}
 local SCRIPTS = {
     { Name = "+1 Wood per Click", Icon = "🪵", File = "%2B1wood-per-click.lua", GameId = 112231208081788 },
     { Name = "1 Keyboard = 1$/s", Icon = "⌨️", File = "1keyboard%3D1%24s.lua", GameId = 121003786627094 },
+    
     { Name = "Airline Idle", Icon = "🛩️", File = "airline-idle.lua", GameId = 70437719899064 },
     { Name = "Anime Astral Simulator", Icon = "🔥", File = "anime-astral-simulator.lua", GameId = 102072869879193 },
     { Name = "Anime Battles", Icon = "🤺", File = "anime-battles.lua", GameId = 126229277218112 },
     { Name = "Anime Capture", Icon = "🖐", File = "anime-capture.lua", GameId = 94717504417144 },
-    { Name = "Anime Card Farm", Icon = "🃏", File = "anime-card-farm.lua", GameId = 125039473548047 }, 
+    { Name = "Anime Card Farm", Icon = "🃏", File = "anime-card-farm.lua", GameId = 125039473548047 },
     { Name = "Anime Dimensions Simulator - Battle", Icon = "⚔️", File = "anime-dimensions-simulator.lua", GameId = 6990129309 },
     { Name = "Anime Dimensions Simulator - High Level Lobby", Icon = "⚔️", File = "anime-dimensions-simulator.lua", GameId = 7274690025 },
     { Name = "Anime Dimensions Simulator - Lobby", Icon = "⚔️", File = "anime-dimensions-simulator.lua", GameId = 6938803436 },
     { Name = "Anime Dimensions Simulator - Raid", Icon = "⚔️", File = "anime-dimensions-simulator.lua", GameId = 7338881230 },
     { Name = "Anime Duelists", Icon = "⚔️", File = "anime-duelists.lua", GameId = 135858844777165 },
+    { Name = "Anime Dungeons - Boss Rush", Icon = "🏰", File = "anime-dungeons.lua", GameId = 71585686583516 },
     { Name = "Anime Dungeons - Demon Train Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 127204771568038 },
     { Name = "Anime Dungeons - Frozen Forest Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 123509790592616 },
     { Name = "Anime Dungeons - Lobby", Icon = "🏰", File = "anime-dungeons-lobby.lua", GameId = 70863683083739 },
     { Name = "Anime Dungeons - Ninja Village Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 109955310601194 },
+    { Name = "Anime Dungeons - Raids", Icon = "🏰", File = "anime-dungeons.lua", GameId = 122377279703567 },
     { Name = "Anime Dungeons - Soul Valley Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 82475659339476 },
     { Name = "Anime Dungeons - Trials", Icon = "🏰", File = "anime-dungeons.lua", GameId = 70972455539417 },
-    { Name = "Anime Dungeons - Raids", Icon = "🏰", File = "anime-dungeons.lua", GameId = 122377279703567 },
-    { Name = "Anime Dungeons - Boss Rush", Icon = "🏰", File = "anime-dungeons.lua", GameId = 71585686583516 },
     { Name = "Anime Powerscaling Card Collection", Icon = "🌟", File = "anime-powerscaling-card-collection.lua", GameId = 85580552562948 },
     { Name = "Anime RNG Defense", Icon = "🏰", File = "anime-rng-defense.lua", GameId = 104693964860826 },
     { Name = "Anime Stars", Icon = "🌠", File = "anime-stars.lua", GameId = 122553263569744 },
     { Name = "Anime Stars Card Collection", Icon = "🌸", File = "anime-stars-card-collection.lua", GameId = 109715918987082 },
     { Name = "Anime Universe", Icon = "🌌", File = "anime-universe.lua", GameId = 95992966043247 },
+
     { Name = "Become an Anime Billionaire", Icon = "💸", File = "become-an-anime-billionaire.lua", GameId = 96891089305948 },
     { Name = "Bomb Fishing", Icon = "🎣", File = "bomb-fishing.lua", GameId = 118677256126351 },
     { Name = "Build a Base and Steal", Icon = "🏯", File = "build-a-base-and-steal.lua", GameId = 132016691802922 },
     { Name = "Build a Base and Steal", Icon = "🏯", File = "build-a-base-and-steal.lua", GameId = 82441325527385 },
     { Name = "Build a Gun Army", Icon = "🔫", File = "build-a-gun-army.lua", GameId = 134162299584012 },
+
     { Name = "Catch and Tame", Icon = "🐒", File = "catch-and-tame.lua", GameId = 96645548064314 },
     { Name = "Chicken Farm", Icon = "🐓", File = "chicken-farm.lua", GameId = 137233438285284 },
     { Name = "Clean the Squishies", Icon = "😻", File = "clean-the-squishies.lua", GameId = 84016394196827 },
     { Name = "Crab Tycoon", Icon = "🦀", File = "crab-tycoon.lua", GameId = 92605157087535 },
     { Name = "Crunch my Butter", Icon = "🧈", File = "crunch-my-butter.lua", GameId = 87555052900625 },
+
     { Name = "Digimon Era", Icon = "🦖", File = "digimon-era.lua", GameId = 77192431769439 },
     { Name = "Dungeon Leveling Origin", Icon = "🏰", File = "dungeon-leveling-origin.lua", GameId = 113526284476060 },
+
     { Name = "Egg Case Farm", Icon = "🥚", File = "egg-case-farm.lua", GameId = 74144293690546 },
     { Name = "Elemental Dungeons - Dungeon", Icon = "🏰", File = "elemental-dungeons.lua", GameId = 10771129745 },
     { Name = "Elemental Dungeons - Raids", Icon = "🏰", File = "elemental-dungeons.lua", GameId = 15278089327 },
+
     { Name = "Fantasy RNG", Icon = "🧚‍♂️", File = "fantasy-rng.lua", GameId = 85167011669131 },
     { Name = "Farm an Island", Icon = "🧑‍🌾", File = "farm-an-island.lua", GameId = 78769336859161 },
+    
     { Name = "Grow it RNG", Icon = "🪴", File = "grow-it-rng.lua", GameId = 78292727217500 },
+
     { Name = "Hatch a Dragon", Icon = "🐲", File = "hatch-a-dragon.lua", GameId = 105420216739306 },
+
     { Name = "Jump to Steal Soccer Players", Icon = "⚽️", File = "jump-to-steal-soccer-players.lua", GameId = 133294838637122 },
+
     { Name = "Loot RNG", Icon = "🗡️", File = "loot-rng.lua", GameId = 118575129990331 },
+
     { Name = "Make a Drill Farm", Icon = "⛏️", File = "make-a-drill-farm.lua", GameId = 79315121100812 },
     { Name = "Make Hotsauce", Icon = "🌶️", File = "make-hotsauce.lua", GameId = 122391683154858 },
     { Name = "Merge a Blackhole", Icon = "🪐", File = "merge-a-blackhole.lua", GameId = 118605709428489 },
@@ -71,27 +82,35 @@ local SCRIPTS = {
     { Name = "My Shrimp Farm", Icon = "🦐", File = "my-shrimp-farm.lua", GameId = 104065269680557 },
     { Name = "My Sword Empire", Icon = "🗡️", File = "my-sword-empire.lua", GameId = 108364799245223 },
     { Name = "My Wood Farm", Icon = "🪵", File = "my-wood-farm.lua", GameId = 79267089300389 },
+
     { Name = "Own a Cafe", Icon = "🍵", File = "own-a-cafe.lua", GameId = 131906518201863 },
+
     { Name = "Pack RNG", Icon = "📦", File = "pack-rng.lua", GameId = 117752943664280 },
     { Name = "Penguin Tycoon", Icon = "🐧", File = "penguin-tycoon.lua", GameId = 89561601601392 },
     { Name = "Place the Keycaps", Icon = "⌨️", File = "place-the-keycaps.lua", GameId = 103984418130080 },
+
     { Name = "RNG Heroes", Icon = "🦸", File = "rng-heroes.lua", GameId = 108307565942574 },
     { Name = "Roll a Keycap", Icon = "⌨️", File = "roll-a-keycap.lua", GameId = 91679585668032 },
-    { Name = "Roll Anime Fighters", Icon = "🎲", File = "roll-anime-fighters.lua", GameId = 115113242795436 },
     { Name = "Roll Anime", Icon = "🎲", File = "roll-anime.lua", GameId = 107706720875645 },
+    { Name = "Roll Anime Fighters", Icon = "🎲", File = "roll-anime-fighters.lua", GameId = 115113242795436 },
     { Name = "Roll to Defend", Icon = "🛡️", File = "roll-to-defend.lua", GameId = 129559579789369 },
+
     { Name = "Scratchy Loot", Icon = "🎰", File = "scratchy-loot.lua", GameId = 78105732598311 },
     { Name = "Snowcone Stand", Icon = "❄️", File = "snowcone-stand.lua", GameId = 76113971506717 },
     { Name = "Soccer Manager", Icon = "🏟️", File = "soccer-manager.lua", GameId = 83988958116126 },
     { Name = "Spin a Car", Icon = "🏎️", File = "spin-a-car.lua", GameId = 136758055891411 },
     { Name = "Spin a Duel Monster", Icon = "🧌", File = "spin-a-duel-monster.lua", GameId = 86789126516616 },
+
     { Name = "Tap Incremental", Icon = "👆", File = "tap-incremental.lua", GameId = 82103875404639 },
     { Name = "Throw a Coin - World 1", Icon = "🪙", File = "throw-a-coin.lua", GameId = 115681808123944 },
     { Name = "Throw a Coin - World 2", Icon = "🪙", File = "throw-a-coin.lua", GameId = 72042130041700 },
     { Name = "Throw a Coin - World 3", Icon = "🪙", File = "throw-a-coin.lua", GameId = 100875131717601 },
     { Name = "Throw a Coin - World 4", Icon = "🪙", File = "throw-a-coin.lua", GameId = 81335362752013 },
+
     { Name = "World Cup Album", Icon = "🏆", File = "world-cup-album.lua", GameId = 71724366181884 },
+
     { Name = "Youtuber Card Collection", Icon = "💻", File = "youtuber-card-collection.lua", GameId = 81440501385895 },
+
     { Name = "Zombie Turret Farm", Icon = "🧟‍♂️", File = "zombie-turret-farm.lua", GameId = 70790155462881 },
 }
 
