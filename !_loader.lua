@@ -9,7 +9,6 @@ local DISCORD_LINK = "https://discord.gg/DHeCNzTypH"
 local VALID_KEYS = {"ilyguys"}
 local KEY_FILE = "IBdihPHub_SavedKey.txt"
 local BASE_URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/"
-local BANNED_USERS = {"8kruo"}
 local LOBBY_PLACE_IDS = {87810101348327}
 local HUB_ICON = "rbxassetid://86226894545369"
 local GAME_COUNT = 66
@@ -117,6 +116,8 @@ local SCRIPTS = {
     
     { Name = "Zombie Turret Farm", Icon = "🧟‍♂️", File = "zombie-turret-farm.lua", GameId = 70790155462881 },
 }
+
+local BANNED_USERS = {"8kruo"}
 
 -- helper functions
 local function trim(s) 
