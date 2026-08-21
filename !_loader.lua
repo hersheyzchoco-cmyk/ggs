@@ -32,6 +32,7 @@ local SCRIPTS = {
     { Name = "Anime Dungeons - Boss Rush", Icon = "🏰", File = "anime-dungeons.lua", GameId = 71585686583516 },
     { Name = "Anime Dungeons - Demon Train Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 127204771568038 },
     { Name = "Anime Dungeons - Frozen Forest Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 123509790592616 },
+    { Name = "Anime Dungeons - Glacial Fortress", Icon = "🏰", File = "anime-dungeons.lua", GameId = 85662046383338 },
     { Name = "Anime Dungeons - Lobby", Icon = "🏰", File = "anime-dungeons-lobby.lua", GameId = 70863683083739 },
     { Name = "Anime Dungeons - Ninja Village Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 109955310601194 },
     { Name = "Anime Dungeons - Raids", Icon = "🏰", File = "anime-dungeons.lua", GameId = 122377279703567 },
