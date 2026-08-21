@@ -15,7 +15,7 @@ local HUB_ICON = "rbxassetid://86226894545369"
 local GAME_COUNT = 66
 
 local SCRIPTS = {
-    { Name = "+1 Wood per Click", Icon = "🪵", File = "%2B1wood-per-click.lua", GameId = 112231208081788 },
+    { Name = "+1 Wood per Click", Icon = "🪵", File = "%2B1-wood-per-click.lua", GameId = 112231208081788 },
     { Name = "+1 Slayer Blade", Icon = "🗡️", File = "%2B1-slayer-blade.lua", GameId = 15744137588 },
     
     { Name = "1 Keyboard = 1$/s", Icon = "⌨️", File = "1keyboard%3D1%24s.lua", GameId = 121003786627094 },
