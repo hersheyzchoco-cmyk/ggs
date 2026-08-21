@@ -118,7 +118,7 @@ local SCRIPTS = {
     { Name = "Zombie Turret Farm", Icon = "🧟‍♂️", File = "zombie-turret-farm.lua", GameId = 70790155462881 },
 }
 
-local BANNED_USERS = {"8kruo"}
+local BANNED_USERS = {"jobjobsahur66778899"}
 
 -- helper functions
 local function trim(s) 
