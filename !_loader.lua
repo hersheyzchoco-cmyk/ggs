@@ -525,7 +525,7 @@ local function buildMainUI(mode)
         new("TextLabel", {
             Size = UDim2.new(1, -20, 0, 50), Position = UDim2.new(0, 10, 0, 84),
             BackgroundTransparency = 1,
-            Text = "Please execute inside one of our supported gamemodes! The script cannot run from this lobby area.",
+            Text = "Please execute inside one of the gamemodes of this game! The script cannot run from this lobby area.",
             TextColor3 = Color3.fromRGB(100, 85, 50), TextSize = 12, Font = Enum.Font.GothamMedium,
             TextXAlignment = Enum.TextXAlignment.Left, TextWrapped = true, ZIndex = 16, Parent = MainNote,
         })
