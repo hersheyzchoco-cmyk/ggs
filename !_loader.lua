@@ -17,7 +17,7 @@ local LOBBY_PLACE_IDS = {
     10515146389, 
 }
 local HUB_ICON = "rbxassetid://86226894545369"
-local GAME_COUNT = 66
+local GAME_COUNT = 67
 
 local SCRIPTS = {
     { Name = "+1 Wood per Click", Icon = "🪵", File = "%2B1-wood-per-click.lua", GameId = 112231208081788 },
