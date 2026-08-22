@@ -1142,10 +1142,14 @@ local gameScript = getGameScript()
 
 if isUserBanned() then
     buildMainUI("Banned")
-elseif isLobbyPlace() then
-    buildMainUI("Lobby")
-elseif isKeyValid(savedKey) and gameScript then
-    launch(gameScript)
+elseif isKeyValid(savedKey) then
+    if isLobbyPlace() then
+        buildMainUI("Lobby")
+    elseif gameScript then
+        launch(gameScript)
+    else
+        buildMainUI("Key") 
+    end
 else
     buildMainUI("Key")
 end
