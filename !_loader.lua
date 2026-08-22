@@ -9,7 +9,13 @@ local DISCORD_LINK = "https://discord.gg/DHeCNzTypH"
 local VALID_KEYS = {"ilyguys"}
 local KEY_FILE = "IBdihPHub_SavedKey.txt"
 local BASE_URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/"
-local LOBBY_PLACE_IDS = {87810101348327}
+local LOBBY_PLACE_IDS = {
+    87810101348327, 
+    106484206883664, 
+    87810101348327, 
+    85809786409351, 
+    10515146389, 
+}
 local HUB_ICON = "rbxassetid://86226894545369"
 local GAME_COUNT = 66
 
