@@ -64,7 +64,7 @@ local SCRIPTS = {
     
     { Name = "Digimon Era", Icon = "🦖", File = "digimon-era.lua", GameId = 77192431769439 },
     { Name = "Dungeon Leveling Origin", Icon = "🏰", File = "dungeon-leveling-origin.lua", GameId = 113526284476060 },
-    { Name = "Dungeon Lootr - Boss Rush / Challenges", Icon = "🏰", File = "dungeon-lootr.lua", GameId = 132285059959516 },
+    { Name = "Dungeon Lootr - Boss Rush / Challenges", Icon = "🏰", File = "dungeon-lootr-boss-rush.lua", GameId = 132285059959516 },
     { Name = "Dungeon Lootr - Dungeons", Icon = "🏰", File = "dungeon-lootr.lua", GameId = 132285059959516 },
     
     { Name = "Egg Case Farm", Icon = "🥚", File = "egg-case-farm.lua", GameId = 74144293690546 },
