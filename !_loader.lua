@@ -179,12 +179,11 @@ local function getGameScript()
     end
 end
 
--- DYNAMIC LAUNCHER: Intercepts script content in RAM and updates links/brands automatically
+-- configure all scripts links
 local function launch(scriptData)
     pcall(function() 
         local rawCode = game:HttpGet(BASE_URL .. scriptData.File)
-        
-        -- Automatic replacement across all 67+ scripts
+
         local patchedCode = rawCode
             :gsub("https://rscripts%.net/@_Hersheyz", "https://rscripts.net/@Prism")
             :gsub("@_Hersheyz", "@Prism")
