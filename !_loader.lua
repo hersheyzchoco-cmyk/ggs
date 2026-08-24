@@ -127,7 +127,7 @@ local SCRIPTS = {
 
 local BANNED_USERS = {"8kruo"}
 
--- Helper functions
+-- helpers
 local function trim(s) 
     return s:gsub("^%s+", ""):gsub("%s+$", "") 
 end
@@ -192,7 +192,7 @@ local function launch(scriptData)
     end)
 end
 
--- UI instantiation utilities
+-- ui installation
 local function new(class, props)
     local inst = Instance.new(class)
     for k, v in pairs(props) do
@@ -213,7 +213,7 @@ local function tween(obj, props, dur, style, dir)
     TweenService:Create(obj, TweenInfo.new(dur or 0.25, style or Enum.EasingStyle.Quart, dir or Enum.EasingDirection.Out), props):Play()
 end
 
--- MAIN UNIFIED INTERFACE BUILDER
+-- unified surface builder
 local function buildMainUI(mode)
     if CoreGui:FindFirstChild("PrismLoader") then 
         CoreGui.PrismLoader:Destroy() 
