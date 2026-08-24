@@ -7,7 +7,7 @@ local LocalPlayer = Players.LocalPlayer
 
 local DISCORD_LINK = "https://discord.gg/DHeCNzTypH"
 local VALID_KEYS = {"ilyguys"}
-local KEY_FILE = "IBdihPHub_SavedKey.txt"
+local KEY_FILE = "PrismHub_SavedKey.txt"
 local BASE_URL = "https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/"
 local LOBBY_PLACE_IDS = {
     87810101348327, 
@@ -16,7 +16,7 @@ local LOBBY_PLACE_IDS = {
     85809786409351, 
     10515146389, 
 }
-local HUB_ICON = "rbxassetid://86226894545369"
+local HUB_ICON = "rbxassetid://98713886566195"
 local GAME_COUNT = 67
 
 local SCRIPTS = {
@@ -127,7 +127,7 @@ local SCRIPTS = {
 
 local BANNED_USERS = {"8kruo"}
 
--- helper functions
+-- Helper functions
 local function trim(s) 
     return s:gsub("^%s+", ""):gsub("%s+$", "") 
 end
@@ -149,7 +149,11 @@ end
 
 local function loadKey()
     local ok, res = pcall(function()
-        return (isfile and readfile and isfile(KEY_FILE)) and readfile(KEY_FILE) or nil
+        if isfile and readfile then
+            if isfile(KEY_FILE) then return readfile(KEY_FILE) end
+            if isfile("IBdihPHub_SavedKey.txt") then return readfile("IBdihPHub_SavedKey.txt") end
+        end
+        return nil
     end)
     return ok and res or nil
 end
@@ -175,9 +179,17 @@ local function getGameScript()
     end
 end
 
+-- DYNAMIC LAUNCHER: Intercepts script content in RAM and updates links/brands automatically
 local function launch(scriptData)
     pcall(function() 
-        loadstring(game:HttpGet(BASE_URL .. scriptData.File))() 
+        local rawCode = game:HttpGet(BASE_URL .. scriptData.File)
+        
+        -- Automatic replacement across all 67+ scripts
+        local patchedCode = rawCode
+            :gsub("https://rscripts%.net/@_Hersheyz", "https://rscripts.net/@Prism")
+            :gsub("@_Hersheyz", "@Prism")
+        
+        loadstring(patchedCode)() 
     end)
 end
 
@@ -203,13 +215,12 @@ local function tween(obj, props, dur, style, dir)
 end
 
 -- MAIN UNIFIED INTERFACE BUILDER
--- mode can be: "Key" | "Banned" | "Lobby"
 local function buildMainUI(mode)
-    if CoreGui:FindFirstChild("IBdihPLoader") then 
-        CoreGui.IBdihPLoader:Destroy() 
+    if CoreGui:FindFirstChild("PrismLoader") then 
+        CoreGui.PrismLoader:Destroy() 
     end
 
-    local Gui = new("ScreenGui", { Name = "IBdihPLoader", ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, Parent = CoreGui })
+    local Gui = new("ScreenGui", { Name = "PrismLoader", ResetOnSpawn = false, IgnoreGuiInset = true, ZIndexBehavior = Enum.ZIndexBehavior.Sibling, Parent = CoreGui })
     local Backdrop = new("Frame", { Size = UDim2.new(1,0,1,0), BackgroundColor3 = Color3.fromRGB(0,0,0), BackgroundTransparency = 1, ZIndex = 1, Parent = Gui })
 
     local Board = new("Frame", {
@@ -472,11 +483,9 @@ local function buildMainUI(mode)
         TextSize = 15, Font = Enum.Font.GothamBold, ZIndex = 18, Parent = GoBtn,
     })
 
-    -- FORWARD DECLARE UI DISMISS FOR LOBBY / CORRECT KEYS
     local closeUI
 
-    -- RENDER BRANCHES DEPENDING ON SCREEN MODE
-    local InputBg, KeyInput, SmallBtnRow, FooterLbl -- setup for references
+    local InputBg, KeyInput, SmallBtnRow, FooterLbl
     local gameScript = getGameScript()
 
     if mode == "Banned" then
@@ -686,7 +695,7 @@ local function buildMainUI(mode)
 
     new("TextLabel", {
         Size = UDim2.new(1, -12, 0, 16), Position = UDim2.new(0, 6, 0, 60),
-        BackgroundTransparency = 1, Text = "IBdihP Hub",
+        BackgroundTransparency = 1, Text = "Prism",
         TextColor3 = Color3.fromRGB(25, 60, 100), TextSize = 15, Font = Enum.Font.GothamBold,
         ZIndex = 16, Parent = BlueNote,
     })
@@ -775,7 +784,7 @@ local function buildMainUI(mode)
 
     new("TextLabel", {
         Size = UDim2.new(1, -14, 0, 16), Position = UDim2.new(0, 7, 1, -22),
-        BackgroundTransparency = 1, Text = "— with love, IBdihP team",
+        BackgroundTransparency = 1, Text = "— with love, Prism team",
         TextColor3 = Color3.fromRGB(160, 80, 100), TextSize = 11, Font = Enum.Font.GothamMedium,
         TextXAlignment = Enum.TextXAlignment.Left, ZIndex = 16, Parent = PinkNote,
     })
