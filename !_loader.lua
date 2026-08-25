@@ -182,6 +182,7 @@ local function getGameScript()
 end
 
 -- configure all scripts links
+-- configure all scripts links
 local function launch(scriptData)
     pcall(function() 
         local rawCode = game:HttpGet(BASE_URL .. scriptData.File)
@@ -189,7 +190,7 @@ local function launch(scriptData)
         local patchedCode = rawCode
             :gsub("https://rscripts%.net/@_Hersheyz", "https://rscripts.net/@Prism")
             :gsub("@_Hersheyz", "@Prism")
-        
+            :gsub("rbxassetid://98713886566195", HUB_ICON)        
         loadstring(patchedCode)() 
     end)
 end
