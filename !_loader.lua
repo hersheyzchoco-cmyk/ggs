@@ -15,7 +15,7 @@ local LOBBY_PLACE_IDS = {
     87810101348327, 
     85809786409351, 
 }
-local HUB_ICON = "rbxassetid://98713886566195"
+local HUB_ICON = "rbxassetid://117487160988921"
 local GAME_COUNT = 67
 
 local SCRIPTS = {
