@@ -114,11 +114,11 @@ local SCRIPTS = {
     { Name = "Spin a Duel Monster", Icon = "🧌", File = "spin-a-duel-monster.lua", GameId = 86789126516616 },
     
     { Name = "Tap Incremental", Icon = "👆", File = "tap-incremental.lua", GameId = 82103875404639 },
-    { Name = "TNT to Earth's Core", Icon = "🧨", File = "tnt-to-earths-core.lua", GameId = 129972079094718 },
     { Name = "Throw a Coin - World 1", Icon = "🪙", File = "throw-a-coin.lua", GameId = 115681808123944 },
     { Name = "Throw a Coin - World 2", Icon = "🪙", File = "throw-a-coin.lua", GameId = 72042130041700 },
     { Name = "Throw a Coin - World 3", Icon = "🪙", File = "throw-a-coin.lua", GameId = 100875131717601 },
     { Name = "Throw a Coin - World 4", Icon = "🪙", File = "throw-a-coin.lua", GameId = 81335362752013 },
+    { Name = "TNT to Earth's Core", Icon = "🧨", File = "tnt-to-earths-core.lua", GameId = 129972079094718 },
     
     { Name = "World Cup Album", Icon = "🏆", File = "world-cup-album.lua", GameId = 71724366181884 },
     
