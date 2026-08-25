@@ -26,7 +26,6 @@ local SCRIPTS = {
     
     { Name = "Airline Idle", Icon = "🛩️", File = "airline-idle.lua", GameId = 70437719899064 },
     { Name = "Anime Astral Simulator", Icon = "🔥", File = "anime-astral-simulator.lua", GameId = 102072869879193 },
-    { Name = "Anime Battles", Icon = "🤺", File = "anime-battles.lua", GameId = 126229277218112 },
     { Name = "Anime Capture", Icon = "🖐", File = "anime-capture.lua", GameId = 94717504417144 },
     { Name = "Anime Card Farm", Icon = "🃏", File = "anime-card-farm.lua", GameId = 125039473548047 },
     { Name = "Anime Dimensions Simulator - Battle", Icon = "⚔️", File = "anime-dimensions-simulator.lua", GameId = 6990129309 },
@@ -44,6 +43,7 @@ local SCRIPTS = {
     { Name = "Anime Dungeons - Soul Valley Dungeon", Icon = "🏰", File = "anime-dungeons.lua", GameId = 82475659339476 },
     { Name = "Anime Dungeons - Trials", Icon = "🏰", File = "anime-dungeons.lua", GameId = 70972455539417 },
     { Name = "Anime Powerscaling Card Collection", Icon = "🌟", File = "anime-powerscaling-card-collection.lua", GameId = 85580552562948 },
+    { Name = "Anime RNG Battles", Icon = "🤺", File = "anime-rng-battles.lua", GameId = 126229277218112 },
     { Name = "Anime RNG Defense", Icon = "🏰", File = "anime-rng-defense.lua", GameId = 104693964860826 },
     { Name = "Anime Stars", Icon = "🌠", File = "anime-stars.lua", GameId = 122553263569744 },
     { Name = "Anime Stars Card Collection", Icon = "🌸", File = "anime-stars-card-collection.lua", GameId = 109715918987082 },
