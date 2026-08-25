@@ -99,6 +99,7 @@ local SCRIPTS = {
     { Name = "Pack RNG", Icon = "📦", File = "pack-rng.lua", GameId = 117752943664280 },
     { Name = "Penguin Tycoon", Icon = "🐧", File = "penguin-tycoon.lua", GameId = 89561601601392 },
     { Name = "Place the Keycaps", Icon = "⌨️", File = "place-the-keycaps.lua", GameId = 103984418130080 },
+    { Name = "Planet RNG", Icon = "🪐", File = "planet-rng.lua", GameId = 107099092059259 },
     
     { Name = "RNG Heroes", Icon = "🦸", File = "rng-heroes.lua", GameId = 108307565942574 },
     { Name = "Roll a Keycap", Icon = "⌨️", File = "roll-a-keycap.lua", GameId = 91679585668032 },
