@@ -65,7 +65,7 @@ local SCRIPTS = {
     { Name = "Dungeon Leveling Origin", Icon = "🏰", File = "dungeon-leveling-origin.lua", GameId = 113526284476060 },
     { Name = "Dungeon Lootr", Icon = "🏰", File = "dungeon-lootr.lua", GameId = 132285059959516 },
     
-    { Name = "Egg Case Farm", Icon = "🥚", File = "egg-case-farm.lua", GameId = 74144293690546 },     , 
+    { Name = "Egg Case Farm", Icon = "🥚", File = "egg-case-farm.lua", GameId = 74144293690546 },     
     { Name = "Elemental Dungeons - Dungeon", Icon = "🏰", File = "elemental-dungeons.lua", GameId = 10771129745 },
     { Name = "Elemental Dungeons - Dungeon", Icon = "🏰", File = "elemental-dungeons.lua", GameId = 10515146389 },
     { Name = "Elemental Dungeons - Raids", Icon = "🏰", File = "elemental-dungeons.lua", GameId = 15278089327 },
