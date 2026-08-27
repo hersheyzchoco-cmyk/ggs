@@ -88,6 +88,6 @@ local poops = ({
 })[game.PlaceId]
 
 if poops then
-    local code = game:HttpGet("https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/" .. poops)
-    loadstring(code)()
+    local url = game:HttpGet("https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/" .. poops)
+    loadstring(url)()
 end
