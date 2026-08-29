@@ -40,6 +40,7 @@ local poops = ({
     [77192431769439]  = "digimon-era.lua",
     [113526284476060] = "dungeon-leveling-origin.lua",
     [132285059959516] = "dungeon-lootr.lua",
+    [106484206883664] = "dungeon-lootr.lua",
     [74144293690546]  = "egg-case-farm.lua",
     [10771129745]     = "elemental-dungeons.lua",
     [10515146389]     = "elemental-dungeons.lua",
