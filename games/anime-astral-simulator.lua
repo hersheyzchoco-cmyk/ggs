@@ -1,3 +1,9 @@
+--!nocheck
+--!nolint
+-- ══════════════════════════════════════════════════════════════════════
+--   PRISM — Anime Astral Simulator
+-- ══════════════════════════════════════════════════════════════════════
+
 local function __main()
 
 local Players            = game:GetService("Players")
@@ -44,6 +50,38 @@ pcall(function()
     local lighting = game:GetService("Lighting")
     lighting.GlobalShadows = false
     lighting.FogEnd = 9e9
+end)
+
+-- ══════════════════════════════════════════
+--   DISCORD LOGGER
+-- ══════════════════════════════════════════
+
+task.spawn(function()
+    local WORKER_URL = "https://ibdihp.hersheyzchoco.workers.dev/"
+    local SECRET     = "this_is_the_best_free_script_hub_arena_ai_goated67"
+    local gName      = "Anime Astral Simulator"
+    pcall(function() gName = MarketplaceService:GetProductInfo(game.PlaceId).Name end)
+    local data = {
+        embeds = {{
+            title  = "Prism -- Execution",
+            color  = 65535,
+            fields = {
+                { name = "User",     value = LocalPlayer.Name,                inline = true },
+                { name = "Executor", value = executorName,                    inline = true },
+                { name = "Game",     value = gName,                           inline = true },
+                { name = "Players",  value = tostring(#Players:GetPlayers()), inline = true },
+            },
+            footer = { text = "Prism - " .. os.date("%x %X") },
+        }}
+    }
+    pcall(function()
+        request({
+            Url     = WORKER_URL,
+            Method  = "POST",
+            Headers = { ["Content-Type"] = "application/json" },
+            Body    = HttpService:JSONEncode({ secret = SECRET, data = data })
+        })
+    end)
 end)
 
 -- ══════════════════════════════════════════
@@ -161,6 +199,7 @@ local aas_codes = {
 -- ══════════════════════════════════════════
 
 local AAS_DIVINE             = "Divine"
+local AAS_ASTRAL             = "Astral"
 local AAS_PRIORITY_WINDOW    = 10
 local AAS_CROW_BALL_GRACE    = 10
 local AAS_WORLD_SWITCH_WAIT  = 10
@@ -2631,19 +2670,19 @@ end)
 function aas_gachaLoop(gachaKey)
     local lastSync = 0
     while S.gachaEnabled[gachaKey] do
-        if S.activeGachaRarities[gachaKey] == AAS_DIVINE then
+        if S.activeGachaRarities[gachaKey] == AAS_ASTRAL then
             S.gachaEnabled[gachaKey] = false
             if Toggles["AutoGacha_"..gachaKey] then Toggles["AutoGacha_"..gachaKey]:SetValue(false) end
-            Library:Notify((S.GachaList[gachaKey] and S.GachaList[gachaKey].Name or gachaKey) .. " - Reached Divine!")
+            Library:Notify((S.GachaList[gachaKey] and S.GachaList[gachaKey].Name or gachaKey) .. " - Reached Astral!")
             break
         end
         pcall(function() aas_gachaRollRemote:Fire(gachaKey) end) task.wait(0.1)
         if tick() - lastSync >= 5 then
             lastSync = tick() pcall(aas_syncAllPlayerData)
-            if S.activeGachaRarities[gachaKey] == AAS_DIVINE then
+            if S.activeGachaRarities[gachaKey] == AAS_ASTRAL then
                 S.gachaEnabled[gachaKey] = false
                 if Toggles["AutoGacha_"..gachaKey] then Toggles["AutoGacha_"..gachaKey]:SetValue(false) end
-                Library:Notify((S.GachaList[gachaKey] and S.GachaList[gachaKey].Name or gachaKey) .. " - Reached Divine!")
+                Library:Notify((S.GachaList[gachaKey] and S.GachaList[gachaKey].Name or gachaKey) .. " - Reached Astral!")
                 break
             end
         end
