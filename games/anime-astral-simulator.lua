@@ -1,9 +1,3 @@
---!nocheck
---!nolint
--- ══════════════════════════════════════════════════════════════════════
---   PRISM — Anime Astral Simulator
--- ══════════════════════════════════════════════════════════════════════
-
 local function __main()
 
 local Players            = game:GetService("Players")
