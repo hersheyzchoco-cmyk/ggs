@@ -163,4 +163,3 @@ discord.MouseButton1Click:Connect(function()
         discord.Text = "Discord"
     end
 end)
-```
