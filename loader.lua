@@ -97,8 +97,12 @@ local poops = {
 local gameFile = poops[game.PlaceId]
 if not gameFile then return end
 
+icon = "rbxassetid://119891081031642"
+
 local function runScript()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/" .. gameFile))()
+    local content = game:HttpGet("https://raw.githubusercontent.com/hersheyzchoco-cmyk/ggs/refs/heads/main/games/" .. gameFile)
+    content = content:gsub("rbxassetid://117487160988921", icon)
+    loadstring(content)()
 end
 
 local keyPath = "PrismKey.txt"
@@ -112,11 +116,9 @@ local frame = Instance.new("Frame", sg)
 frame.Size = UDim2.new(0, 300, 0, 150)
 frame.Position = UDim2.new(0.5, -150, 0.5, -75)
 frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
-
-local corner = Instance.new("UICorner", frame)
+Instance.new("UICorner", frame)
 
 local input = Instance.new("TextBox", frame)
 input.Size = UDim2.new(0.9, 0, 0, 35)
@@ -139,7 +141,7 @@ local discord = Instance.new("TextButton", frame)
 discord.Size = UDim2.new(0.42, 0, 0, 35)
 discord.Position = UDim2.new(0.53, 0, 0.6, 0)
 discord.BackgroundColor3 = Color3.fromRGB(88, 101, 242)
-discord.Text = "Join Discord for Free Key"
+discord.Text = "Join Discord"
 discord.TextColor3 = Color3.fromRGB(255, 255, 255)
 Instance.new("UICorner", discord)
 
@@ -158,8 +160,8 @@ end)
 discord.MouseButton1Click:Connect(function()
     if setclipboard then
         setclipboard("https://discord.gg/DHeCNzTypH")
-        discord.Text = "Copied Link!"
+        discord.Text = "Copied!"
         task.wait(1.5)
-        discord.Text = "Discord"
+        discord.Text = "Join Discord"
     end
 end)
