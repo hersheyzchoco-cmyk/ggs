@@ -1,2954 +1,1950 @@
---!nocheck
 --!nolint
--- ══════════════════════════════════════════════════════════════════════
---   PRISM — Anime Dungeons 
--- ══════════════════════════════════════════════════════════════════════
-
-local Players            = game:GetService("Players")
-local ReplicatedStorage  = game:GetService("ReplicatedStorage")
-local RunService         = game:GetService("RunService")
-local TweenService       = game:GetService("TweenService")
-local UserInputService   = game:GetService("UserInputService")
-local VirtualUser        = game:GetService("VirtualUser")
-local VIM                = game:GetService("VirtualInputManager")
-local HttpService        = game:GetService("HttpService")
-local StatsService       = game:GetService("Stats")
-local PathfindingService = game:GetService("PathfindingService")
-local LocalPlayer        = Players.LocalPlayer
-
--- ══════════════════════════════════════════
---   EXECUTOR DETECTION
--- ══════════════════════════════════════════
-
-local executorName = "Unknown"
-pcall(function()
-    if identifyexecutor then
-        local name, version = identifyexecutor()
-        if type(name) == "string" and name ~= "" then
-            executorName = type(version) == "string" and version ~= "" and (name .. " " .. version) or name
-        end
-    elseif syn then executorName = "Synapse"
-    elseif fluxus then executorName = "Fluxus"
-    elseif KRNL_LOADED then executorName = "KRNL"
-    elseif pebc_execute then executorName = "Pencil"
-    end
-end)
-
--- ══════════════════════════════════════════
---   SESSION STATS
--- ══════════════════════════════════════════
-
-local SessionStats = {
-    startTime       = os.clock(),
-    dungeonsRun     = 0,
-    goldGained      = 0,
-    gemsGained      = 0,
-    itemsObtained   = 0,
-    enemiesDefeated = 0,
-    attacksFired    = 0,
-    skillsCast      = 0,
-}
-
--- ══════════════════════════════════════════
---   DISCORD LOGGER
--- ══════════════════════════════════════════
-
-task.spawn(function()
-    local WORKER_URL = "https://ibdihp.hersheyzchoco.workers.dev/"
-    local SECRET     = "this_is_the_best_free_script_hub_arena_ai_goated67"
-    local gName      = "Anime Dungeons"
-    pcall(function()
-        gName = game:GetService("MarketplaceService"):GetProductInfo(game.PlaceId).Name
-    end)
-    local data = {
-        embeds = {{
-            title  = "Prism -- Execution",
-            color  = 65535,
-            fields = {
-                { name = "User",     value = LocalPlayer.Name,                inline = true },
-                { name = "Executor", value = executorName,                    inline = true },
-                { name = "Game",     value = gName,                           inline = true },
-                { name = "Players",  value = tostring(#Players:GetPlayers()), inline = true },
-            },
-            footer = { text = "Prism - " .. os.date("%x %X") },
-        }}
-    }
-    pcall(function()
-        request({
-            Url     = WORKER_URL,
-            Method  = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body    = HttpService:JSONEncode({ secret = SECRET, data = data })
-        })
-    end)
-end)
-
--- ══════════════════════════════════════════
---   LOAD OBSIDIAN UI
--- ══════════════════════════════════════════
-
-local repo         = "https://raw.githubusercontent.com/joustingmatch/ObsidianUltra/main/"
-local Library      = loadstring(game:HttpGet(repo .. "Library.lua"))()
-
-pcall(function() Library.ScreenGui.Parent = game:GetService("CoreGui") end)
-
-local ThemeManager = loadstring(game:HttpGet(repo .. "addons/ThemeManager.lua"))()
-local SaveManager  = loadstring(game:HttpGet(repo .. "addons/SaveManager.lua"))()
-
-local Toggles = Library.Toggles
-local Options = Library.Options
-
-function isOn(name)
-    if Library.Unloaded then return false end
-    local t = Toggles[name]
-    return type(t) == "table" and t.Value == true
-end
-
-function getNumber(name, fallback)
-    local o = Options[name]
-    return (type(o) == "table" and tonumber(o.Value)) or fallback
-end
-
-function copyText(text, msg)
-    if setclipboard then setclipboard(text)
-    elseif toclipboard then toclipboard(text) end
-    Library:Notify(msg or "Copied to clipboard!")
-end
-
--- ══════════════════════════════════════════
---   WAIT FOR CHARACTER
--- ══════════════════════════════════════════
-
-function ad_waitForCharacter()
-    local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    while not char:FindFirstChild("HumanoidRootPart") do
-        task.wait(0.1)
-        char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-    end
-    return char
-end
-
-ad_waitForCharacter()
-
--- ══════════════════════════════════════════
---   REMOTES
--- ══════════════════════════════════════════
-
-local Remotes         = ReplicatedStorage:WaitForChild("Remotes")
-local ad_Attack       = Remotes:WaitForChild("Attack")
-local ad_StartDungeon = Remotes:WaitForChild("StartDungeon")
-local ad_Dungeon      = Remotes:WaitForChild("Dungeon")
-local ad_SP           = Remotes:WaitForChild("SP")
-local ad_Equip        = Remotes:WaitForChild("Equip")
-local ad_Quest        = Remotes:WaitForChild("Quest")
-local ad_DailySpin    = Remotes:WaitForChild("DailySpin")
-local ad_CosmeticSpin = Remotes:WaitForChild("CosmeticSpin")
-
--- ══════════════════════════════════════════
---   CONFIG DATA
--- ══════════════════════════════════════════
-
-local ad_spellData  = {}
-local ad_armorData  = {}
-local ad_rarityRank = {
-    Common = 1, Rare = 2, Epic = 3,
-    Legendary = 4, Mythic = 5, Secret = 6,
-}
-
-pcall(function()
-    local spellStats = require(ReplicatedStorage:WaitForChild("Stats"):WaitForChild("SpellStats"))
-    if spellStats then
-        for spellId, info in pairs(spellStats) do
-            if info.Type == "Spell" and not info.EnemyOnly then
-                ad_spellData[spellId] = {
-                    id               = spellId,
-                    name             = info.Name or spellId,
-                    rarity           = info.Rarity or "Common",
-                    rarityRank       = ad_rarityRank[info.Rarity] or 0,
-                    damageType       = info.DamageType or "Strength",
-                    cooldown         = info.CoolDown or 5,
-                    isUltimate       = info.Ultimate == true,
-                    description      = info.Description or "",
-                    damageMultiplier = tonumber(info.DamageMultiplier) or 0,
-                }
-            end
-        end
-    end
-end)
-
-pcall(function()
-    local armorStats = require(ReplicatedStorage:WaitForChild("Stats"):WaitForChild("ArmorStats"))
-    if armorStats then ad_armorData = armorStats end
-end)
-
--- ══════════════════════════════════════════
---   STATE & FARM CONFIGURATION (1:1 LOOTR)
--- ══════════════════════════════════════════
-
-local ad_isLoadingConfig     = false
-local ad_farm_paused         = false
-local ad_farm_mode           = "Above Head"
-local ad_farm_method         = "Teleport"
-local ad_farm_height         = 11
-local ad_farm_orbit_speed    = 1.8
-local ad_farm_orbit_radius   = 14
-local ad_tween_speed         = 95
-
-local ad_selected_stat       = "Strength"
-local ad_weapon_priority     = "Balanced"
-local ad_armor_priority      = "Balanced"
-local ad_helmet_priority     = "Balanced"
-local ad_hero_priority       = "Tank"
-local ad_virus_action        = "Engage"
-
-local currentTarget          = nil
-local adf_currentTarget      = nil
-local adf_moveConnection     = nil
-local adf_orbitAngle         = 0
-local adf_activeTween        = nil
-local adf_isTransitioning    = false
-local characterParts         = {}
-
-local ad_equipDoneWeapon     = false
-local ad_equipDoneArmor      = false
-local ad_equipDoneHelmet     = false
-local ad_equipDoneSpells     = false
-local ad_equipDoneUlt        = false
-local ad_equipDoneHeroes     = false
-
-local ad_sell_weapon_rarities  = {}
-local ad_sell_armor_rarities   = {}
-local ad_sell_helmet_rarities  = {}
-local ad_sell_spell_rarities   = {}
-local ad_sell_ult_rarities     = {}
-local ad_sell_batch_delay      = 0.20
-local ad_sell_skip_equipped    = true
-local ad_sell_skip_favorites   = true
-
--- ══════════════════════════════════════════
---   WEBHOOK STATE
--- ══════════════════════════════════════════
-
-local wh_url            = ""
-local wh_userId         = ""
-local wh_pingEnabled    = false
-local wh_isSending      = false
-local wh_dungeonActive  = false
-local wh_sessionItems   = {}
-local wh_startGold      = 0
-local wh_startGems      = 0
-local wh_startExp       = 0
-local wh_startEnemies   = 0
-local wh_startViruses   = 0
-local wh_pingRarities   = {}
-local wh_pingCategories = {}
-
-local wh_rarityOrder = {
-    Secret = 1, Mythic = 2, Legendary = 3,
-    Epic = 4, Rare = 5, Common = 6,
-}
-
-function wh_requestFunc(options)
-    local fn = (syn and syn.request)
-            or (http and http.request)
-            or http_request
-            or (fluxus and fluxus.request)
-            or request
-            or (getgenv and getgenv().request)
-    if fn then return fn(options) end
-end
-
-function wh_formatNumber(n)
-    n = math.floor(n or 0)
-    if n >= 1000000000 then return string.format("%.1fB", n / 1000000000)
-    elseif n >= 1000000 then return string.format("%.1fM", n / 1000000)
-    elseif n >= 1000    then return string.format("%.1fK", n / 1000)
-    end
-    return tostring(n)
-end
-
-function wh_rarityColor(rarity)
-    local colors = {
-        Common    = 0x9e9e9e, Rare      = 0x2196f3,
-        Epic      = 0x9c27b0, Legendary = 0xffc107,
-        Mythic    = 0xf44336, Secret    = 0xff69b4,
-    }
-    return colors[rarity] or 0x00ff88
-end
-
-function wh_rarityEmoji(rarity)
-    local emojis = {
-        Common = "⚪", Rare = "🔵", Epic = "🟣",
-        Legendary = "🟡", Mythic = "🔴", Secret = "🌈",
-    }
-    return emojis[rarity] or "⚪"
-end
-
-function wh_shouldPingForItem(rarity, category)
-    if not wh_pingEnabled then return false end
-
-    local rarityMatch = false
-    if next(wh_pingRarities) == nil then
-        rarityMatch = true
-    else
-        rarityMatch = (wh_pingRarities[rarity] == true)
-    end
-
-    local categoryMatch = false
-    if next(wh_pingCategories) == nil then
-        categoryMatch = true
-    else
-        categoryMatch = (wh_pingCategories[category] == true)
-    end
-
-    return rarityMatch and categoryMatch
-end
-
-function wh_snapshotStats()
-    if wh_dungeonActive then return end
-    wh_dungeonActive = true
-    wh_sessionItems  = {}
-    local ps = LocalPlayer:FindFirstChild("PlayerStats")
-    if ps then
-        wh_startGold    = (ps:FindFirstChild("Gold")            and ps.Gold.Value)            or 0
-        wh_startGems    = (ps:FindFirstChild("Gems")            and ps.Gems.Value)            or 0
-        wh_startExp     = (ps:FindFirstChild("Exp")             and ps.Exp.Value)             or 0
-        wh_startEnemies = (ps:FindFirstChild("EnemiesDefeated") and ps.EnemiesDefeated.Value) or 0
-        wh_startViruses = (ps:FindFirstChild("VirusesDefeated") and ps.VirusesDefeated.Value) or 0
-    end
-end
-
-function ad_isHelmetByName(n)
-    local c = ad_armorData[n]
-    return c and c.TypeSpecific == "Helmet"
-end
-
-function ad_isBodyArmorByName(n)
-    local c = ad_armorData[n]
-    return c and c.Type == "Armor" and c.TypeSpecific ~= "Helmet"
-end
-
-function wh_sendWebhook()
-    if wh_isSending        then return end
-    if not wh_dungeonActive then return end
-    if wh_url == ""         then return end
-    wh_isSending     = true
-    wh_dungeonActive = false
-    task.wait(2)
-
-    local ps            = LocalPlayer:FindFirstChild("PlayerStats")
-    local goldGained    = ps and ps:FindFirstChild("Gold")            and math.max(0, ps.Gold.Value            - wh_startGold)    or 0
-    local gemsGained    = ps and ps:FindFirstChild("Gems")            and math.max(0, ps.Gems.Value            - wh_startGems)    or 0
-    local expGained     = ps and ps:FindFirstChild("Exp")             and math.max(0, ps.Exp.Value             - wh_startExp)     or 0
-    local enemiesKilled = ps and ps:FindFirstChild("EnemiesDefeated") and math.max(0, ps.EnemiesDefeated.Value - wh_startEnemies) or 0
-    local virusesKilled = ps and ps:FindFirstChild("VirusesDefeated") and math.max(0, ps.VirusesDefeated.Value - wh_startViruses) or 0
-    local currentLevel  = ps and ps:FindFirstChild("Level")           and ps.Level.Value or 0
-
-    table.sort(wh_sessionItems, function(a, b)
-        return (wh_rarityOrder[a.Rarity] or 6) < (wh_rarityOrder[b.Rarity] or 6)
-    end)
-
-    local itemLines = {}
-    for _, item in ipairs(wh_sessionItems) do
-        table.insert(itemLines,
-            wh_rarityEmoji(item.Rarity) ..
-            " **" .. item.Name .. "** ─ *" .. item.Rarity .. "*"
-        )
-    end
-
-    local itemDisplay = #itemLines > 0 and table.concat(itemLines, "\n") or "*No items dropped this run.*"
-    local embedColor  = #wh_sessionItems > 0 and wh_rarityColor(wh_sessionItems[1].Rarity) or 0x00ff88
-
-    local shouldPing  = false
-    if wh_pingEnabled and wh_userId ~= "" then
-        for _, item in ipairs(wh_sessionItems) do
-            if wh_shouldPingForItem(item.Rarity, item.Category) then shouldPing = true break end
-        end
-    end
-
-    local pingContent = shouldPing and ("<@" .. wh_userId .. ">") or ""
-
-    local data = {
-        content = pingContent,
-        embeds  = {{
-            title       = "🏆  Dungeon Complete!",
-            description = "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-            color       = embedColor,
-            fields      = {
-                { name = "👤  Player",          value = "```" .. LocalPlayer.Name .. "```",                   inline = true  },
-                { name = "⚔️  Level",            value = "```" .. tostring(currentLevel) .. "```",            inline = true  },
-                { name = "‎",                    value = "‎",                                                   inline = false },
-                { name = "💰  Gold Earned",      value = "```+" .. wh_formatNumber(goldGained)    .. "```",   inline = true  },
-                { name = "💎  Gems Earned",      value = "```+" .. wh_formatNumber(gemsGained)    .. "```",   inline = true  },
-                { name = "📈  EXP Gained",       value = "```+" .. wh_formatNumber(expGained)     .. "```",   inline = true  },
-                { name = "💀  Enemies Killed",   value = "```"  .. tostring(enemiesKilled)        .. "```",   inline = true  },
-                { name = "🦠  Viruses Defeated", value = "```"  .. tostring(virusesKilled)        .. "```",   inline = true  },
-                { name = "‎",                    value = "‎",                                                   inline = false },
-                { name = "🎁  Items Dropped (" .. tostring(#wh_sessionItems) .. ")", value = itemDisplay, inline = false },
-            },
-            footer    = { text = "Prism  •  Anime Dungeons  •  " .. os.date("%x %X") },
-            timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-        }}
-    }
-
-    pcall(function()
-        wh_requestFunc({
-            Url     = wh_url,
-            Method  = "POST",
-            Headers = { ["Content-Type"] = "application/json" },
-            Body    = HttpService:JSONEncode(data),
-        })
-    end)
-
-    SessionStats.dungeonsRun = SessionStats.dungeonsRun + 1
-    SessionStats.goldGained = SessionStats.goldGained + goldGained
-    SessionStats.gemsGained = SessionStats.gemsGained + gemsGained
-    SessionStats.enemiesDefeated = SessionStats.enemiesDefeated + enemiesKilled
-
-    wh_sessionItems = {}
-    task.wait(5)
-    wh_isSending = false
-end
-
-LocalPlayer:WaitForChild("Inventory").ChildAdded:Connect(function(child)
-    if not wh_dungeonActive then return end
-    task.wait(0.3)
-    local rarity = child:GetAttribute("Rarity") or "Common"
-    local itemType = child:GetAttribute("Type") or "Unknown"
-
-    local category = "Unknown"
-    if itemType == "Weapon" then
-        category = "Weapon"
-    elseif itemType == "Armor" then
-        if ad_isHelmetByName(child.Name) then
-            category = "Helmet"
-        else
-            category = "Armor"
-        end
-    elseif itemType == "Spell" then
-        local data = ad_spellData[child.Name]
-        if data and data.isUltimate then
-            category = "Ultimate"
-        else
-            category = "Spell"
-        end
-    end
-
-    table.insert(wh_sessionItems, { Name = child.Name, Rarity = rarity, Category = category })
-    SessionStats.itemsObtained = SessionStats.itemsObtained + 1
-end)
-
-task.spawn(function()
-    local gf = workspace:WaitForChild("Game", 30)
-    if not gf then return end
-    local dsv = gf:WaitForChild("DungeonStarted", 30)
-    if not dsv then return end
-    dsv:GetPropertyChangedSignal("Value"):Connect(function()
-        if dsv.Value == true then
-            wh_snapshotStats()
-        elseif dsv.Value == false then
-            task.spawn(wh_sendWebhook)
-        end
-    end)
-end)
-
-ad_Dungeon.OnClientEvent:Connect(function(action)
-    if action == "ShowDungeonStats" then
-        task.spawn(wh_sendWebhook)
-    end
-end)
-
--- ══════════════════════════════════════════
---   BASIC HELPERS
--- ══════════════════════════════════════════
-
-function ad_getHRP()
-    local char = LocalPlayer.Character
-    if not char then return nil end
-    return char:FindFirstChild("HumanoidRootPart")
-end
-
-function getHumanoid()
-    local char = LocalPlayer.Character
-    return char and char:FindFirstChildOfClass("Humanoid")
-end
-
-function makeVec(x, y, z)
-    if rawget(_G, "vector") and vector.create then
-        return vector.create(x, y, z)
-    end
-    return Vector3.new(x, y, z)
-end
-
-function updateCharParts(char)
-    table.clear(characterParts)
-    if not char then return end
-    for _, p in ipairs(char:GetDescendants()) do
-        if p:IsA("BasePart") then
-            table.insert(characterParts, p)
-        end
-    end
-end
-
-LocalPlayer.CharacterAdded:Connect(function(char)
-    updateCharParts(char)
-    local childAdded = char.DescendantAdded:Connect(function(p)
-        if p:IsA("BasePart") then table.insert(characterParts, p) end
-    end)
-    local childRemoved = char.DescendantRemoving:Connect(function(p)
-        local idx = table.find(characterParts, p)
-        if idx then table.remove(characterParts, idx) end
-    end)
-    local deathConn
-    deathConn = char:WaitForChild("Humanoid").Died:Connect(function()
-        childAdded:Disconnect()
-        childRemoved:Disconnect()
-        deathConn:Disconnect()
-    end)
-end)
-
-if LocalPlayer.Character then
-    updateCharParts(LocalPlayer.Character)
-end
-
--- ══════════════════════════════════════════
---   DUNGEON STATE DETECTION
--- ══════════════════════════════════════════
-
-function ad_isDungeonComplete()
-    local ok, result = pcall(function()
-        local pg = LocalPlayer:FindFirstChild("PlayerGui")
-        if not pg then return false end
-        local main = pg:FindFirstChild("Main")
-        if not main or (main:IsA("ScreenGui") and not main.Enabled) then return false end
-        local df = main:FindFirstChild("DungeonFrame")
-        if not df or (df:IsA("GuiObject") and not df.Visible) then return false end
-        local ds = df:FindFirstChild("DungeonStats")
-        if not ds or (ds:IsA("GuiObject") and not ds.Visible) then return false end
-        local ea = ds:FindFirstChild("EndActions")
-        if not ea or (ea:IsA("GuiObject") and not ea.Visible) then return false end
-        local pa = ea:FindFirstChild("PlayAgain")
-        if not pa or (pa:IsA("GuiObject") and not pa.Visible) then return false end
-        return true
-    end)
-    return ok and result
-end
-
-function ad_isDungeonNotStarted()
-    local gf = workspace:FindFirstChild("Game")
-    if not gf then return false end
-    local s = gf:FindFirstChild("DungeonStarted")
-    return s and s.Value == false
-end
-
--- ══════════════════════════════════════════
---   PRISM MOVEMENT & PHYSICS (1:1 LOOTR)
--- ══════════════════════════════════════════
-
-function ad_cancelTween()
-    if adf_activeTween then
-        pcall(function() adf_activeTween:Cancel() end)
-        adf_activeTween = nil
-    end
-end
-
-function ad_resetPhysics()
-    local hrp = ad_getHRP()
-    if not hrp then return end
-    hrp.Velocity    = Vector3.zero
-    hrp.RotVelocity = Vector3.zero
-    pcall(function() hrp.AssemblyLinearVelocity  = Vector3.zero end)
-    pcall(function() hrp.AssemblyAngularVelocity = Vector3.zero end)
-    local hum = getHumanoid()
-    if hum then hum:ChangeState(Enum.HumanoidStateType.GettingUp) end
-end
-
-function ad_directTeleport(targetCF)
-    local hrp = ad_getHRP()
-    if not hrp then return end
-    ad_cancelTween()
-    hrp.CFrame = targetCF
-    ad_resetPhysics()
-end
-
-function ad_tweenTo(targetCF, speedOverride)
-    local hrp = ad_getHRP()
-    if not hrp then return end
-    local dist = (targetCF.Position - hrp.Position).Magnitude
-    if dist < 1 then return end
-    ad_cancelTween()
-    local speed = speedOverride or ad_tween_speed
-    local t    = math.clamp(dist / speed, 0.05, 3.0)
-    local info = TweenInfo.new(t, Enum.EasingStyle.Sine, Enum.EasingDirection.Out)
-    local ok, tween = pcall(function()
-        return TweenService:Create(hrp, info, { CFrame = targetCF })
-    end)
-    if not ok or not tween then return end
-    adf_activeTween = tween
-    tween.Completed:Connect(function(state)
-        if state == Enum.PlaybackState.Completed then ad_resetPhysics() end
-        if adf_activeTween == tween then adf_activeTween = nil end
-    end)
-    tween:Play()
-    return tween
-end
-
-function ad_moveTo(targetCF)
-    if ad_farm_method == "Teleport" then
-        ad_directTeleport(targetCF)
-    else
-        ad_tweenTo(targetCF)
-    end
-end
-
-function ad_pathfindTweenTo(targetPosition, speed)
-    local hrp = ad_getHRP()
-    if not hrp then return false end
-    speed = speed or 45
-
-    local path = PathfindingService:CreatePath({
-        AgentRadius = 3.0,
-        AgentHeight = 5.0,
-        AgentCanJump = true,
-        AgentJumpHeight = 8.0,
-        AgentMaxSlope = 45,
-        WaypointSpacing = 4.0,
-    })
-
-    local success, err = pcall(function()
-        path:ComputeAsync(hrp.Position, targetPosition)
-    end)
-
-    if not success or path.Status ~= Enum.PathStatus.Success then
-        return false
-    end
-
-    local waypoints = path:GetWaypoints()
-    if #waypoints < 2 then
-        return false
-    end
-
-    for i = 2, #waypoints do
-        if Library.Unloaded then return false end
-        local waypoint = waypoints[i]
-        local wpPos = waypoint.Position + Vector3.new(0, 3.0, 0)
-        local currentHRP = ad_getHRP()
-        if not currentHRP then return false end
-
-        local dist = (currentHRP.Position - wpPos).Magnitude
-        if dist > 0.5 then
-            local tweenTime = dist / speed
-            local info = TweenInfo.new(tweenTime, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
-            local tween = TweenService:Create(currentHRP, info, { CFrame = CFrame.new(wpPos) })
-
-            adf_activeTween = tween
-            tween:Play()
-
-            local startT = tick()
-            while tween.PlaybackState == Enum.PlaybackState.Playing and (tick() - startT) < (tweenTime + 0.2) do
-                task.wait()
-            end
-
-            pcall(function() tween:Cancel() end)
-            adf_activeTween = nil
-        end
-    end
-
-    local finalHRP = ad_getHRP()
-    if finalHRP then
-        finalHRP.CFrame = CFrame.new(targetPosition + Vector3.new(0, 3.0, 0))
-    end
-    return true
-end
-
--- ══════════════════════════════════════════
---   ENEMY TARGETING ENGINE
--- ══════════════════════════════════════════
-
-function adf_isEnemyAlive(enemy)
-    if not enemy or not enemy.Parent then return false end
-    local hv = enemy:FindFirstChild("Health", true)
-    if hv and hv:IsA("NumberValue") and hv.Value <= 0 then return false end
-    local hd = enemy:FindFirstChild("HasDied", true)
-    if hd and hd:IsA("BoolValue") and hd.Value then return false end
-    local hum = enemy:FindFirstChildOfClass("Humanoid")
-    if hum and hum.Health <= 0 then return false end
-    return true
-end
-
-function adf_getEnemyPart(enemy)
-    if not enemy or not enemy.Parent then return nil end
-    return enemy:FindFirstChild("Bot")
-        or enemy:FindFirstChild("HumanoidRootPart")
-        or enemy:FindFirstChild("Root")
-        or enemy.PrimaryPart
-        or enemy:FindFirstChildWhichIsA("BasePart", true)
-end
-
-function adf_getEnemies()
-    local results = {}
-    local gf = workspace:FindFirstChild("Game")
-    if not gf then return results end
-    local ef = gf:FindFirstChild("Enemies")
-    if not ef then return results end
-    for _, e in ipairs(ef:GetChildren()) do
-        if e:IsA("Model") and adf_isEnemyAlive(e) then
-            local p = adf_getEnemyPart(e)
-            if p and p:IsA("BasePart") then
-                table.insert(results, { model = e, part = p })
-            end
-        end
-    end
-    return results
-end
-
-function adf_isValidTarget(t)
-    if not t then return false end
-    if not t.model or not t.model.Parent then return false end
-    if not t.part  or not t.part.Parent  then return false end
-    return adf_isEnemyAlive(t.model)
-end
-
-function adf_pickTarget()
-    if adf_isValidTarget(adf_currentTarget) then return adf_currentTarget end
-    adf_currentTarget = nil
-    local hrp = ad_getHRP()
-    if not hrp then return nil end
-    local closest, closestDist = nil, math.huge
-    for _, e in ipairs(adf_getEnemies()) do
-        local d = (e.part.Position - hrp.Position).Magnitude
-        if d < closestDist then closestDist = d; closest = e end
-    end
-    adf_currentTarget = closest
-    return adf_currentTarget
-end
-
--- ══════════════════════════════════════════
---   TELEPORT PAD AUTO PROGRESSION
--- ══════════════════════════════════════════
-
-function adTP_getNearestTeleportPad()
-    local gf = workspace:FindFirstChild("Game")
-    if not gf then return nil, math.huge end
-    local tps = gf:FindFirstChild("Teleports")
-    if not tps then return nil, math.huge end
-    local hrp = ad_getHRP()
-    if not hrp then return nil, math.huge end
-    local nearest, nearestDist = nil, math.huge
-    for _, tp in ipairs(tps:GetChildren()) do
-        local hitbox = tp:FindFirstChild("HitBox") or tp:FindFirstChildWhichIsA("BasePart")
-        if hitbox and hitbox:IsA("BasePart") then
-            local d = (hitbox.Position - hrp.Position).Magnitude
-            if d < nearestDist then
-                nearestDist = d
-                nearest = hitbox
-            end
-        end
-    end
-    return nearest, nearestDist
-end
-
-function adf_checkAndHandleTeleportPad()
-    if adf_isTransitioning then return true end
-    if #adf_getEnemies() > 0 then return false end
-
-    local hrp = ad_getHRP()
-    if not hrp then return false end
-
-    local padHitBox, padDist = adTP_getNearestTeleportPad()
-    if padHitBox and padDist <= 110 then
-        adf_isTransitioning = true
-        ad_cancelTween()
-
-        local targetCF = CFrame.new(padHitBox.Position + Vector3.new(0, padHitBox.Size.Y / 2 + 3, 0))
-        local tweenTime = math.clamp(padDist / 45, 0.4, 2.5)
-
-        local tweenInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Linear)
-        local ok, tween = pcall(function()
-            return TweenService:Create(hrp, tweenInfo, { CFrame = targetCF })
-        end)
-
-        if ok and tween then
-            adf_activeTween = tween
-            tween.Completed:Connect(function()
-                adf_activeTween = nil
-                ad_resetPhysics()
-                task.wait(1.5)
-                adf_currentTarget = nil
-                currentTarget = nil
-                adf_isTransitioning = false
-            end)
-            tween:Play()
-            return true
-        else
-            adf_isTransitioning = false
-        end
-    end
-    return false
-end
-
--- ══════════════════════════════════════════
---   FARM MOVEMENT & SEQUENTIAL ENGINE (1:1 LOOTR)
--- ══════════════════════════════════════════
-
-function adf_stopMovement()
-    if adf_moveConnection then
-        adf_moveConnection:Disconnect()
-        adf_moveConnection = nil
-    end
-    ad_cancelTween()
-    currentTarget       = nil
-    adf_currentTarget   = nil
-    adf_orbitAngle      = 0
-    adf_isTransitioning = false
-end
-
-function adf_startMovement()
-    if adf_moveConnection then return end
-    adf_orbitAngle      = 0
-    adf_isTransitioning = false
-
-    adf_moveConnection = RunService.Stepped:Connect(function(_, dt)
-        if Library.Unloaded or not isOn("AutoFarm") then adf_stopMovement(); return end
-        if ad_farm_paused then return end
-        if adf_isTransitioning then return end
-
-        local hrp = ad_getHRP()
-        if not hrp then return end
-
-        function calculateTargetCFrame(targetPart)
-            if not targetPart then return nil end
-            local enemyPos = targetPart.Position
-            local targetCF = nil
-
-            if ad_farm_mode == "Above Head" then
-                local pos = enemyPos + Vector3.new(0, ad_farm_height, 0)
-                targetCF  = CFrame.new(pos, enemyPos)
-            elseif ad_farm_mode == "Orbiting" then
-                adf_orbitAngle = (adf_orbitAngle + ad_farm_orbit_speed * dt) % (math.pi * 2)
-                local pos = enemyPos + Vector3.new(
-                    math.cos(adf_orbitAngle) * ad_farm_orbit_radius,
-                    ad_farm_height,
-                    math.sin(adf_orbitAngle) * ad_farm_orbit_radius
-                )
-                targetCF = CFrame.new(pos, enemyPos)
-            elseif ad_farm_mode == "Behind" then
-                local backVec = targetPart.CFrame.LookVector * -6
-                targetCF = CFrame.new(enemyPos + backVec, enemyPos)
-            elseif ad_farm_mode == "Same Level" then
-                targetCF = CFrame.new(enemyPos + Vector3.new(0, 0, 4), enemyPos)
-            elseif ad_farm_mode == "Under" then
-                local pos = enemyPos - Vector3.new(0, ad_farm_height, 0)
-                targetCF = CFrame.new(pos, enemyPos)
-            end
-            return targetCF
-        end
-
-        local enemies = adf_getEnemies()
-
-        if #enemies > 0 then
-            local target = adf_pickTarget()
-            if not target then return end
-            currentTarget = target.model
-
-            local targetCF = calculateTargetCFrame(target.part)
-            if targetCF then
-                ad_moveTo(targetCF)
-            end
-        else
-            currentTarget = nil
-            if adf_checkAndHandleTeleportPad() then return end
-        end
-    end)
-end
-
--- ══════════════════════════════════════════
---   FAST EQUIP SYSTEM
--- ══════════════════════════════════════════
-
-function adeq_fire(action, item, slot)
-    pcall(function() ad_Equip:FireServer(action, item, slot) end)
-end
-
-function adeq_oldHP(i)    return i:GetAttribute("OldHealth")   or 0 end
-function adeq_oldSTR(i)   return i:GetAttribute("OldStrength") or 0 end
-function adeq_oldMAG(i)   return i:GetAttribute("OldMagic")    or 0 end
-function adeq_total(i)    return adeq_oldHP(i) + adeq_oldSTR(i) + adeq_oldMAG(i) end
-function adeq_isLoaded(i) return adeq_total(i) > 0 end
-
-function adeq_waitForLoaded(item, timeout)
-    local t = tick()
-    while tick() - t < timeout do
-        if adeq_isLoaded(item) then return true end
-        task.wait(0.05)
-    end
-    return false
-end
-
-function adeq_waitForSlot(item, slot, timeout)
-    local t = tick()
-    while tick() - t < timeout do
-        if item:GetAttribute("Equipped") == true and item:GetAttribute("Slot") == slot then return true end
-        task.wait(0.05)
-    end
-    return false
-end
-
-function adeq_waitForUnequip(item, timeout)
-    local t = tick()
-    while tick() - t < timeout do
-        if not item:GetAttribute("Equipped") then return true end
-        task.wait(0.05)
-    end
-    return false
-end
-
-function adeq_getInv()
-    return LocalPlayer:FindFirstChild("Inventory")
-end
-
-function adeq_getEquippedInSlot(slot)
-    local inv = adeq_getInv()
-    if not inv then return nil end
-    for _, item in ipairs(inv:GetChildren()) do
-        if item:GetAttribute("Equipped") == true and item:GetAttribute("Slot") == slot then
-            return item
-        end
-    end
-end
-
-function adeq_collect(typeAttr, filterFn)
-    local inv = adeq_getInv()
-    if not inv then return {} end
-    local t = {}
-    for _, i in ipairs(inv:GetChildren()) do
-        if i:GetAttribute("Type") == typeAttr then
-            if not filterFn or filterFn(i) then table.insert(t, i) end
-        end
-    end
-    return t
-end
-
-function adeq_score(item, priority)
-    if priority == "Warrior" then return adeq_oldSTR(item) * 1000 + adeq_total(item)
-    elseif priority == "Tank" then return adeq_oldHP(item) * 1000 + adeq_total(item)
-    elseif priority == "Magic" then return adeq_oldMAG(item) * 1000 + adeq_total(item)
-    else return adeq_total(item) end
-end
-
-function adeq_sort(items, priority)
-    table.sort(items, function(a, b)
-        local sa, sb = adeq_score(a, priority), adeq_score(b, priority)
-        if sa ~= sb then return sa > sb end
-        local ta, tb = adeq_total(a), adeq_total(b)
-        if ta ~= tb then return ta > tb end
-        local la = a:GetAttribute("Level") or 0
-        local lb = b:GetAttribute("Level") or 0
-        if la ~= lb then return la > lb end
-        return tostring(a:GetAttribute("ItemId") or "") < tostring(b:GetAttribute("ItemId") or "")
-    end)
-end
-
-function adeq_fastPrime(items, equipAction, primeSlot)
-    local unprimed = {}
-    for _, item in ipairs(items) do
-        if not adeq_isLoaded(item) then table.insert(unprimed, item) end
-    end
-    if #unprimed == 0 then return end
-    for _, item in ipairs(unprimed) do
-        local occupant = adeq_getEquippedInSlot(primeSlot)
-        if occupant then
-            adeq_fire("Unequip", occupant, primeSlot)
-            adeq_waitForUnequip(occupant, 1)
-            task.wait(0.03)
-        end
-        adeq_fire(equipAction, item, primeSlot)
-        adeq_waitForLoaded(item, 1.5)
-        adeq_fire("Unequip", item, primeSlot)
-        adeq_waitForUnequip(item, 1)
-        task.wait(0.03)
-    end
-end
-
-function adeq_doEquipWeapon(priority)
-    local items = adeq_collect("Weapon")
-    if #items == 0 then return nil end
-    local current = adeq_getEquippedInSlot("Weapon")
-    if current then adeq_fire("Unequip", current, "Weapon") adeq_waitForUnequip(current, 1.5) task.wait(0.05) end
-    adeq_fastPrime(items, "Weapon", "Weapon")
-    adeq_sort(items, priority)
-    local best = items[1]
-    adeq_fire("Weapon", best, "Weapon")
-    adeq_waitForSlot(best, "Weapon", 2)
-    return best.Name
-end
-
-function adeq_doEquipArmor(priority)
-    local items = adeq_collect("Armor", function(i) return ad_isBodyArmorByName(i.Name) end)
-    if #items == 0 then return nil end
-    local current = adeq_getEquippedInSlot("Armor")
-    if current then adeq_fire("Unequip", current, "Armor") adeq_waitForUnequip(current, 1.5) task.wait(0.05) end
-    adeq_fastPrime(items, "Armor", "Armor")
-    adeq_sort(items, priority)
-    local best = items[1]
-    adeq_fire("Armor", best, "Armor")
-    adeq_waitForSlot(best, "Armor", 2)
-    return best.Name
-end
-
-function adeq_doEquipHelmet(priority)
-    local items = adeq_collect("Armor", function(i) return ad_isHelmetByName(i.Name) end)
-    if #items == 0 then return nil end
-    local current = adeq_getEquippedInSlot("Helmet")
-    if current then adeq_fire("Unequip", current, "Helmet") adeq_waitForUnequip(current, 1.5) task.wait(0.05) end
-    adeq_fastPrime(items, "Helmet", "Helmet")
-    adeq_sort(items, priority)
-    local best = items[1]
-    adeq_fire("Helmet", best, "Helmet")
-    adeq_waitForSlot(best, "Helmet", 2)
-    return best.Name
-end
-
-function adeq_doEquipHeroes(priority)
-    local items = adeq_collect("Hero")
-    if #items == 0 then return {} end
-    local slots = { "Hero1", "Hero2", "Hero3", "Hero4" }
-    for _, item in ipairs(items) do
-        if item:GetAttribute("Equipped") == true then
-            adeq_fire("Unequip", item, "Hero")
-            adeq_waitForUnequip(item, 1.5)
-            task.wait(0.03)
-        end
-    end
-    task.wait(0.1)
-    adeq_fastPrime(items, "Hero", "Hero4")
-    adeq_sort(items, priority)
-    local equipped = {}
-    for i = 1, math.min(4, #items) do
-        local hero = items[i]
-        local slot = slots[i]
-        adeq_fire("Hero", hero, slot)
-        adeq_waitForSlot(hero, slot, 2)
-        table.insert(equipped, hero.Name)
-        task.wait(0.05)
-    end
-    return equipped
-end
-
-function adeq_collectSpells()
-    local inv = adeq_getInv()
-    if not inv then return {}, {} end
-    local spells, ults = {}, {}
-    for _, i in ipairs(inv:GetChildren()) do
-        local data = ad_spellData[i.Name]
-        if data then
-            if data.isUltimate then table.insert(ults, i)
-            else table.insert(spells, i) end
-        end
-    end
-    function spellScore(item)
-        local data = ad_spellData[item.Name]
-        return data and ((data.rarityRank or 0) * 1000 + (data.damageMultiplier or 0)) or 0
-    end
-    table.sort(spells, function(a, b) return spellScore(a) > spellScore(b) end)
-    table.sort(ults,   function(a, b) return spellScore(a) > spellScore(b) end)
-    return spells, ults
-end
-
-function adeq_doEquipSpells()
-    local spells, _ = adeq_collectSpells()
-    if #spells == 0 then return {} end
-    local equipped = {}
-    for _, item in ipairs(spells) do
-        if item:GetAttribute("Equipped") == true then
-            adeq_fire("Unequip", item, "Spell")
-            adeq_waitForUnequip(item, 1)
-            task.wait(0.03)
-        end
-    end
-    if spells[1] then
-        adeq_fire("Spell", spells[1], "Spell1")
-        adeq_waitForSlot(spells[1], "Spell1", 2)
-        table.insert(equipped, spells[1].Name)
-    end
-    if spells[2] then
-        task.wait(0.05)
-        adeq_fire("Spell", spells[2], "Spell2")
-        adeq_waitForSlot(spells[2], "Spell2", 2)
-        table.insert(equipped, spells[2].Name)
-    end
-    return equipped
-end
-
-function adeq_doEquipUltimate()
-    local _, ults = adeq_collectSpells()
-    if #ults == 0 then return nil end
-    for _, item in ipairs(ults) do
-        if item:GetAttribute("Equipped") == true then
-            adeq_fire("Unequip", item, "Spell")
-            adeq_waitForUnequip(item, 1)
-            task.wait(0.03)
-        end
-    end
-    adeq_fire("Spell", ults[1], "Ultimate")
-    adeq_waitForSlot(ults[1], "Ultimate", 2)
-    return ults[1].Name
-end
-
-LocalPlayer.CharacterAdded:Connect(function()
-    ad_equipDoneWeapon = false
-    ad_equipDoneArmor  = false
-    ad_equipDoneHelmet = false
-    ad_equipDoneSpells = false
-    ad_equipDoneUlt    = false
-    ad_equipDoneHeroes = false
-end)
-
--- ══════════════════════════════════════════
---   AUTO QUEST SYSTEM
--- ══════════════════════════════════════════
-
-local QUEST_HOURLY_COUNT = 5
-local QUEST_DAILY_COUNT  = 6
-local QUEST_WEEKLY_COUNT = 5
-
-function adQuest_claimHourly()
-    local claimed = 0
-    for i = 1, QUEST_HOURLY_COUNT do
-        if Library.Unloaded or not isOn("AutoQuestHourly") then break end
-        pcall(function() ad_Quest:FireServer("HourlyCurrentQuest" .. i) end)
-        claimed = claimed + 1
-        task.wait(1)
-    end
-    return claimed
-end
-
-function adQuest_claimDaily()
-    local claimed = 0
-    for i = 1, QUEST_DAILY_COUNT do
-        if Library.Unloaded or not isOn("AutoQuestDaily") then break end
-        pcall(function() ad_Quest:FireServer("DailyCurrentQuest" .. i) end)
-        claimed = claimed + 1
-        task.wait(1)
-    end
-    return claimed
-end
-
-function adQuest_claimWeekly()
-    local claimed = 0
-    for i = 1, QUEST_WEEKLY_COUNT do
-        if Library.Unloaded or not isOn("AutoQuestWeekly") then break end
-        pcall(function() ad_Quest:FireServer("WeeklyCurrentQuest" .. i) end)
-        claimed = claimed + 1
-        task.wait(1)
-    end
-    return claimed
-end
-
--- ══════════════════════════════════════════
---   VIRUS AUTO HANDLER
--- ══════════════════════════════════════════
-
-function adVirus_getButtons()
-    local pg      = LocalPlayer:FindFirstChild("PlayerGui")
-    local main    = pg and pg:FindFirstChild("Main")
-    local vf      = main and main:FindFirstChild("VirusFrame")
-    local warning = vf and vf:FindFirstChild("Warning")
-    local buttons = warning and warning:FindFirstChild("Buttons")
-    if not buttons then return nil, nil end
-    return buttons:FindFirstChild("Confirm"), buttons:FindFirstChild("Decline")
-end
-
-function adVirus_isVisible()
-    local ok, result = pcall(function()
-        local pg      = LocalPlayer:FindFirstChild("PlayerGui")
-        local main    = pg and pg:FindFirstChild("Main")
-        local vf      = main and main:FindFirstChild("VirusFrame")
-        local warning = vf and vf:FindFirstChild("Warning")
-        local buttons = warning and warning:FindFirstChild("Buttons")
-        if not buttons then return false end
-        local obj = buttons
-        while obj and obj ~= pg do
-            if obj:IsA("GuiObject") and not obj.Visible then return false end
-            obj = obj.Parent
-        end
-        return true
-    end)
-    return ok and result
-end
-
-function adVirus_clickBtn(btn)
-    if not btn then return false end
-    if firesignal then
-        pcall(function() firesignal(btn.MouseButton1Click) end)
-        task.wait(0.05)
-        pcall(function() firesignal(btn.Activated) end)
-        task.wait(0.05)
-    end
-    pcall(function()
-        local pos  = btn.AbsolutePosition
-        local size = btn.AbsoluteSize
-        local x    = pos.X + math.floor(size.X / 2)
-        local y    = pos.Y + math.floor(size.Y / 2)
-        VIM:SendMouseButtonEvent(x, y, 0, true,  game, 0)
-        task.wait(0.05)
-        VIM:SendMouseButtonEvent(x, y, 0, false, game, 0)
-    end)
-    return true
-end
-
--- ══════════════════════════════════════════
---   CHEST DETECTION
--- ══════════════════════════════════════════
-
-function ad_getChests()
-    local chests = {}
-    pcall(function()
-        local gf = workspace:FindFirstChild("Game")
-        if not gf then return end
-        local d = gf:FindFirstChild("Destructibles")
-        if not d then return end
-        for _, obj in pairs(d:GetChildren()) do
-            if obj.Name:find("Chest") then
-                local p = obj:FindFirstChild("ProximityPrompt", true)
-                if p and p:IsA("ProximityPrompt") then
-                    table.insert(chests, { model = obj, prompt = p })
-                end
-            end
-        end
-    end)
-    return chests
-end
-
-function ad_getNearestChest()
-    local hrp = ad_getHRP()
-    if not hrp then return nil end
-    local chests = ad_getChests()
-    local nearest, nearestDist = nil, math.huge
-    for _, c in ipairs(chests) do
-        local ok, d = pcall(function()
-            return (c.model:GetPivot().Position - hrp.Position).Magnitude
-        end)
-        if ok and d < nearestDist then nearestDist = d; nearest = c end
-    end
-    return nearest
-end
-
--- ══════════════════════════════════════════
---   SPELL GETTERS
--- ══════════════════════════════════════════
-
-function ad_getEquippedSpellBySlot(slot)
-    local inv = LocalPlayer:FindFirstChild("Inventory")
-    if not inv then return nil end
-    for _, i in pairs(inv:GetChildren()) do
-        if i:GetAttribute("Type") == "Spell"
-            and i:GetAttribute("Equipped") == true
-            and i:GetAttribute("Slot") == slot then
-            return i
-        end
-    end
-end
-
-function ad_getEquippedUltimate()
-    return ad_getEquippedSpellBySlot("Ultimate")
-end
-
--- ══════════════════════════════════════════
---   AUTO SELL HELPERS
--- ══════════════════════════════════════════
-
-function adSell_normalizeMulti(value)
-    local result = {}
-    if type(value) ~= "table" then return result end
-    for k, v in pairs(value) do
-        if type(k) == "number" then result[tostring(v)] = true
-        elseif v == true then result[tostring(k)] = true end
-    end
-    return result
-end
-
-function adSell_getRarityTable(category)
-    if category == "Weapon"       then return ad_sell_weapon_rarities
-    elseif category == "Armor"    then return ad_sell_armor_rarities
-    elseif category == "Helmet"   then return ad_sell_helmet_rarities
-    elseif category == "Spell"    then return ad_sell_spell_rarities
-    elseif category == "Ultimate" then return ad_sell_ult_rarities
-    end
-    return {}
-end
-
-function adSell_hasRarityFilter(category)
-    return next(adSell_getRarityTable(category)) ~= nil
-end
-
-function adSell_rarityAllowed(item, category)
-    local rarity   = tostring(item:GetAttribute("Rarity") or "Common")
-    local selected = adSell_getRarityTable(category)
-    if not adSell_hasRarityFilter(category) then return true end
-    return selected[rarity] == true
-end
-
-function adSell_isUltimateSpell(item)
-    local data = ad_spellData[item.Name]
-    return data and data.isUltimate == true
-end
-
-function adSell_matchesCategory(item, category)
-    local itemType = item:GetAttribute("Type")
-    if category == "Weapon"       then return itemType == "Weapon"
-    elseif category == "Armor"    then return itemType == "Armor" and ad_isBodyArmorByName(item.Name)
-    elseif category == "Helmet"   then return itemType == "Armor" and ad_isHelmetByName(item.Name)
-    elseif category == "Spell"    then return itemType == "Spell" and not adSell_isUltimateSpell(item)
-    elseif category == "Ultimate" then return itemType == "Spell" and adSell_isUltimateSpell(item)
-    end
-    return false
-end
-
-function adSell_canSellItem(item, category)
-    if not item or not item.Parent then return false end
-    if not adSell_matchesCategory(item, category) then return false end
-    if not adSell_rarityAllowed(item, category) then return false end
-    if ad_sell_skip_equipped  and item:GetAttribute("Equipped")  == true then return false end
-    if ad_sell_skip_favorites and item:GetAttribute("Favorite")  == true then return false end
-    return true
-end
-
-function adSell_collect(category)
-    local inv = LocalPlayer:FindFirstChild("Inventory")
-    if not inv then return {} end
-    local items = {}
-    for _, item in ipairs(inv:GetChildren()) do
-        if adSell_canSellItem(item, category) then table.insert(items, item) end
-    end
-    table.sort(items, function(a, b)
-        local ra = ad_rarityRank[a:GetAttribute("Rarity") or "Common"] or 0
-        local rb = ad_rarityRank[b:GetAttribute("Rarity") or "Common"] or 0
-        if ra ~= rb then return ra < rb end
-        if a.Name ~= b.Name then return a.Name < b.Name end
-        local la = a:GetAttribute("Level") or 0
-        local lb = b:GetAttribute("Level") or 0
-        if la ~= lb then return la < lb end
-        return tostring(a:GetAttribute("ItemId") or "") < tostring(b:GetAttribute("ItemId") or "")
-    end)
-    return items
-end
-
-function adSell_fireBatch(items)
-    local batch = {}
-    for i = 1, math.min(2, #items) do
-        local item = items[i]
-        if item and item.Parent then table.insert(batch, item) end
-    end
-    if #batch == 0 then return 0 end
-    local ok = pcall(function() ad_Equip:FireServer("Sell", batch) end)
-    return ok and #batch or 0
-end
-
-function adSell_sellOneBatch(category)
-    local items = adSell_collect(category)
-    if #items == 0 then return 0 end
-    return adSell_fireBatch(items)
-end
-
-function adSell_anyEnabled()
-    return isOn("AutoSellWeapon") or isOn("AutoSellArmor") or isOn("AutoSellHelmet")
-        or isOn("AutoSellSpell") or isOn("AutoSellUltimate")
-end
-
--- ══════════════════════════════════════════
---   TEXT HELPERS & FORMATTING
--- ══════════════════════════════════════════
-
-function c(t, col)
-    if not col or col == "" then return t end
-    return string.format('<font color="%s">%s</font>', col, t)
-end
-
-function b(t) return string.format("<b>%s</b>", t) end
-function i(t) return string.format("<i>%s</i>", t) end
-function sz(t, size) return string.format('<font size="%d">%s</font>', size, t) end
-
-function hexToRgb(hex)
-    hex = hex:gsub("#", "")
-    return tonumber("0x" .. hex:sub(1, 2)), tonumber("0x" .. hex:sub(3, 4)), tonumber("0x" .. hex:sub(5, 6))
-end
-
-function rgbToHex(r, g, b)
-    return string.format("#%02x%02x%02x", math.clamp(r, 0, 255), math.clamp(g, 0, 255), math.clamp(b, 0, 255))
-end
-
-function lerp(a, b, t) return a + (b - a) * t end
-
-function createGradientText(word, startHex, endHex)
-    local r1, g1, b1 = hexToRgb(startHex)
-    local r2, g2, b2 = hexToRgb(endHex)
-    local result = ""
-    local len = #word
-    if len == 0 then return "" end
-    if len == 1 then return string.format('<font color="%s">%s</font>', startHex, word) end
-    for j = 1, len do
-        local t = (j - 1) / (len - 1)
-        local r = math.round(lerp(r1, r2, t))
-        local g = math.round(lerp(g1, g2, t))
-        local b = math.round(lerp(b1, b2, t))
-        local char = word:sub(j, j)
-        if char == " " then
-            result = result .. " "
-        else
-            result = result .. string.format('<font color="%s">%s</font>', rgbToHex(r, g, b), char)
-        end
-    end
-    return result
-end
-
-function createMultiGradientText(word, colors)
-    if #colors < 2 then return createGradientText(word, colors[1] or "#ffffff", colors[1] or "#ffffff") end
-    local result = ""
-    local len = #word
-    if len == 0 then return "" end
-    for j = 1, len do
-        local globalT = (len == 1) and 0 or (j - 1) / (len - 1)
-        local scaled = globalT * (#colors - 1)
-        local idx = math.floor(scaled) + 1
-        local localT = scaled - (idx - 1)
-        local c1 = colors[math.min(idx, #colors)]
-        local c2 = colors[math.min(idx + 1, #colors)]
-        local r1, g1, b1 = hexToRgb(c1)
-        local r2, g2, b2 = hexToRgb(c2)
-        local r = math.round(lerp(r1, r2, localT))
-        local g = math.round(lerp(g1, g2, localT))
-        local b = math.round(lerp(b1, b2, localT))
-        local char = word:sub(j, j)
-        if char == " " then
-            result = result .. " "
-        else
-            result = result .. string.format('<font color="%s">%s</font>', rgbToHex(r, g, b), char)
-        end
-    end
-    return result
-end
-
-local PALETTE = {
-    prism   = { "#38bdf8", "#a78bfa", "#ec4899" },
-    aurora  = { "#4ade80", "#22d3ee", "#a78bfa" },
-    sunset  = { "#fbbf24", "#f97316", "#ef4444" },
-    ocean   = { "#38bdf8", "#0ea5e9", "#6366f1" },
-    fire    = { "#fef08a", "#fb923c", "#dc2626" },
-    ice     = { "#e0f2fe", "#7dd3fc", "#3b82f6" },
-}
-
-function formatNumber(n)
-    if type(n) ~= "number" then return tostring(n) end
-    local formatted = tostring(math.floor(n))
-    while true do
-        local newFormatted, k = formatted:gsub("^(-?%d+)(%d%d%d)", "%1,%2")
-        formatted = newFormatted
-        if k == 0 then break end
-    end
-    return formatted
-end
-
-function formatDuration(secs)
-    secs = math.floor(secs)
-    local h = math.floor(secs / 3600)
-    local m = math.floor((secs % 3600) / 60)
-    local s = secs % 60
-    if h > 0 then return string.format("%dh %dm %ds", h, m, s) end
-    if m > 0 then return string.format("%dm %ds", m, s) end
-    return string.format("%ds", s)
-end
-
-function gradPlus(colors)
-    return createMultiGradientText("[+]", colors)
-end
-
-local DISCORD_INVITE = "https://discord.gg/DHeCNzTypH"
-local RSCRIPTS_LINK  = "https://rscripts.net/@Prism"
-
--- ══════════════════════════════════════════
---   CREATE WINDOW
--- ══════════════════════════════════════════
-
-local Window = Library:CreateWindow({
-    Title            = "Prism",
-    Footer           = "Prism  |  Anime Dungeons  |  v5.2",
-    Icon             = "rbxassetid://117487160988921",
-    MobileButtonSide = "Right",
-    NotifySide       = "Right",
-    ShowCustomCursor = false,
-    CornerRadius     = 2,
-    Animations = {
-        ToggleWindow    = false,
-        TabSwitch       = true,
-        Groupbox        = false,
-        Dropdown        = true,
-        KeyPicker       = true,
-        SubTabUnderline = true,
-    },
-})
-
--- ══════════════════════════════════════════
---   TABS & SUBTABS
--- ══════════════════════════════════════════
-
-local Tabs = {
-    Info     = Window:AddTab("Info",      "activity"),
-    Main     = Window:AddTab("Main",      "zap"),
-    Combat   = Window:AddTab("Combat",    "swords"),
-    Farm     = Window:AddTab("Farm",      "target"),
-    Equip    = Window:AddTab("Equipment", "shield"),
-    AutoSell = Window:AddTab("Auto Sell", "coins"),
-    Quests   = Window:AddTab("Quests",    "scroll-text"),
-    Webhook  = Window:AddTab("Webhook",   "webhook"),
-    Player   = Window:AddTab("Player",    "user-check"),
-    Settings = Window:AddTab("Settings",  "settings"),
-}
-
-Tabs.Dungeon = Tabs.Main:AddSubTab("Dungeon", "map")
-Tabs.Stats   = Tabs.Main:AddSubTab("Stats",   "chart-column-big")
-Tabs.Chests  = Tabs.Main:AddSubTab("Chests",  "gift")
-Tabs.Virus   = Tabs.Main:AddSubTab("Virus",   "shield-alert")
-Tabs.Spins   = Tabs.Main:AddSubTab("Spins",   "refresh-cw")
-
-Tabs.Weapon   = Tabs.Combat:AddSubTab("Attack",   "swords")
-Tabs.Spells   = Tabs.Combat:AddSubTab("Spells",   "flame")
-Tabs.Ultimate = Tabs.Combat:AddSubTab("Ultimate", "zap")
-
-Tabs.WeaponEq = Tabs.Equip:AddSubTab("Weapon",   "swords")
-Tabs.ArmorEq  = Tabs.Equip:AddSubTab("Armor",    "shield")
-Tabs.HelmetEq = Tabs.Equip:AddSubTab("Helmet",   "hard-hat")
-Tabs.SpellsEq = Tabs.Equip:AddSubTab("Spells",   "flame")
-Tabs.UltEq    = Tabs.Equip:AddSubTab("Ultimate", "zap")
-Tabs.HeroesEq = Tabs.Equip:AddSubTab("Heroes",   "users")
-
-Tabs.HourlyQ = Tabs.Quests:AddSubTab("Hourly",   "clock")
-Tabs.DailyQ  = Tabs.Quests:AddSubTab("Daily",    "sun")
-Tabs.WeeklyQ = Tabs.Quests:AddSubTab("Weekly",   "calendar")
-Tabs.AllQ    = Tabs.Quests:AddSubTab("Claim All","zap")
-
-Tabs.WebhookSetup  = Tabs.Webhook:AddSubTab("Setup",   "settings")
-Tabs.WebhookFilter = Tabs.Webhook:AddSubTab("Filters", "funnel-plus")
-Tabs.WebhookTest   = Tabs.Webhook:AddSubTab("Test",    "send")
-
--- ══════════════════════════════════════════
---   INFO TAB
--- ══════════════════════════════════════════
-
-do
-    local PrismBox = Tabs.Info:AddLeftGroupbox("Prism", "sparkles")
-    PrismBox:AddLabel(sz(b(createMultiGradientText("PRISM", PALETTE.prism)), 20), true)
-    PrismBox:AddLabel(c(i("keyless forever, always will be"), "#9ca3af"), true)
-    PrismBox:AddLabel(
-        c(b("status "),  "#6b7280") .. c(b("online"), "#4ade80") ..
-        c("     ",       "#374151") ..
-        c(b("version "), "#6b7280") .. c(b("5.2"), "#38bdf8"),
-    true)
-    PrismBox:AddDivider()
-    PrismBox:AddLabel(sz(b(createMultiGradientText("if you enjoy the script or want to report a bug, please consider the following:", PALETTE.ice)), 14), true)
-    PrismBox:AddLabel(sz(b(createMultiGradientText("more than 60 keyless scripts in this hub, I would love your support!", PALETTE.ice)), 14), true)
-    PrismBox:AddButton({ Text = "Discord for Support 💝", Func = function() copyText(DISCORD_INVITE, "Discord invite copied!") end })
-    PrismBox:AddButton({ Text = "Follow Rscripts 🙏", Func = function() copyText(RSCRIPTS_LINK, "Rscripts link copied!") end })
-
-    local FeaturesBox = Tabs.Info:AddLeftGroupbox("Features", "layers")
-    local featureList = {
-        "Auto Farm Mobs",
-        "Auto Open Chests",
-        "Auto Melee Strike",
-        "Auto Skills Rotation",
-        "Auto Ultimate",
-        "Auto Equip Best Gear",
-        "Auto Claim Quests",
-        "Auto Sell Loot",
-        "Discord Webhook for Rewards",
-        "Anti AFK",
-        "Fly, NoClip, WalkSpeed",
-    }
-    for _, item in ipairs(featureList) do
-        FeaturesBox:AddLabel(gradPlus(PALETTE.prism) .. c(" " .. item, "#f3f4f6"), true)
-    end
-
-    local DiagnosticBox = Tabs.Info:AddRightGroupbox("Live", "cpu")
-    local FpsLabel     = DiagnosticBox:AddLabel(b("FPS: ")    .. c("...", "#60a5fa"), true)
-    local PingLabel    = DiagnosticBox:AddLabel(b("Ping: ")   .. c("...", "#4ade80"), true)
-    local MemoryLabel  = DiagnosticBox:AddLabel(b("Memory: ") .. c("...", "#fbbf24"), true)
-    local SessionLabel = DiagnosticBox:AddLabel(b("Uptime: ") .. c("0s",  "#a78bfa"), true)
-
-    local sessionStart = SessionStats.startTime
-    local frameCount = 0
-    local lastFpsUpdate = os.clock()
-
-    RunService.RenderStepped:Connect(function()
-        frameCount = frameCount + 1
-        local now = os.clock()
-        if now - lastFpsUpdate >= 0.5 then
-            local fps = math.floor(frameCount / (now - lastFpsUpdate))
-            frameCount = 0
-            lastFpsUpdate = now
-            if not Library.Unloaded then
-                local ping = math.floor(StatsService and StatsService.PerformanceStats.Ping:GetValue() or 0)
-                local mem  = math.floor(StatsService and StatsService:GetTotalMemoryUsageMb() or 0)
-                local fpsColor  = fps > 45 and "#4ade80" or (fps > 25 and "#fbbf24" or "#ef4444")
-                local pingColor = ping < 80 and "#4ade80" or (ping < 150 and "#fbbf24" or "#ef4444")
-                FpsLabel:SetText(b("FPS: ")    .. c(tostring(fps), fpsColor))
-                PingLabel:SetText(b("Ping: ")  .. c(tostring(ping) .. " ms", pingColor))
-                MemoryLabel:SetText(b("Memory: ") .. c(tostring(mem) .. " MB", "#fbbf24"))
-            end
-        end
-    end)
-
-    task.spawn(function()
-        while not Library.Unloaded do
-            task.wait(1)
-            SessionLabel:SetText(b("Uptime: ") .. c(formatDuration(os.clock() - sessionStart), "#a78bfa"))
-        end
-    end)
-
-    local SessionBox = Tabs.Info:AddRightGroupbox("Roblox", "server")
-    SessionBox:AddLabel(b(createMultiGradientText("EXTRA INFO", PALETTE.aurora)), true)
-    SessionBox:AddDivider()
-    SessionBox:AddLabel(b("User: ")     .. c(LocalPlayer.Name, "#ffffff"), true)
-    SessionBox:AddLabel(b("Executor: ") .. c(executorName, "#fb923c"), true)
-    SessionBox:AddLabel(b("Place ID: ") .. c(tostring(game.PlaceId), "#60a5fa"), true)
-    SessionBox:AddLabel(b("Job ID: ")   .. c(string.sub(tostring(game.JobId), 1, 14) .. "...", "#9ca3af"), true)
-    SessionBox:AddDivider()
-    SessionBox:AddButton({
-        Text = "Copy Server ID",
-        Func = function() copyText(game.JobId, "Server JobId copied!") end,
-    })
-    SessionBox:AddButton({
-        Text = "Copy Rejoin Script",
-        Func = function()
-            copyText(string.format('game:GetService("TeleportService"):TeleportToPlaceInstance(%s, "%s", game.Players.LocalPlayer)', game.PlaceId, game.JobId), "Rejoin script copied!")
-        end,
-    })
-end
-
--- ══════════════════════════════════════════
---   MAIN > DUNGEON
--- ══════════════════════════════════════════
-
-do
-    local DG = Tabs.Dungeon:AddLeftGroupbox("Dungeon Control", "map")
-    DG:AddToggle("AutoStartDungeon", { Text = "Auto Start Dungeon",   Default = false, Tooltip = "Fires StartDungeon once when lobby is ready" })
-    DG:AddToggle("AutoReplay",       { Text = "Smart Instant Replay", Default = false, Tooltip = "Replays the instant victory screen appears" })
-    DG:AddDivider()
-    DG:AddButton({ Text = "Start Dungeon Once",  Func = function() pcall(function() ad_StartDungeon:FireServer() end) Library:Notify("Dungeon started!") end })
-    DG:AddButton({ Text = "Replay Dungeon Once", Func = function() pcall(function() ad_Dungeon:FireServer("PlayAgain") end) Library:Notify("Replay fired!") end })
-
-    local StatsGroup = Tabs.Dungeon:AddRightGroupbox("Live Stats", "trending-up")
-    local LevelLabel   = StatsGroup:AddLabel(b("Level: ") .. c("...", "#60a5fa"), true)
-    local GoldLabel    = StatsGroup:AddLabel(b("Gold: ")  .. c("...", "#fbbf24"), true)
-    local GemsLabel    = StatsGroup:AddLabel(b("Gems: ")  .. c("...", "#a78bfa"), true)
-    local TargetLabel  = StatsGroup:AddLabel(b("Target: ") .. c("None", "#ef4444"), true)
-    StatsGroup:AddDivider()
-    local DungeonsLabel = StatsGroup:AddLabel(b("Dungeons Completed: ") .. c("0", "#4ade80"), true)
-    local GoldGainedLabel = StatsGroup:AddLabel(b("Gold Gained: ") .. c("0", "#fbbf24"), true)
-    local GemsGainedLabel = StatsGroup:AddLabel(b("Gems Gained: ") .. c("0", "#a78bfa"), true)
-    local ItemsObtainedLabel = StatsGroup:AddLabel(b("Items Obtained: ") .. c("0", "#f472b6"), true)
-    local EnemiesDefeatedLabel = StatsGroup:AddLabel(b("Enemies Defeated: ") .. c("0", "#ef4444"), true)
-
-    task.spawn(function()
-        while not Library.Unloaded do
-            task.wait(2)
-            local ps = LocalPlayer:FindFirstChild("PlayerStats")
-            local lvl = ps and ps:FindFirstChild("Level") and ps.Level.Value or 0
-            local gold = ps and ps:FindFirstChild("Gold") and ps.Gold.Value or 0
-            local gems = ps and ps:FindFirstChild("Gems") and ps.Gems.Value or 0
-            local targetName = "None"
-            if currentTarget then
-                targetName = currentTarget.Name
-            end
-
-            LevelLabel:SetText(b("Level: ") .. c(formatNumber(lvl), "#60a5fa"))
-            GoldLabel:SetText(b("Gold: ") .. c(formatNumber(gold), "#fbbf24"))
-            GemsLabel:SetText(b("Gems: ") .. c(formatNumber(gems), "#a78bfa"))
-            TargetLabel:SetText(b("Target: ") .. c(targetName, "#ef4444"))
-
-            DungeonsLabel:SetText(b("Dungeons Completed: ") .. c(formatNumber(SessionStats.dungeonsRun), "#4ade80"))
-            GoldGainedLabel:SetText(b("Gold Gained: ") .. c(formatNumber(SessionStats.goldGained), "#fbbf24"))
-            GemsGainedLabel:SetText(b("Gems Gained: ") .. c(formatNumber(SessionStats.gemsGained), "#a78bfa"))
-            ItemsObtainedLabel:SetText(b("Items Obtained: ") .. c(formatNumber(SessionStats.itemsObtained), "#f472b6"))
-            EnemiesDefeatedLabel:SetText(b("Enemies Defeated: ") .. c(formatNumber(SessionStats.enemiesDefeated), "#ef4444"))
-        end
-    end)
-end
-
--- ══════════════════════════════════════════
---   MAIN > STATS
--- ══════════════════════════════════════════
-
-do
-    local SG = Tabs.Stats:AddLeftGroupbox("Stat Points", "chart-column-big")
-    SG:AddDropdown("StatSelect", {
-        Values = { "Strength", "Magic", "Health" }, Default = "Strength", Text = "Stat to Level Up",
-        Callback = function(v) ad_selected_stat = v end,
-    })
-    SG:AddToggle("AutoStatPoint", { Text = "Auto Allocate Stat Points", Default = false })
-end
-
--- ══════════════════════════════════════════
---   MAIN > CHESTS
--- ══════════════════════════════════════════
-
-do
-    local CG = Tabs.Chests:AddLeftGroupbox("Golden Chests", "gift")
-    CG:AddToggle("AutoChest", { Text = "Auto Open Golden Chests", Default = false })
-    CG:AddDivider()
-    CG:AddButton({ Text = "Open Nearest Chest Once", Func = function()
-        task.spawn(function()
-            local chest = ad_getNearestChest()
-            if not chest then Library:Notify("No chests found!"); return end
-            pcall(function()
-                chest.prompt.MaxActivationDistance = 99999
-                chest.prompt.RequiresLineOfSight   = false
-                chest.prompt.HoldDuration          = 0
-                chest.prompt.Enabled               = true
-            end)
-            pcall(function()
-                local cp = chest.model:GetPivot().Position
-                local hrp = ad_getHRP()
-                if hrp then
-                    hrp.CFrame = CFrame.new(cp + Vector3.new(0, 3, 0), cp)
-                end
-            end)
-            task.wait(0.2)
-            for _ = 1, 50 do
-                pcall(function()
-                    if chest.prompt and chest.prompt.Parent then
-                        fireproximityprompt(chest.prompt, 0)
-                    end
-                end)
-                task.wait()
-            end
-            Library:Notify("Opened chest!")
-        end)
-    end })
-end
-
--- ══════════════════════════════════════════
---   MAIN > VIRUS
--- ══════════════════════════════════════════
-
-do
-    local VG = Tabs.Virus:AddLeftGroupbox("Virus Auto Handler", "shield-alert")
-    VG:AddDropdown("VirusAction", {
-        Values = { "Engage", "Escape" }, Default = "Engage", Text = "Virus Action",
-        Tooltip = "Engage = click Confirm | Escape = click Decline",
-        Callback = function(v) ad_virus_action = v end,
-    })
-    VG:AddToggle("AutoVirus", { Text = "Auto Handle Virus", Default = false })
-    VG:AddDivider()
-    VG:AddButton({ Text = "Engage Virus Once", Func = function()
-        local confirm, _ = adVirus_getButtons()
-        if not confirm then Library:Notify("Prompt not visible!"); return end
-        adVirus_clickBtn(confirm) Library:Notify("Confirmed virus!")
-    end })
-    VG:AddButton({ Text = "Escape Virus Once", Func = function()
-        local _, decline = adVirus_getButtons()
-        if not decline then Library:Notify("Prompt not visible!"); return end
-        adVirus_clickBtn(decline) Library:Notify("Declined virus!")
-    end })
-end
-
--- ══════════════════════════════════════════
---   MAIN > SPINS
--- ══════════════════════════════════════════
-
-do
-    local SG = Tabs.Spins:AddLeftGroupbox("Spins", "refresh-cw")
-    SG:AddToggle("AutoDailySpin",    { Text = "Auto Claim Daily Spin",  Default = false })
-    SG:AddToggle("AutoCosmeticSpin", { Text = "Auto Cosmetic Spin",     Default = false })
-    SG:AddDivider()
-    SG:AddButton({ Text = "Claim Daily Spin Once", Func = function()
-        task.spawn(function()
-            local ok, err = pcall(function() ad_DailySpin:InvokeServer("Claim") end)
-            Library:Notify(ok and "Daily Spin claimed!" or ("Error: " .. tostring(err)))
-        end)
-    end })
-    SG:AddButton({ Text = "Cosmetic Spin Once", Func = function()
-        task.spawn(function()
-            local ok, err = pcall(function() ad_CosmeticSpin:InvokeServer() end)
-            Library:Notify(ok and "Cosmetic Spin complete!" or ("Error: " .. tostring(err)))
-        end)
-    end })
-end
-
--- ══════════════════════════════════════════
---   COMBAT > ATTACK
--- ══════════════════════════════════════════
-
-do
-    local WG = Tabs.Weapon:AddLeftGroupbox("Weapon Attack", "swords")
-    WG:AddToggle("AutoAttack", { Text = "Auto Attack", Default = false })
-
-    local CIG = Tabs.Weapon:AddRightGroupbox("Combat Info", "info")
-    CIG:AddButton({ Text = "Show Enemy Count", Func = function()
-        Library:Notify("Active enemies: " .. #adf_getEnemies())
-    end })
-end
-
--- ══════════════════════════════════════════
---   COMBAT > SPELLS
--- ══════════════════════════════════════════
-
-do
-    local SG = Tabs.Spells:AddLeftGroupbox("Auto Spells", "flame")
-    SG:AddToggle("AutoSpell", { Text = "Auto Use Spells", Default = false })
-end
-
--- ══════════════════════════════════════════
---   COMBAT > ULTIMATE
--- ══════════════════════════════════════════
-
-do
-    local UG = Tabs.Ultimate:AddLeftGroupbox("Auto Use Ultimate", "zap")
-    UG:AddToggle("AutoUltimate", { Text = "Auto Use Ultimate", Default = false })
-end
-
--- ══════════════════════════════════════════
---   FARM TAB (EXACT 1:1 WITH DUNGEONS LOOTR)
--- ══════════════════════════════════════════
-
-do
-    local FG = Tabs.Farm:AddLeftGroupbox("Mob Farm Engine", "target")
-    FG:AddLabel(b("FARM POSITIONING"), true)
-    FG:AddDivider()
-    FG:AddToggle("AutoFarm", { Text = "Auto Farm Mobs", Default = false })
-    FG:AddDropdown("FarmMode", {
-        Values   = { "Above Head", "Orbiting", "Behind", "Same Level", "Under" },
-        Default  = "Above Head",
-        Text     = "Relative Positioning",
-        Callback = function(v) ad_farm_mode = v; adf_orbitAngle = 0 end,
-    })
-    FG:AddDropdown("FarmMethod", {
-        Values   = { "Teleport", "Tween" },
-        Default  = "Teleport",
-        Text     = "Movement Type",
-        Callback = function(v) ad_farm_method = v end,
-    })
-    FG:AddSlider("FarmHeight", { Text = "Target Height Offset", Default = 11, Min = -30, Max = 50, Rounding = 0, Callback = function(v) ad_farm_height = v end })
-    FG:AddSlider("TweenSpeed", { Text = "Tween Transition Speed", Default = 95, Min = 20, Max = 250, Rounding = 0, Callback = function(v) ad_tween_speed = v end })
-
-    local Ob = Tabs.Farm:AddRightGroupbox("Orbit Offsets", "compass")
-    Ob:AddLabel(b("ORBIT CONTROLS"), true)
-    Ob:AddDivider()
-    Ob:AddSlider("OrbitRadius", { Text = "Orbit Radius", Default = 14, Min = 5, Max = 50, Rounding = 0, Callback = function(v) ad_farm_orbit_radius = v end })
-    Ob:AddSlider("OrbitSpeed",  { Text = "Orbit Rotational Speed", Default = 1.8, Min = 0.5, Max = 10, Rounding = 1, Callback = function(v) ad_farm_orbit_speed = v end })
-end
-
-Toggles.AutoFarm:OnChanged(function(v)
-    if v then
-        adf_orbitAngle = 0
-        adf_startMovement()
-        Library:Notify("Auto Farm ON (" .. ad_farm_mode .. ")")
-    else
-        adf_stopMovement()
-        Library:Notify("Auto Farm OFF")
-    end
-end)
-
--- ══════════════════════════════════════════
---   EQUIPMENT SUBTABS
--- ══════════════════════════════════════════
-
-local priorityValues = { "Tank", "Warrior", "Magic", "Balanced" }
-
-do
-    local WG = Tabs.WeaponEq:AddLeftGroupbox("Weapon Assignment", "swords")
-    WG:AddDropdown("WeaponPriority", { Values = priorityValues, Default = "Balanced", Text = "Weapon Priority", Callback = function(v) ad_weapon_priority = v end })
-    WG:AddToggle("AutoEquipWeapon", { Text = "Auto Equip Best Weapon", Default = false })
-    WG:AddDivider()
-    WG:AddButton({ Text = "Equip Best Weapon Once", Func = function()
-        task.spawn(function()
-            ad_equipDoneWeapon = false
-            Library:Notify("Equipping weapon...")
-            local r = adeq_doEquipWeapon(ad_weapon_priority)
-            ad_equipDoneWeapon = true
-            Library:Notify("Equipped: " .. (r or "None"))
-        end)
-    end })
-end
-
-do
-    local AG = Tabs.ArmorEq:AddLeftGroupbox("Body Armor Assignment", "shield")
-    AG:AddDropdown("ArmorPriority", { Values = priorityValues, Default = "Balanced", Text = "Armor Priority", Callback = function(v) ad_armor_priority = v end })
-    AG:AddToggle("AutoEquipArmor", { Text = "Auto Equip Best Armor", Default = false })
-    AG:AddDivider()
-    AG:AddButton({ Text = "Equip Best Armor Once", Func = function()
-        task.spawn(function()
-            ad_equipDoneArmor = false
-            Library:Notify("Equipping armor...")
-            local r = adeq_doEquipArmor(ad_armor_priority)
-            ad_equipDoneArmor = true
-            Library:Notify("Equipped: " .. (r or "None"))
-        end)
-    end })
-end
-
-do
-    local HG = Tabs.HelmetEq:AddLeftGroupbox("Head Gear Assignment", "hard-hat")
-    HG:AddDropdown("HelmetPriority", { Values = priorityValues, Default = "Balanced", Text = "Helmet Priority", Callback = function(v) ad_helmet_priority = v end })
-    HG:AddToggle("AutoEquipHelmet", { Text = "Auto Equip Best Helmet", Default = false })
-    HG:AddDivider()
-    HG:AddButton({ Text = "Equip Best Helmet Once", Func = function()
-        task.spawn(function()
-            ad_equipDoneHelmet = false
-            Library:Notify("Equipping helmet...")
-            local r = adeq_doEquipHelmet(ad_helmet_priority)
-            ad_equipDoneHelmet = true
-            Library:Notify("Equipped: " .. (r or "None"))
-        end)
-    end })
-end
-
-do
-    local SG = Tabs.SpellsEq:AddLeftGroupbox("Spell Assignment", "flame")
-    SG:AddToggle("AutoEquipSpells", { Text = "Auto Equip Best Spells", Default = false })
-    SG:AddDivider()
-    SG:AddButton({ Text = "Equip Best Spells Once", Func = function()
-        task.spawn(function()
-            ad_equipDoneSpells = false
-            Library:Notify("Equipping spells...")
-            local r = adeq_doEquipSpells()
-            ad_equipDoneSpells = true
-            Library:Notify("Spells: " .. (#r > 0 and table.concat(r, ", ") or "None"))
-        end)
-    end })
-end
-
-do
-    local UG = Tabs.UltEq:AddLeftGroupbox("Ultimate Assignment", "zap")
-    UG:AddToggle("AutoEquipUltimate", { Text = "Auto Equip Best Ultimate", Default = false })
-    UG:AddDivider()
-    UG:AddButton({ Text = "Equip Best Ultimate Once", Func = function()
-        task.spawn(function()
-            ad_equipDoneUlt = false
-            Library:Notify("Equipping ultimate...")
-            local r = adeq_doEquipUltimate()
-            ad_equipDoneUlt = true
-            Library:Notify("Ultimate: " .. (r or "None"))
-        end)
-    end })
-end
-
-do
-    local HG = Tabs.HeroesEq:AddLeftGroupbox("Hero Assembly (4 Slots)", "users")
-    HG:AddDropdown("HeroPriority", { Values = priorityValues, Default = "Tank", Text = "Hero Priority", Callback = function(v) ad_hero_priority = v end })
-    HG:AddToggle("AutoEquipHeroes", { Text = "Auto Equip Best Heroes", Default = false })
-    HG:AddDivider()
-    HG:AddButton({ Text = "Equip Best Heroes Once", Func = function()
-        task.spawn(function()
-            ad_equipDoneHeroes = false
-            Library:Notify("Equipping heroes...")
-            local r = adeq_doEquipHeroes(ad_hero_priority)
-            ad_equipDoneHeroes = true
-            Library:Notify("Heroes: " .. (#r > 0 and table.concat(r, ", ") or "None"))
-        end)
-    end })
-    HG:AddButton({ Text = "Copy Hero Stats", Func = function()
-        local heroes = adeq_collect("Hero")
-        adeq_sort(heroes, ad_hero_priority)
-        local lines = { "Heroes (" .. ad_hero_priority .. "):" }
-        for i, h in ipairs(heroes) do
-            local eq   = h:GetAttribute("Equipped") == true
-            local slot = h:GetAttribute("Slot") or ""
-            table.insert(lines,
-                "#" .. i .. " " .. h.Name .. (eq and " [EQ:" .. slot .. "]" or "") ..
-                " STR=" .. string.format("%.1f", adeq_oldSTR(h)) ..
-                " HP="  .. string.format("%.1f", adeq_oldHP(h))  ..
-                " MAG=" .. string.format("%.1f", adeq_oldMAG(h)) ..
-                " Loaded=" .. tostring(adeq_isLoaded(h))
-            )
-        end
-        copyText(table.concat(lines, "\n"), "Hero stats copied to clipboard")
-    end })
-end
-
--- ══════════════════════════════════════════
---   AUTO SELL TAB
--- ══════════════════════════════════════════
-
-do
-    local SF = Tabs.AutoSell:AddLeftGroupbox("Rarity Filters", "funnel-plus")
-    SF:AddLabel("If no rarity is checked, all items inside that category sell.", true)
-    SF:AddLabel("Equipped and favorited items are protected and skipped.", true)
-    SF:AddDivider()
-    local rarityValues = { "Common", "Rare", "Epic", "Legendary", "Mythic", "Secret" }
-    SF:AddDropdown("SellWeaponRarities",   { Values = rarityValues, Default = {}, Multi = true, Text = "Weapon Rarities",   Callback = function(v) ad_sell_weapon_rarities  = adSell_normalizeMulti(v) end })
-    SF:AddDropdown("SellArmorRarities",    { Values = rarityValues, Default = {}, Multi = true, Text = "Armor Rarities",    Callback = function(v) ad_sell_armor_rarities   = adSell_normalizeMulti(v) end })
-    SF:AddDropdown("SellHelmetRarities",   { Values = rarityValues, Default = {}, Multi = true, Text = "Helmet Rarities",   Callback = function(v) ad_sell_helmet_rarities  = adSell_normalizeMulti(v) end })
-    SF:AddDropdown("SellSpellRarities",    { Values = rarityValues, Default = {}, Multi = true, Text = "Spell Rarities",    Callback = function(v) ad_sell_spell_rarities   = adSell_normalizeMulti(v) end })
-    SF:AddDropdown("SellUltimateRarities", { Values = rarityValues, Default = {}, Multi = true, Text = "Ultimate Rarities", Callback = function(v) ad_sell_ult_rarities     = adSell_normalizeMulti(v) end })
-    SF:AddSlider("SellBatchDelay", { Text = "Batch Process Delay", Default = 0.20, Min = 0.05, Max = 2, Rounding = 2, Callback = function(v) ad_sell_batch_delay = v end })
-
-    local ST = Tabs.AutoSell:AddRightGroupbox("Auto Sell Categories", "coins")
-    ST:AddToggle("AutoSellWeapon",   { Text = "Auto Sell Weapons",   Default = false })
-    ST:AddToggle("AutoSellArmor",    { Text = "Auto Sell Armors",    Default = false })
-    ST:AddToggle("AutoSellHelmet",   { Text = "Auto Sell Helmets",   Default = false })
-    ST:AddToggle("AutoSellSpell",    { Text = "Auto Sell Spells",    Default = false })
-    ST:AddToggle("AutoSellUltimate", { Text = "Auto Sell Ultimates", Default = false })
-end
-
--- ══════════════════════════════════════════
---   QUESTS
--- ══════════════════════════════════════════
-
-do
-    local HG = Tabs.HourlyQ:AddLeftGroupbox("Hourly Challenges", "clock")
-    HG:AddToggle("AutoQuestHourly", { Text = "Auto Claim Hourly Quests", Default = false })
-    HG:AddDivider()
-    HG:AddButton({ Text = "Claim All Hourly Now", Func = function()
-        task.spawn(function() Library:Notify("Fired " .. adQuest_claimHourly() .. " claims") end)
-    end })
-end
-
-do
-    local DG = Tabs.DailyQ:AddLeftGroupbox("Daily Challenges", "sun")
-    DG:AddToggle("AutoQuestDaily", { Text = "Auto Claim Daily Quests", Default = false })
-    DG:AddDivider()
-    DG:AddButton({ Text = "Claim All Daily Now", Func = function()
-        task.spawn(function() Library:Notify("Fired " .. adQuest_claimDaily() .. " claims") end)
-    end })
-end
-
-do
-    local WG = Tabs.WeeklyQ:AddLeftGroupbox("Weekly Challenges", "calendar")
-    WG:AddToggle("AutoQuestWeekly", { Text = "Auto Claim Weekly Quests", Default = false })
-    WG:AddDivider()
-    WG:AddButton({ Text = "Claim All Weekly Now", Func = function()
-        task.spawn(function() Library:Notify("Fired " .. adQuest_claimWeekly() .. " claims") end)
-    end })
-end
-
-do
-    local AG = Tabs.AllQ:AddLeftGroupbox("Mass Quest Claim", "zap")
-    AG:AddButton({ Text = "Claim All Quests Now", Func = function()
-        task.spawn(function()
-            local h = adQuest_claimHourly()
-            local d = adQuest_claimDaily()
-            local w = adQuest_claimWeekly()
-            Library:Notify("Claims Processed -> Hourly: " .. h .. " | Daily: " .. d .. " | Weekly: " .. w)
-        end)
-    end })
-end
-
--- ══════════════════════════════════════════
---   WEBHOOK SETUP
--- ══════════════════════════════════════════
-
-do
-    local WS = Tabs.WebhookSetup:AddLeftGroupbox("Webhook Setup", "webhook")
-    WS:AddLabel("Input your Discord Webhook below:", true)
-    WS:AddInput("WebhookURL", {
-        Default = "", Numeric = false, Finished = false, ClearTextOnFocus = false,
-        Text = "Webhook URL", Placeholder = "https://discord.com/api/webhooks/...",
-        Callback = function(v) wh_url = v end,
-    })
-    WS:AddDivider()
-    WS:AddLabel("Input your Discord User ID below:", true)
-    WS:AddInput("WebhookUserID", {
-        Default = "", Numeric = true, Finished = false, ClearTextOnFocus = false,
-        Text = "Discord User ID", Placeholder = "123456789012345678",
-        Callback = function(v) wh_userId = v end,
-    })
-    WS:AddDivider()
-    WS:AddButton({ Text = "Validate Webhook Configuration", Func = function()
-        if wh_url == "" then Library:Notify("Please input a URL!"); return end
-        if not wh_url:find("discord") then Library:Notify("URL format invalid!"); return end
-        Library:Notify("URL Saved and Configured!")
-    end })
-end
-
--- ══════════════════════════════════════════
---   WEBHOOK FILTERS
--- ══════════════════════════════════════════
-
-do
-    local WF = Tabs.WebhookFilter:AddLeftGroupbox("Ping Filters", "bell")
-    WF:AddToggle("WebhookPingEnabled", {
-        Text = "Enable Discord Ping", Default = false,
-        Callback = function(v) wh_pingEnabled = v end,
-    })
-    WF:AddDropdown("WebhookPingRarities", {
-        Values = { "Common", "Rare", "Epic", "Legendary", "Mythic", "Secret" },
-        Default = {}, Multi = true, Text = "Ping Rarity Filters",
-        Callback = function(v)
-            wh_pingRarities = {}
-            if type(v) == "table" then
-                for k, val in pairs(v) do
-                    if type(k) == "number" then wh_pingRarities[tostring(val)] = true
-                    elseif val == true     then wh_pingRarities[tostring(k)]   = true end
-                end
-            end
-        end,
-    })
-    WF:AddDropdown("WebhookPingCategories", {
-        Values = { "Weapon", "Armor", "Helmet", "Spell", "Ultimate" },
-        Default = { "Weapon", "Armor", "Helmet", "Spell", "Ultimate" }, Multi = true, Text = "Ping Item Type Filters",
-        Tooltip = "Only items matching the selected types will trigger a user ping",
-        Callback = function(v)
-            wh_pingCategories = {}
-            if type(v) == "table" then
-                for k, val in pairs(v) do
-                    if type(k) == "number" then wh_pingCategories[tostring(val)] = true
-                    elseif val == true     then wh_pingCategories[tostring(k)]   = true end
-                end
-            end
-        end,
-    })
-
-    local WFR = Tabs.WebhookFilter:AddRightGroupbox("Tracked Metrics", "list")
-    local metrics = { "All Dropped Items", "Gold Received", "Gems Received", "EXP Received", "Enemies Defeated", "Viruses Cleared", "Current Character Level" }
-    for _, t in ipairs(metrics) do WFR:AddLabel("[+] " .. t, true) end
-end
-
--- ══════════════════════════════════════════
---   WEBHOOK TEST
--- ══════════════════════════════════════════
-
-do
-    local WT = Tabs.WebhookTest:AddLeftGroupbox("Test Webhook", "send")
-    WT:AddButton({ Text = "Send Simple Test Message", Func = function()
-        if wh_url == "" then Library:Notify("Webhook URL is empty!"); return end
-        task.spawn(function()
-            local data = {
-                embeds = {{
-                    title       = "Webhook Active",
-                    description = "Your Webhook setup is correctly configured and working!",
-                    color       = 65535,
-                    fields      = {
-                        { name = "Player", value = "```" .. LocalPlayer.Name .. "```", inline = true },
-                        { name = "Ping",   value = "```" .. (wh_userId ~= "" and "Configured" or "Disabled") .. "```", inline = true },
-                    },
-                    footer    = { text = "Prism  •  " .. os.date("%x %X") },
-                    timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-                }}
-            }
-            local ok, err = pcall(function()
-                wh_requestFunc({ Url = wh_url, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = HttpService:JSONEncode(data) })
-            end)
-            Library:Notify(ok and "Test processed, check Discord" or "Error: " .. tostring(err))
-        end)
-    end })
-
-    WT:AddButton({ Text = "Simulate Run Complete", Func = function()
-        if wh_url == "" then Library:Notify("Webhook URL is empty!"); return end
-        task.spawn(function()
-            local fakeItems = {
-                { Name = "GoldenKatana", Rarity = "Legendary", Category = "Weapon" },
-                { Name = "DreamLamp",    Rarity = "Rare",      Category = "Spell" },
-                { Name = "SteelDagger",  Rarity = "Common",    Category = "Weapon" },
-            }
-            local itemLines = {}
-            for _, item in ipairs(fakeItems) do
-                table.insert(itemLines, wh_rarityEmoji(item.Rarity) .. " **" .. item.Name .. "** ─ *" .. item.Rarity .. "*")
-            end
-
-            local shouldPingSim = false
-            if wh_pingEnabled and wh_userId ~= "" then
-                for _, item in ipairs(fakeItems) do
-                    if wh_shouldPingForItem(item.Rarity, item.Category) then shouldPingSim = true break end
-                end
-            end
-
-            local pingContent = shouldPingSim and ("<@" .. wh_userId .. "> (Simulation)") or ""
-            local data = {
-                content = pingContent,
-                embeds  = {{
-                    title       = "Dungeon Complete! (Simulation)",
-                    description = "━━━━━━━━━━━━━━━━━━━━━━━━━━",
-                    color       = wh_rarityColor("Legendary"),
-                    fields      = {
-                        { name = "Player",          value = "```" .. LocalPlayer.Name .. "```", inline = true  },
-                        { name = "Level",            value = "```42```",                         inline = true  },
-                        { name = "‎",                    value = "‎",                                  inline = false },
-                        { name = "Gold Earned",      value = "```+12.5K```",                     inline = true  },
-                        { name = "Gems Earned",      value = "```+3```",                          inline = true  },
-                        { name = "EXP Gained",       value = "```+8.2K```",                       inline = true  },
-                        { name = "Enemies Killed",   value = "```47```",                          inline = true  },
-                        { name = "Viruses Defeated", value = "```2```",                           inline = true  },
-                        { name = "‎",                    value = "‎",                                  inline = false },
-                        { name = "Items Dropped",    value = table.concat(itemLines, "\n"),       inline = false },
-                    },
-                    footer    = { text = "Prism  •  Anime Dungeons  •  " .. os.date("%x %X") },
-                    timestamp = os.date("!%Y-%m-%dT%H:%M:%SZ"),
-                }}
-            }
-            local ok, err = pcall(function()
-                wh_requestFunc({ Url = wh_url, Method = "POST", Headers = { ["Content-Type"] = "application/json" }, Body = HttpService:JSONEncode(data) })
-            end)
-            Library:Notify(ok and "Simulation complete, check Discord" or "Error: " .. tostring(err))
-        end)
-    end })
-
-    WT:AddDivider()
-    local WHStatusLabel = WT:AddLabel("URL: None | Ping: Off", true)
-    task.spawn(function()
-        while not Library.Unloaded do
-            task.wait(1)
-            local urlStatus  = wh_url ~= "" and c("URL: Set", "#4ade80") or c("URL: Not Set", "#ff6b6b")
-            local pingStatus = wh_pingEnabled and c("Ping: ON", "#4ade80") or c("Ping: OFF", "#9ca3af")
-            local idStatus   = wh_userId ~= "" and c("ID: Set", "#4ade80") or c("ID: Not Set", "#9ca3af")
-            WHStatusLabel:SetText(urlStatus .. "  |  " .. pingStatus .. "  |  " .. idStatus)
-        end
-    end)
-end
-
--- ══════════════════════════════════════════
---   PLAYER TAB
--- ══════════════════════════════════════════
-
-local FLYING = false
-local QEfly = true
-local iyflyspeed = 1
-local vehicleflyspeed = 1
-local flyKeyDown, flyKeyUp
-
-local currentWalkSpeed = 16
-local currentJumpPower = 50
-local currentFlySpeed  = 60
-
-function sFLY(vfly)
-    local plr = Players.LocalPlayer
-    local char = plr.Character or plr.CharacterAdded:Wait()
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not humanoid then
-        repeat task.wait() until char:FindFirstChildOfClass("Humanoid")
-        humanoid = char:FindFirstChildOfClass("Humanoid")
-    end
-
-    if flyKeyDown or flyKeyUp then
-        if flyKeyDown then flyKeyDown:Disconnect() end
-        if flyKeyUp then flyKeyUp:Disconnect() end
-    end
-
-    local T = ad_getHRP()
-    if not T then return end
-
-    local CONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0}
-    local lCONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0}
-    local SPEED = 0
-
-    function FLY()
-        FLYING = true
-        local BG = Instance.new('BodyGyro')
-        local BV = Instance.new('BodyVelocity')
-        BG.P = 9e4
-        BG.Parent = T
-        BV.Parent = T
-        BG.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
-        BG.CFrame = T.CFrame
-        BV.Velocity = Vector3.new(0, 0, 0)
-        BV.MaxForce = Vector3.new(9e9, 9e9, 9e9)
-
-        task.spawn(function()
-            repeat task.wait()
-                local camera = workspace.CurrentCamera
-                if not camera then continue end
-
-                if not vfly and humanoid then
-                    humanoid.PlatformStand = true
-                end
-
-                local activeSpeed = getNumber("FlySpeed", 60)
-
-                if CONTROL.L + CONTROL.R ~= 0 or CONTROL.F + CONTROL.B ~= 0 or CONTROL.Q + CONTROL.E ~= 0 then
-                    SPEED = activeSpeed
-                elseif not (CONTROL.L + CONTROL.R ~= 0 or CONTROL.F + CONTROL.B ~= 0 or CONTROL.Q + CONTROL.E ~= 0) and SPEED ~= 0 then
-                    SPEED = 0
-                end
-
-                if (CONTROL.L + CONTROL.R) ~= 0 or (CONTROL.F + CONTROL.B) ~= 0 or (CONTROL.Q + CONTROL.E) ~= 0 then
-                    BV.Velocity = ((camera.CFrame.LookVector * (CONTROL.F + CONTROL.B)) + ((camera.CFrame * CFrame.new(CONTROL.L + CONTROL.R, (CONTROL.F + CONTROL.B + CONTROL.Q + CONTROL.E) * 0.2, 0).p) - camera.CFrame.p)) * SPEED
-                    lCONTROL = {F = CONTROL.F, B = CONTROL.B, L = CONTROL.L, R = CONTROL.R}
-                elseif (CONTROL.L + CONTROL.R) == 0 and (CONTROL.F + CONTROL.B) == 0 and (CONTROL.Q + CONTROL.E) == 0 and SPEED ~= 0 then
-                    BV.Velocity = ((camera.CFrame.LookVector * (lCONTROL.F + lCONTROL.B)) + ((camera.CFrame * CFrame.new(lCONTROL.L + lCONTROL.R, (lCONTROL.F + lCONTROL.B + CONTROL.Q + CONTROL.E) * 0.2, 0).p) - camera.CFrame.p)) * SPEED
-                else
-                    BV.Velocity = Vector3.new(0, 0, 0)
-                end
-                BG.CFrame = camera.CFrame
-            until not FLYING or Library.Unloaded
-
-            CONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0}
-            lCONTROL = {F = 0, B = 0, L = 0, R = 0, Q = 0, E = 0}
-            SPEED = 0
-            BG:Destroy()
-            BV:Destroy()
-
-            if humanoid then humanoid.PlatformStand = false end
-        end)
-    end
-
-    flyKeyDown = UserInputService.InputBegan:Connect(function(input, processed)
-        if processed then return end
-        local multi = (vfly and vehicleflyspeed or iyflyspeed)
-        if input.KeyCode == Enum.KeyCode.W then CONTROL.F = multi
-        elseif input.KeyCode == Enum.KeyCode.S then CONTROL.B = -multi
-        elseif input.KeyCode == Enum.KeyCode.A then CONTROL.L = -multi
-        elseif input.KeyCode == Enum.KeyCode.D then CONTROL.R = multi
-        elseif input.KeyCode == Enum.KeyCode.E and QEfly then CONTROL.Q = multi * 2
-        elseif input.KeyCode == Enum.KeyCode.Q and QEfly then CONTROL.E = -multi * 2
-        end
-    end)
-
-    flyKeyUp = UserInputService.InputEnded:Connect(function(input, processed)
-        if processed then return end
-        if input.KeyCode == Enum.KeyCode.W then CONTROL.F = 0
-        elseif input.KeyCode == Enum.KeyCode.S then CONTROL.B = 0
-        elseif input.KeyCode == Enum.KeyCode.A then CONTROL.L = 0
-        elseif input.KeyCode == Enum.KeyCode.D then CONTROL.R = 0
-        elseif input.KeyCode == Enum.KeyCode.E then CONTROL.Q = 0
-        elseif input.KeyCode == Enum.KeyCode.Q then CONTROL.E = 0
-        end
-    end)
-
-    FLY()
-end
-
-do
-    local PlayerGroup = Tabs.Player:AddLeftGroupbox("Player", "user-check")
-    PlayerGroup:AddLabel(b(createMultiGradientText("USER", PALETTE.fire)), true)
-    PlayerGroup:AddPlayerInfo("PlayerCardCompact", {
-        ThumbnailType = "Bust",
-        Height = 190,
-    })
-
-    local FlyGroup = Tabs.Player:AddRightGroupbox("Movement", "feather")
-    FlyGroup:AddLabel(b(createMultiGradientText("FLIGHT", PALETTE.prism)), true)
-    FlyGroup:AddDivider()
-    FlyGroup:AddToggle("Fly",      { Text = "Fly", Default = false })
-    FlyGroup:AddSlider("FlySpeed", { Text = "Fly Speed", Default = 60, Min = 10, Max = 350, Rounding = 0, Callback = function(v) currentFlySpeed = v end })
-    FlyGroup:AddDivider()
-    FlyGroup:AddToggle("AntiSit", {
-        Text = "Anti-Sit",
-        Default = false,
-        Callback = function(v)
-            local h = getHumanoid()
-            if h then h:SetStateEnabled(Enum.HumanoidStateType.Seated, not v) end
-        end,
-    })
-    FlyGroup:AddDivider()
-    FlyGroup:AddLabel(b(createMultiGradientText("MOBILITY", PALETTE.ocean)), true)
-    FlyGroup:AddDivider()
-    FlyGroup:AddToggle("WalkSpeedEnabled", { Text = "Speed", Default = false })
-    FlyGroup:AddSlider("WalkSpeed",        { Text = "Speed Value", Default = 16, Min = 16, Max = 250, Rounding = 0, Callback = function(v) currentWalkSpeed = v end })
-    FlyGroup:AddDivider()
-    FlyGroup:AddToggle("JumpPowerEnabled", { Text = "Jump", Default = false })
-    FlyGroup:AddSlider("JumpPower",        { Text = "Jump Value", Default = 50, Min = 50, Max = 300, Rounding = 0, Callback = function(v) currentJumpPower = v end })
-    FlyGroup:AddDivider()
-    FlyGroup:AddToggle("InfJump", { Text = "Infinite Jump", Default = false })
-    FlyGroup:AddToggle("NoClip",  { Text = "NoClip", Default = false })
-end
-
--- ══════════════════════════════════════════
---   SETTINGS TAB
--- ══════════════════════════════════════════
-
-do
-    local PerfGroup = Tabs.Settings:AddLeftGroupbox("Performance", "cpu")
-
-local fpsBoostStateCache = {}
-local isFPSBoostActive = false
-
-local function applyFPSBoost(enabled)
-    pcall(function()
-        local Lighting = game:GetService("Lighting")
-
-        if enabled then
-            if isFPSBoostActive then return end
-            isFPSBoostActive = true
-            table.clear(fpsBoostStateCache)
-
-            -- Save and disable GlobalShadows
-            fpsBoostStateCache["GlobalShadows"] = Lighting.GlobalShadows
-            Lighting.GlobalShadows = false
-
-            -- Save ONLY what is currently enabled before disabling
-            for _, v in ipairs(Lighting:GetChildren()) do
-                if (v:IsA("PostEffect") or v:IsA("Atmosphere") or v:IsA("Sky")) and v.Enabled then
-                    fpsBoostStateCache[v] = true
-                    v.Enabled = false
-                end
-            end
-
-            for _, desc in ipairs(workspace:GetDescendants()) do
-                if (desc:IsA("ParticleEmitter") or desc:IsA("Trail") or desc:IsA("Smoke") or desc:IsA("Fire") or desc:IsA("Sparkles")) and desc.Enabled then
-                    fpsBoostStateCache[desc] = true
-                    desc.Enabled = false
-                elseif desc:IsA("BasePart") and desc.CastShadow then
-                    fpsBoostStateCache[desc] = true
-                    desc.CastShadow = false
-                end
-            end
-        else
-            if not isFPSBoostActive then return end
-            isFPSBoostActive = false
-
-            -- Restore GlobalShadows to original state
-            if fpsBoostStateCache["GlobalShadows"] ~= nil then
-                Lighting.GlobalShadows = fpsBoostStateCache["GlobalShadows"]
-            end
-
-            -- ONLY restore instances that were originally active
-            for obj, wasActive in pairs(fpsBoostStateCache) do
-                if typeof(obj) == "Instance" and obj.Parent then
-                    pcall(function()
-                        if obj:IsA("BasePart") then
-                            obj.CastShadow = true
-                        else
-                            obj.Enabled = true
-                        end
-                    end)
-                end
-            end
-
-            table.clear(fpsBoostStateCache)
-        end
-    end)
-end
-
-    PerfGroup:AddLabel(b(createMultiGradientText("OPTIMIZATION", PALETTE.aurora)), true)
-    PerfGroup:AddDivider()
-
-    PerfGroup:AddToggle("PotatoMode", {
-        Text = "Disable 3D Rendering",
-        Default = false,
-        Tooltip = "Reduces resource allocation when AFK farming",
-        Callback = function(v) RunService:Set3dRenderingEnabled(not v) end,
-    })
-
-    local MenuGroup = Tabs.Settings:AddRightGroupbox("Interface", "settings")
-    MenuGroup:AddLabel(b(createMultiGradientText("UI PREFERENCES", PALETTE.prism)), true)
-    MenuGroup:AddDivider()
-    MenuGroup:AddToggle("AntiAFK", { Text = "Anti-AFK System", Default = true })
-    MenuGroup:AddToggle("KeybindMenuOpen", {
-        Text     = "Show Keybind Menu",
-        Default  = false,
-        Callback = function(v) if Library.KeybindFrame then Library.KeybindFrame.Visible = v end end,
-    })
-    MenuGroup:AddDropdown("NotificationSide", {
-        Values   = { "Left", "Right" },
-        Default  = "Right",
-        Text     = "Notification Placement",
-        Callback = function(v) pcall(function() Library:SetNotifySide(v) end) end,
-    })
-    MenuGroup:AddDivider()
-    MenuGroup:AddLabel("Menu Keybind"):AddKeyPicker("MenuKeybind", { Default = "G", NoUI = true, Text = "Menu keybind" })
-    Library.ToggleKeybind = Options.MenuKeybind
-    MenuGroup:AddButton("Unload Prism", function() Library:Unload() end)
-end
-
--- ══════════════════════════════════════════
---   HIGH PERFORMANCE EVENT LISTENERS
--- ══════════════════════════════════════════
-
-local steppedConnection = RunService.Stepped:Connect(function()
-    if Library.Unloaded then return end
-    if isOn("NoClip") or isOn("AutoFarm") then
-        for i = 1, #characterParts do
-            local p = characterParts[i]
-            if p and p.Parent then
-                p.CanCollide = false
-            end
-        end
-    end
-end)
-
-local jumpConnection = UserInputService.JumpRequest:Connect(function()
-    if Library.Unloaded then return end
-    if isOn("InfJump") then
-        local h = getHumanoid()
-        if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
-    end
-end)
-
-local renderConnection = RunService.RenderStepped:Connect(function()
-    if Library.Unloaded then return end
-    if isOn("WalkSpeedEnabled") then
-        local h = getHumanoid()
-        if h then h.WalkSpeed = currentWalkSpeed end
-    end
-    if isOn("JumpPowerEnabled") then
-        local h = getHumanoid()
-        if h then h.JumpPower = currentJumpPower end
-    end
-end)
-
-Toggles.Fly:OnChanged(function(v)
-    if v then
-        sFLY(false)
-    else
-        FLYING = false
-        if flyKeyDown then flyKeyDown:Disconnect() flyKeyDown = nil end
-        if flyKeyUp then flyKeyUp:Disconnect() flyKeyUp = nil end
-        local h = getHumanoid()
-        if h then h.PlatformStand = false end
-    end
-end)
-
-Toggles.WalkSpeedEnabled:OnChanged(function(v)
-    if not v then
-        local h = getHumanoid()
-        if h then h.WalkSpeed = 16 end
-    end
-end)
-
-Toggles.JumpPowerEnabled:OnChanged(function(v)
-    if not v then
-        local h = getHumanoid()
-        if h then h.JumpPower = 50 end
-    end
-end)
-
-Toggles.WebhookPingEnabled:OnChanged(function()
-    wh_pingEnabled = isOn("WebhookPingEnabled")
-end)
-
--- ══════════════════════════════════════════
---   ANTI-AFK SYSTEM
--- ══════════════════════════════════════════
-
-local antiAfkLastInput = tick()
-local antiAfkLastTap   = tick()
-
-pcall(function()
-    for _, conn in ipairs(getconnections(LocalPlayer.Idled)) do conn:Disable() end
-end)
-
-function antiAfkTap()
-    local cam = workspace.CurrentCamera
-    if not cam then return end
-    VirtualUser:Button2Down(Vector2.new(0, 0), cam.CFrame)
-    task.wait(0.1)
-    VirtualUser:Button2Up(Vector2.new(0, 0), cam.CFrame)
-    antiAfkLastTap = tick()
-end
-
-UserInputService.InputBegan:Connect(function() antiAfkLastInput = tick() end)
-UserInputService.InputChanged:Connect(function(input)
-    local t = input.UserInputType
-    if t == Enum.UserInputType.MouseMovement or t == Enum.UserInputType.Gamepad1 then
-        antiAfkLastInput = tick()
-    end
-end)
-
-task.spawn(function()
-    while not Library.Unloaded do
-        task.wait(2)
-        if isOn("AntiAFK") then
-            local idle = tick() - antiAfkLastInput
-            if idle >= 300 and (tick() - antiAfkLastTap >= 60) then
-                pcall(antiAfkTap)
-            end
-        end
-    end
-end)
-
--- ══════════════════════════════════════════
---   AUTOMATION LOOPS
--- ══════════════════════════════════════════
-
--- Auto Start / Replay Loop
-task.spawn(function()
-    local replayFired = false
-    while not Library.Unloaded do
-        if isOn("AutoStartDungeon") and ad_isDungeonNotStarted() then
-            pcall(function() ad_StartDungeon:FireServer() end)
-            local t = tick()
-            while isOn("AutoStartDungeon") and ad_isDungeonNotStarted() and tick() - t < 10 do
-                task.wait(0.5)
-            end
-        end
-        if isOn("AutoReplay") then
-            local done = ad_isDungeonComplete()
-            if done and not replayFired then
-                replayFired = true
-                task.wait(1)
-                pcall(function() ad_Dungeon:FireServer("PlayAgain") end)
-            elseif not done then
-                replayFired = false
-            end
-        else
-            replayFired = false
-        end
-        task.wait(0.5)
-    end
-end)
-
--- Auto Stat Points Loop
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoStatPoint") then
-            pcall(function() ad_SP:FireServer(ad_selected_stat) end)
-            task.wait(0.1)
-        else task.wait(0.5) end
-    end
-end)
-
--- Auto Chest Loop
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoChest") then
-            local chest = ad_getNearestChest()
-            if not chest then
-                task.wait(2)
-            else
-                ad_farm_paused    = true
-                adf_currentTarget = nil
-                currentTarget     = nil
-                pcall(function()
-                    chest.prompt.MaxActivationDistance = 99999
-                    chest.prompt.RequiresLineOfSight   = false
-                    chest.prompt.HoldDuration          = 0
-                    chest.prompt.Enabled               = true
-                end)
-                pcall(function()
-                    local cp = chest.model:GetPivot().Position
-                    local hrp = ad_getHRP()
-                    if hrp then
-                        hrp.CFrame = CFrame.new(cp + Vector3.new(0, 3, 0), cp)
-                    end
-                end)
-                task.wait(0.2)
-                local t0 = tick()
-                while isOn("AutoChest") and tick() - t0 < 10 do
-                    local done = false
-                    pcall(function()
-                        if chest.prompt and chest.prompt.Parent then
-                            fireproximityprompt(chest.prompt, 0)
-                        else done = true end
-                    end)
-                    pcall(function()
-                        if not chest.model or not chest.model.Parent then done = true end
-                    end)
-                    if done then break end
-                    task.wait()
-                end
-                task.wait(0.5)
-                ad_farm_paused = false
-            end
-            task.wait(1)
-        else
-            ad_farm_paused = false
-            task.wait(0.5)
-        end
-    end
-end)
-
--- Auto Attack Loop
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoAttack") and (isOn("AutoFarm") or currentTarget) and not ad_farm_paused then
-            pcall(function()
-                local inv = LocalPlayer:FindFirstChild("Inventory")
-                local wid = "SteelDaggers"
-                if inv then
-                    for _, i in ipairs(inv:GetChildren()) do
-                        if i:GetAttribute("Type") == "Weapon" and i:GetAttribute("Equipped") == true then
-                            wid = i.Name; break
-                        end
-                    end
-                end
-                local dir    = Vector3.new(0, 0, -1)
-                local target = adf_pickTarget()
-                local hrp    = ad_getHRP()
-                if hrp and target and target.part then
-                    local diff = target.part.Position - hrp.Position
-                    if diff.Magnitude > 0 then dir = diff.Unit end
-                end
-                ad_Attack:FireServer("M1", wid, makeVec(dir.X, dir.Y, dir.Z), 3)
-                SessionStats.attacksFired = SessionStats.attacksFired + 1
-            end)
-            task.wait(0.06)
-        else task.wait(0.3) end
-    end
-end)
-
--- Auto Spell Loop
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoSpell") and (isOn("AutoFarm") or currentTarget) and not ad_farm_paused then
-            local s1 = ad_getEquippedSpellBySlot("Spell1")
-            local s2 = ad_getEquippedSpellBySlot("Spell2")
-            if s1 then pcall(function() ad_Attack:FireServer("Spell1", s1.Name) end) SessionStats.skillsCast = SessionStats.skillsCast + 1 end
-            if s2 then pcall(function() ad_Attack:FireServer("Spell2", s2.Name) end) SessionStats.skillsCast = SessionStats.skillsCast + 1 end
-            task.wait(0.04)
-        else task.wait(0.3) end
-    end
-end)
-
--- Auto Ultimate Loop
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoUltimate") and (isOn("AutoFarm") or currentTarget) and not ad_farm_paused then
-            local ult = ad_getEquippedUltimate()
-            if ult then
-                pcall(function() ad_Attack:FireServer("Ultimate", ult.Name) end)
-                SessionStats.skillsCast = SessionStats.skillsCast + 1
-            end
-            task.wait(0.04)
-        else task.wait(0.3) end
-    end
-end)
-
--- Auto Equip Loops
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoEquipWeapon") and not ad_equipDoneWeapon then
-            local r = adeq_doEquipWeapon(ad_weapon_priority)
-            ad_equipDoneWeapon = true
-            if r and not ad_isLoadingConfig then Library:Notify("Equipped Weapon: " .. r) end
-        end
-        task.wait(1)
-    end
-end)
-
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoEquipArmor") and not ad_equipDoneArmor then
-            local r = adeq_doEquipArmor(ad_armor_priority)
-            ad_equipDoneArmor = true
-            if r and not ad_isLoadingConfig then Library:Notify("Equipped Armor: " .. r) end
-        end
-        task.wait(1)
-    end
-end)
-
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoEquipHelmet") and not ad_equipDoneHelmet then
-            local r = adeq_doEquipHelmet(ad_helmet_priority)
-            ad_equipDoneHelmet = true
-            if r and not ad_isLoadingConfig then Library:Notify("Equipped Helmet: " .. r) end
-        end
-        task.wait(1)
-    end
-end)
-
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoEquipSpells") and not ad_equipDoneSpells then
-            local r = adeq_doEquipSpells()
-            ad_equipDoneSpells = true
-            if #r > 0 and not ad_isLoadingConfig then Library:Notify("Equipped Spells: " .. table.concat(r, ", ")) end
-        end
-        task.wait(1)
-    end
-end)
-
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoEquipUltimate") and not ad_equipDoneUlt then
-            local r = adeq_doEquipUltimate()
-            ad_equipDoneUlt = true
-            if r and not ad_isLoadingConfig then Library:Notify("Equipped Ultimate: " .. r) end
-        end
-        task.wait(1)
-    end
-end)
-
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoEquipHeroes") and not ad_equipDoneHeroes then
-            local r = adeq_doEquipHeroes(ad_hero_priority)
-            ad_equipDoneHeroes = true
-            if #r > 0 and not ad_isLoadingConfig then Library:Notify("Equipped Heroes: " .. table.concat(r, ", ")) end
-        end
-        task.wait(1)
-    end
-end)
-
--- Auto Virus Loop
-task.spawn(function()
-    while not Library.Unloaded do
-        task.wait(0.3)
-        if isOn("AutoVirus") and adVirus_isVisible() then
-            local confirm, decline = adVirus_getButtons()
-            if ad_virus_action == "Engage" then adVirus_clickBtn(confirm)
-            else adVirus_clickBtn(decline) end
-            task.wait(1)
-        end
-    end
-end)
-
--- Auto Quests Loops
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoQuestHourly") then adQuest_claimHourly(); task.wait(1)
-        else task.wait(0.5) end
-    end
-end)
-
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoQuestDaily") then adQuest_claimDaily(); task.wait(1)
-        else task.wait(0.5) end
-    end
-end)
-
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoQuestWeekly") then adQuest_claimWeekly(); task.wait(1)
-        else task.wait(0.5) end
-    end
-end)
-
--- Auto Sell Loop
-task.spawn(function()
-    while not Library.Unloaded do
-        if not adSell_anyEnabled() then
-            task.wait(0.5)
-        else
-            if isOn("AutoSellWeapon")   then adSell_sellOneBatch("Weapon");   task.wait(ad_sell_batch_delay) end
-            if isOn("AutoSellArmor")    then adSell_sellOneBatch("Armor");    task.wait(ad_sell_batch_delay) end
-            if isOn("AutoSellHelmet")   then adSell_sellOneBatch("Helmet");   task.wait(ad_sell_batch_delay) end
-            if isOn("AutoSellSpell")    then adSell_sellOneBatch("Spell");    task.wait(ad_sell_batch_delay) end
-            if isOn("AutoSellUltimate") then adSell_sellOneBatch("Ultimate"); task.wait(ad_sell_batch_delay) end
-            task.wait(0.5)
-        end
-    end
-end)
-
--- Auto Daily Spin Loop
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoDailySpin") then
-            pcall(function() ad_DailySpin:InvokeServer("Claim") end)
-            task.wait(60)
-        else task.wait(1) end
-    end
-end)
-
--- Auto Cosmetic Spin Loop
-task.spawn(function()
-    while not Library.Unloaded do
-        if isOn("AutoCosmeticSpin") then
-            pcall(function() ad_CosmeticSpin:InvokeServer() end)
-            task.wait(0.5)
-        else task.wait(0.5) end
-    end
-end)
-
--- ══════════════════════════════════════════
---   UNLOAD
--- ══════════════════════════════════════════
-
-Library:OnUnload(function()
-    steppedConnection:Disconnect()
-    jumpConnection:Disconnect()
-    renderConnection:Disconnect()
-    adf_stopMovement()
-
-    FLYING = false
-    if flyKeyDown then flyKeyDown:Disconnect() end
-    if flyKeyUp then flyKeyUp:Disconnect() end
-
-    RunService:Set3dRenderingEnabled(true)
-    local h = getHumanoid()
-    if h then
-        h.PlatformStand = false
-        h.WalkSpeed     = 16
-        h.JumpPower     = 50
-    end
-end)
-
--- ══════════════════════════════════════════
---   FINALIZE SETUP & CONFIG RESTORATION
--- ══════════════════════════════════════════
-
-ThemeManager:SetLibrary(Library)
-SaveManager:SetLibrary(Library)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({ "MenuKeybind" })
-ThemeManager:SetFolder("PrismHub")
-SaveManager:SetFolder("PrismHub/AnimeDungeons")
-
-SaveManager:BuildConfigSection(Tabs.Settings)
-ThemeManager:ApplyToTab(Tabs.Settings)
-ThemeManager:SaveDefault("Claude")
-ThemeManager:LoadDefault()
-
-ad_isLoadingConfig = true
-SaveManager:LoadAutoloadConfig()
-
-Window:SetGlow(true, {
-    Color = Color3.fromRGB(217, 119, 87),
-    Radius = 30,
-    Transparency = 0.1
-})
-
-task.defer(function() ad_isLoadingConfig = false end)
-
-task.spawn(function()
-    task.wait(1.5)
-
-    local togglesToVerify = {
-        "AutoFarm", "AutoAttack", "AutoSpell", "AutoUltimate", "AutoChest",
-        "AutoStartDungeon", "AutoReplay", "AutoStatPoint", "AntiAFK",
-        "AutoEquipWeapon", "AutoEquipArmor", "AutoEquipHelmet",
-        "AutoEquipSpells", "AutoEquipUltimate", "AutoEquipHeroes",
-        "AutoVirus", "AutoSellWeapon", "AutoSellArmor", "AutoSellHelmet",
-        "AutoSellSpell", "AutoSellUltimate", "AutoQuestHourly", "AutoQuestDaily",
-        "AutoQuestWeekly", "AutoDailySpin", "AutoCosmeticSpin", "WebhookPingEnabled",
-        "Fly", "WalkSpeedEnabled", "JumpPowerEnabled", "AntiSit", "PotatoMode", "FPSBoost"
-    }
-
-    for _, toggleName in ipairs(togglesToVerify) do
-        local toggle = Toggles[toggleName]
-        if toggle and toggle.Value == true then
-            pcall(function()
-                if type(toggle.Callback) == "function" then
-                    toggle.Callback(toggle.Value)
-                end
-            end)
-        end
-    end
-
-    local dropdownsToVerify = {
-        "FarmMode", "FarmMethod", "StatSelect", "WeaponPriority", "ArmorPriority",
-        "HelmetPriority", "HeroPriority", "VirusAction", "NotificationSide"
-    }
-    for _, dropName in ipairs(dropdownsToVerify) do
-        local opt = Options[dropName]
-        if opt and opt.Value then
-            pcall(function()
-                if type(opt.Callback) == "function" then
-                    opt.Callback(opt.Value)
-                end
-            end)
-        end
-    end
-
-    local sliderMap = {
-        FarmHeight      = function(v) ad_farm_height = v end,
-        TweenSpeed      = function(v) ad_tween_speed = v end,
-        OrbitRadius     = function(v) ad_farm_orbit_radius = v end,
-        OrbitSpeed      = function(v) ad_farm_orbit_speed = v end,
-        FlySpeed        = function(v) currentFlySpeed = v end,
-        WalkSpeed       = function(v) currentWalkSpeed = v end,
-        JumpPower       = function(v) currentJumpPower = v end,
-        SellBatchDelay  = function(v) ad_sell_batch_delay = v end,
-    }
-    for name, applyFn in pairs(sliderMap) do
-        local opt = Options[name]
-        if opt and opt.Value then
-            pcall(function() applyFn(opt.Value) end)
-        end
-    end
-
-    local inputMap = {
-        WebhookURL    = function(v) wh_url = v end,
-        WebhookUserID = function(v) wh_userId = v end,
-    }
-    for name, applyFn in pairs(inputMap) do
-        local opt = Options[name]
-        if opt and opt.Value then
-            pcall(function() applyFn(opt.Value) end)
-        end
-    end
-
-    Library:Notify("Config verified & callbacks restored!", 3)
-end)
-
-Library:Notify("Prism loaded successfully, welcome " .. LocalPlayer.Name, 5)
+--!nocheck
+-- generated by luast v1.0.1 https://luast.clv.cloud
+local U2 = {}; local UK; local C4; local DN; local CM; local Dt; local Eb; local Da; local DT; local CS; local Dz; local Eh; local Dg; local Cy; local CY; local DF; local CE; local D4; local C3; local DM; local CL; local Ea; local C9; local CR; local Dy; local Eg;
+local Df; local DY; local CX; local DE; local CD; local Dl; local D3; local C2; local DL; local CK; local D9; local C8; local DR; local CQ; local Dx; local Ef; local Cw; local De; local DX; local CW; local DD; local CC; local Dk; local DK; local CJ; local Dq;
+local D8; local C7; local DQ; local CP; local Dw; local Ee; local Dd; local Cv; local CV; local CB; local Dj; local C0; local DJ; local CI; local Dp; local C6; local DP; local CO; local Dv; local Ed; local Cu; local Dc; local DV; local CU; local DB; local CA;
+local Di; local C_; local CH; local Do; local D6; local C5; local CN; local Du; local Ec; local Ct; local Db; local CT; local DA; local Cz; local Dh; local D_; local CZ; local DH; local CF; local Dn; UK = { "Relative Positioning", "jxwt", "Auto Claim Daily Quests",
+56, 2925., 1661, 101, "tpsoirgihia", 3956, "feather", "WebhookURL", 492., function(nS) DL = nS end, 41, "https://discord.gg/DHeCNzTypH", 4020., "AutoSellHelmet", 3932, function(ar, as) local E1 = nil; local E2 = nil; E2 = 5; while true do E2 = 15522. - E2;
+do if E2 < 8783 then break elseif E2 < 15517 then if E2 < 15514 then break elseif E2 < 15515 then break elseif E2 < 15516. then if E2 == 15515 then E2 = 1 else E2 = 1528; continue end else E1 = UK[598]; E2 = 3. end elseif E2 < 15520 then if E2 < 15518 then
+if E2 == 15517 then E2 = if setclipboard then 2 else 0. else E2 = 15521; continue end elseif E2 < 15519. then if E2 == 15518 then toclipboard(ar); E2 = 7 else E2 = 15516.; continue end else DJ:Notify(E1); E2 = 8 end elseif E2 < 15521 then if E2 == 15520 then
+setclipboard(ar); E2 = 1 else E2 = 5490.; continue end elseif E2 < 15522. then E1 = as; E2 = if E1 then 3. else 6. elseif E2 == 15522. then E2 = if toclipboard then 4 else 7 else E2 = 15516.; continue end end end end, "Helmet", "wpsz", "Chest", "A", 16738740.,
+"skillsCast", "dbds", 1178171526., Color3, "Died", "E", "mcqwn", 803, "\u{1F535}", function() local T6 = nil; T6 = 18.; while true do T6 = 15946 - T6; do if T6 < 15938 then if T6 < 15933. then if T6 < 15931 then if T6 < 15928 then if T6 < 13883 then break elseif T6 < 15926 then
+break elseif T6 < 15927. then if T6 == 15926 then T6 = 17 else T6 = 15946; continue end else T6 = if isOn(UK[1822]) then 16 else 3. end elseif T6 < 15929 then if T6 == 15928 then T6 = 11 else T6 = 16347.; continue end elseif T6 < 15930. then break else adSell_sellOneBatch(UK[111.]);
+local U3 = UK[1957][UK[438.]]; UK[1433](DA); T6 = 3. end elseif T6 < 15932 then T6 = 20 elseif T6 == 15932 then T6 = if not adSell_anyEnabled() then 8 else 19 else T6 = 15940; continue end elseif T6 < 15936. then if T6 < 15935 then if T6 < 15934 then if T6 == 15933. then
+T6 = 11 else T6 = 15942.; continue end elseif T6 == 15934 then adSell_sellOneBatch(UK[476]); local U4 = UK[1957][UK[438.]]; UK[1433](DA); T6 = 0. else T6 = 15930.; continue end elseif T6 == 15935 then T6 = if true then 7 else 20 else T6 = 15943; continue end
+elseif T6 < 15937 then adSell_sellOneBatch(UK[188]); local U5 = UK[1957][UK[438.]]; UK[1433](DA); T6 = 5 else adSell_sellOneBatch(UK[1933]); local U6 = UK[1957][UK[438.]]; UK[1433](DA); T6 = 2 end elseif T6 < 15943 then if T6 < 15941 then if T6 < 15940 then
+if T6 < 15939. then local U7 = UK[1957][UK[438.]]; UK[1433](UK[419]); T6 = 4 elseif T6 == 15939. then T6 = if not DJ[UK[1902.]] then 14 else 15. else T6 = 15946; continue end else adSell_sellOneBatch(UK[20]); local U8 = UK[1957][UK[438.]]; UK[1433](DA); T6 = 1
+end elseif T6 < 15942. then T6 = if isOn(UK[17]) then 6. else 1 else T6 = 13 end elseif T6 < 15945. then if T6 < 15944 then T6 = if isOn(UK[656]) then 10 else 5 else local U9 = UK[1957][UK[438.]]; UK[1433](UK[419]); T6 = 4 end elseif T6 < 15946 then T6 = if isOn(UK[662]) then 12. else 0.
+elseif T6 < 16347. then if T6 == 15946 then T6 = if isOn(UK[972.]) then 9. else 2 else break end else break end end end end, "TweenService", 3352, "Epic", "hkdrdeootrj", "SellBatchDelay", "Claim Daily Spin Once", "qsbov", '<font color="%s">%s</font>', 2305,
+"settings", 150., "Equipped", 274, 4636662., "#3b82f6", "WebhookUserID", 3898, "ruldvhmk", "#6366f1", 3455, 415, "Hero1", "Webhook URL", "WaterWaveSpeed", 23952705., "txwhqne", function() local I3 = nil; I3 = 1; while true do I3 = 250 - I3; do if I3 < 2644 then
+if I3 < 249. then if I3 < 247 then break elseif I3 < 248 then break elseif I3 == 248 then CO:Disconnect(); CO = nil; I3 = 0. else I3 = 249.; continue end elseif I3 < 800 then if I3 < 250 then I3 = if CO then 2 else 0. elseif I3 == 250 then ad_cancelTween();
+CW = nil; CS = nil; CM = UK[650]; CI = false; I3 = 3. else break end else break end else break end end end end, "Folder", "VirusesDefeated", "CurrentCamera", 3130962876., function() local Va = UK; Va[879.](function() DD:FireServer(UK[330.]) end); DJ:Notify(Va[1791.])
+end, 2932, "<i>%s</i>", "All Dropped Items", function() local Vb = UK[1957][UK[394]]; UK[1383.](function() local Pp, Pq = nil, nil; local Pr = nil; Pr = 3.; while true do Pr = 12229 - Pr; do if Pr < 12226 then break elseif Pr < 12229 then if Pr < 12227 then
+if Pr == 12226 then CA = false; DJ:Notify(UK[398]); Pp = adeq_doEquipArmor(Dg); CA = true; Pq = Pp; Pr = if Pq then 1 else 0. else Pr = 12227; continue end elseif Pr < 12228. then break elseif Pr == 12228. then DJ:Notify(UK[1708] .. Pq); Pr = 2 else Pr = 12227;
+continue end elseif Pr < 14095 then if Pr == 12229 then Pq = UK[458]; Pr = 1 else break end else break end end end end) end, 430, "mhxqfao", "color", "OldHealth", "jiqlbo", "sxvvjdjz", function() local EO, EP, EQ, ER, ET, EU, EV = nil, nil, nil, nil, nil, nil, nil;
+local ES = nil; ES = 2; while true do ES = 7466 - ES; do if ES < 7455. then if ES < 7446. then if ES < 7442 then if ES < 7008. then break elseif ES < 7441 then break elseif ES == 7441 then EV = if KRNL_LOADED then UK[1292] else UK[650]; ET = UK[1008.] * EV + UK[1517] * (UK[1292] - EV);
+EU = UK[1375] * EV + UK[289] * (UK[1292] - EV); ES = if (ET * UK[275] + EU * UK[583] + ET * EU) % UK[1264] == UK[1830.] then 3. else 15. else ES = 7454; continue end elseif ES < 7444 then if ES < 7443. then EQ = EP .. UK[1895] .. EO; ES = 8 else ES = 13 end
+elseif ES < 7445 then if ES == 7444 then EQ = EO ~= UK[2056]; ES = 5 else ES = 7461.; continue end elseif ES == 7445 then Dc = EO; ES = 14 else ES = 4334; continue end elseif ES < 7450 then if ES < 7448 then if ES < 7447 then if ES == 7446. then Dc = UK[1769];
+ES = 19 else ES = 7454; continue end else ES = 10 end elseif ES < 7449. then ES = if fluxus then 20 else 25 elseif ES == 7449. then EO = EP; ES = 21. else ES = 7999; continue end elseif ES < 7452. then if ES < 7451 then break elseif ES == 7451 then ES = if pebc_execute then 4 else 23
+else ES = 7452.; continue end elseif ES < 7453 then if ES == 7452. then ES = 6. else ES = 7444; continue end elseif ES < 7454 then if ES == 7453 then ES = 19 else ES = 8121.; continue end elseif ES == 7454 then EQ = type(EO) == UK[1497.]; ES = if EQ then 22 else 5
+else ES = 7446.; continue end elseif ES < 7464. then if ES < 7459 then if ES < 7457 then if ES < 7456 then ES = if ER then 12. else 14 elseif ES == 7456 then ES = 6. else ES = 7008.; continue end elseif ES < 7458. then EP, EO = identifyexecutor(); EQ = EP ~= UK[2056];
+ER = type(EP) == UK[1497.]; ES = if ER then 1 else 11 elseif ES == 7458. then EO = EQ; ES = if EO then 21. else 17 else ES = 7444; continue end elseif ES < 7461. then if ES < 7460 then if ES == 7459 then Dc = UK[497]; ES = 10 else ES = 7445; continue end elseif ES == 7460 then
+ES = 16 else ES = 7999; continue end elseif ES < 7462 then if ES == 7461. then ES = if EQ then 24. else 8 else ES = 7446.; continue end elseif ES < 7463 then if ES == 7462 then Dc = UK[654.]; ES = 23 else ES = 7464.; continue end else Dc = UK[619]; ES = 13
+end elseif ES < 7999 then if ES < 7466 then if ES < 7465 then ES = if identifyexecutor then 9. else 0. else ER = EQ; ES = 11 end elseif ES < 7716. then if ES == 7466 then ES = if syn then 7 else 18. else ES = 4334; continue end else break end else break end
+end end end, 2449915462, "vpsglymhpcn", "Decline", "Replays the instant victory screen appears", function(jO) local Mo, Mq, Mr, Ms, Mu = nil, nil, nil, nil, nil; local Mp = nil; Mp = 0.; while true do Mp = 5434 - Mp; do if Mp < 5434 then if Mp < 5432 then break
+elseif Mp < 5433. then return nil else Mr = false; for jR, jS in UK[1189](Mo:GetChildren()) do Ms = jR; Mu = jS; local Mt = Ms; local Mv = Mu; local Mq = nil; local Vc = UK; Mq = Vc[597.]; while true do if Mq < 4 then if Mq < 2 then if Mq < 1 then Mr = true;
+Mq = Vc[2008] else Mq = if Mo then Vc[1579] else Vc[633.] end elseif Mq < 3. then break else Mo = Mv:GetAttribute(Vc[692]) == jO; Mq = Vc[1292] end elseif Mq < 6. then if Mq < 5 then Mo = Mv:GetAttribute(Vc[46]) == true; Mq = Vc[749] else Mq = Vc[2008] end
+elseif Mq < 7 then return Mv elseif Mq < 8 then Mo = Mv:GetAttribute(Vc[1436]) == Vc[476]; Mq = if Mo then Vc[327.] else Vc[749] else Mq = if Mo then Vc[1165] else Vc[1292] end end; if Mr then break end end; Mp = 3. end elseif Mp < 10474 then if Mp < 8115. then
+if Mp < 5451. then if Mp == 5434 then Mo = Dk:FindFirstChild(UK[1915]); Mp = if not Mo then 2 else 1 else Mp = 4158.; continue end else break end else break end else break end end end end, "sslxpdbgqe", 1636, "Viruses Cleared", "lkh", 3136352, 65535., "0s",
+"syeaye", "flame", function() local H6, H7, H8, Ia, Ib, Ic, Id, Ie, If, Ih = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local H9 = nil; H9 = 5; while true do H9 = 16031 - H9; do if H9 < 16029. then if H9 < 16028 then if H9 < 11156 then break elseif H9 < 16026. then
+break elseif H9 < 16027 then if H9 == 16026. then H6 = {}; H7 = UK[1560.]:FindFirstChild(UK[1968.]); H9 = if not H7 then 1 else 4 else H9 = 824; continue end else local Vd = UK; H8 = H7:FindFirstChild(Vd[506]); Ic = if not H8 then Vd[1292] else Vd[650]; Ia = Vd[1914.] * Ic + Vd[1608.] * (Vd[1292] - Ic);
+Ib = Vd[727] * Ic + Vd[1677.] * (Vd[1292] - Ic); H9 = if (Ia * Vd[1681] + Ib * Vd[130] + Ia * Ib) % Vd[1264] == Vd[594.] then 0. else 2 end else break end elseif H9 < 16030 then if H9 == 16029. then Ie = false; for fo, fp in UK[1295](H8:GetChildren()) do If = fo;
+Ih = fp; local Ig = If; local Ii = Ih; local Id = nil; local Vd = UK; Id = Vd[1292]; while true do if Id < 5 then if Id < 2 then if Id < 1 then H7 = adf_isEnemyAlive(Ii); Id = Vd[749] else H7 = (Ii:IsA(Vd[453.])); Id = if H7 then Vd[650] else Vd[749] end elseif Id < 3. then
+H7 = adf_getEnemyPart(Ii); H8 = H7; Id = if H8 then Vd[1756] else Vd[1579] elseif Id < 4 then Id = Vd[633.] else table.insert(H6, { [Vd[1825]] = Ii, [Vd[1394]] = H7 }); Id = Vd[1165] end elseif Id < 8 then if Id < 6. then Id = Vd[1620.] elseif Id < 7 then Id = if H8 then Vd[327.] else Vd[1165]
+else Ie = true; Id = Vd[1620.] end elseif Id < 9. then Id = if H7 then Vd[2008] else Vd[633.] elseif Id < 10 then break else H8 = H7:IsA(Vd[878]); Id = Vd[1579] end end; if Ie then break end end; return H6 else H9 = 9261.; continue end elseif H9 < 16031 then
+return H6 elseif H9 == 16031 then return H6 else H9 = 16026.; continue end end end end, 374761393, 3736, "L", "DamageMultiplier", "ggo", "Orbit Offsets", "\u{200E}", 2048, "wccrsejxj", 5804060, 1335., "Ping: OFF", "vzs", "sparkles", 1441210104., "EasingStyle",
+"DescendantRemoving", "F", "Weapon", 3157, 80, "ieal", 1601, "Material", 2992, "miuxahvtoi", 2509, 2430., "xwk", "EnemyOnly", 128, "Low", "CosmeticSpin", 3527, function() local UO = math.huge; local IC, ID, IE, IF, IG, II, IJ, IK, IL, IM, IN, IP = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local IH = nil; IH = 8; while true do IH = 13354 - IH; do if IH < 13348 then if IH < 12999. then break elseif IH < 13346 then if IH < 13345 then break else IH = if (II * UK[896] + IJ * UK[1659.] + II * IJ) % UK[1264] == UK[1753] then 0. else 3. end elseif IH < 13347. then
+if IH == 13346 then IC = UK[1560.]:FindFirstChild(UK[1968.]); IK = if not IC then UK[1292] else UK[650]; II = UK[36.] * IK + UK[1496] * (UK[1292] - IK); IH = 4 else IH = 13345; continue end else IF, IE = nil, UO; IM = false; for fI, fJ in UK[1295](ID:GetChildren()) do
+IN = fI; IP = fJ; local IO = IN; local IQ = IP; local IL = nil; IL = UK[1756]; while true do if IL < 5 then if IL < 2 then if IL < 1 then IG = ID; ID = IG; IL = if ID then UK[749] else UK[1292] else IL = if ID then UK[1579] else UK[1620.] end elseif IL < 3. then
+IM = true; IL = UK[633.] elseif IL < 4 then IE = ID; IF = IG; IL = UK[597.] else ID = IQ:FindFirstChildWhichIsA(UK[878]); IL = UK[650] end elseif IL < 8 then if IL < 6. then break elseif IL < 7 then ID = (IG[UK[2060]] - IC[UK[2060]])[UK[1142]]; IL = if ID < IE then UK[1165] else UK[597.]
+else IL = UK[1620.] end elseif IL < 9. then ID = IG:IsA(UK[878]); IL = UK[1292] elseif IL < 10 then IL = UK[633.] else ID = (IQ:FindFirstChild(UK[567.])); IL = if ID then UK[650] else UK[327.] end end; if IM then break end end; return IF, IE end elseif IH < 13354 then
+if IH < 13351 then if IH < 13349 then if IH == 13348 then return nil, UO else IH = 8875; continue end elseif IH < 13350. then return nil, UO else IJ = UK[1496] * IK + UK[1261] * (UK[1292] - IK); IH = 9. end elseif IH < 13352 then if IH == 13351 then ID = IC:FindFirstChild(UK[384.]);
+IH = if not ID then 5 else 2 else IH = 13349; continue end elseif IH < 13353. then if IH == 13352 then IC = ad_getHRP(); IH = if not IC then 6. else 7 else IH = 15483.; continue end else break end elseif IH < 15272 then if IH == 13354 then return nil, UO else
+IH = 1055; continue end else break end end end end, "AutoStatPoint", "AntiSit", 3709, "B", "Equipping weapon...", 4135563746, "Attack", "Equip Best Weapon Once", 9583481, 3267., function() local T5 = nil; T5 = 10; while true do T5 = 2262. - T5; do if T5 < 2260 then
+if T5 < 2257 then if T5 < 2256. then if T5 < 2254 then if T5 < 2253. then if T5 == 2252 then T5 = 0. else break end elseif T5 == 2253. then T5 = if not DJ[UK[1902.]] then 1 else 3. else T5 = 2255; continue end elseif T5 < 2255 then T5 = 4 else T5 = 2 end elseif T5 == 2256. then
+adQuest_claimWeekly(); local Ve = UK[1957][UK[438.]]; UK[1433](UK[1292]); T5 = 7 else T5 = 14876; continue end elseif T5 < 2258 then local Vf = UK[1957][UK[438.]]; UK[1433](UK[419]); T5 = 7 elseif T5 < 2259. then break elseif T5 == 2259. then T5 = 8 else T5 = 2254;
+continue end elseif T5 < 2262. then if T5 < 2261 then T5 = 0. elseif T5 == 2261 then T5 = if isOn(UK[1992.]) then 6. else 5 else T5 = 2258; continue end elseif T5 < 7460 then if T5 == 2262. then T5 = if true then 9. else 8 else T5 = 7506.; continue end else
+break end end end end, function() local TA, TB, TC = nil, nil, nil; local TD = nil; TD = 0.; while true do TD = 5473 - TD; do if TD < 5465 then if TD < 5462 then if TD < 5460. then if TD < 5459 then if TD < 4205 then break elseif TD < 4712 then break elseif TD < 5458 then
+break else TD = if true then 8 else 2 end else TA = not CD; TB = (isOn(UK[820])); TD = if TB then 10 else 13 end elseif TD < 5461 then TD = if TB then 7 else 3. else TD = 3. end elseif TD < 5464 then if TD < 5463. then DJ:Notify(UK[1599.] .. TA); TD = 12. else
+TB = TA; TD = 13 end elseif TD == 5464 then TC = TB; TD = 4 else TD = 15296; continue end elseif TD < 5469. then if TD < 5467 then if TD < 5466. then TD = if not DJ[UK[1902.]] then 14 else 6. else TA = adeq_doEquipWeapon(Dp); CD = true; TB = not Eg; TC = TA;
+TD = if TC then 9. else 4 end elseif TD < 5468 then if TD == 5467 then TD = 2 else TD = 1212.; continue end else TD = 15. end elseif TD < 5471 then if TD < 5470 then if TD == 5469. then TD = if TC then 11 else 12. else TD = 5459; continue end else local Vg = UK[1957][UK[438.]];
+UK[1433](UK[1292]); TD = 5 end elseif TD < 12016 then if TD < 5473 then if TD < 5472. then TD = 1 else break end elseif TD < 9090. then if TD == 5473 then TD = 15. else TD = 541; continue end else break end else break end end end end, 590246533, "Enabled",
+"Ping: ON", function(n9) Dg = n9 end, "Anime Dungeons", "NoUI", 2893, function() local T9 = nil; local Ua = nil; Ua = 0.; while true do Ua = 16299. - Ua; do if Ua < 15589 then break elseif Ua < 16295 then if Ua < 16293. then if Ua < 16292 then break else D8:Set3dRenderingEnabled(true);
+T9 = getHumanoid(); Ua = if T9 then 1 else 2 end elseif Ua < 16294 then if Ua == 16293. then DE:Disconnect(); Ua = 7 else Ua = 16292; continue end elseif Ua == 16294 then Ua = if DE then 6. else 7 else Ua = 15589; continue end elseif Ua < 16297 then if Ua < 16296. then
+break elseif Ua == 16296. then DM:Disconnect(); Ua = 5 else Ua = 16297; continue end elseif Ua < 16298 then Ua = 4 elseif Ua < 16299. then if Ua == 16298 then local Vh = UK; T9[Vh[1923.]] = false; T9[Vh[857]] = Vh[1060]; T9[Vh[315.]] = Vh[1096]; Ua = 2 else
+Ua = 16294; continue end elseif Ua == 16299. then Ec:Disconnect(); DV:Disconnect(); Dj:Disconnect(); adf_stopMovement(); Ea = false; Ua = if DM then 3. else 5 else Ua = 16298; continue end end end end, "USER", function(e9) local HW, HX, HZ, H_, H0 = nil, nil, nil, nil, nil;
+local HY = nil; HY = 19; while true do HY = 13519 - HY; do if HY < 13503. then if HY < 11213 then break elseif HY < 13498 then if HY < 13496 then break elseif HY < 13497. then if HY == 13496 then HX = HW[UK[248]]; HY = 5 else HY = 13514; continue end else HY = if HX then 18. else 1
+end elseif HY < 13500. then if HY < 13499 then if HY == 13498 then return false else HY = 13509.; continue end elseif HY == 13499 then return false else HY = 13497.; continue end elseif HY < 13501 then HW = not e9; HY = if HW then 10 else 13 elseif HY < 13502 then
+HX = HW[UK[248]] <= UK[650]; HY = 1 elseif HY == 13502 then HX = HW:IsA(UK[1504]); HY = 16 else HY = 13500.; continue end elseif HY < 13512. then if HY < 13507 then if HY < 13505 then if HY < 13504 then if HY == 13503. then HY = if HX then 23 else 5 else HY = 13512.;
+continue end else return false end elseif HY < 13506. then return true else HW = not e9[UK[499]]; HY = 10 end elseif HY < 13509. then if HY < 13508 then if HY == 13507 then return false else HY = 4689.; continue end else break end elseif HY < 13510 then if HY == 13509. then
+HY = if HW then 15. else 9. else HY = 13516; continue end elseif HY < 13511 then HW = e9:FindFirstChild(UK[1548.], true); HX = HW; HY = if HX then 6. else 22 else HW = e9:FindFirstChild(UK[996.], true); HX = HW; HY = if HX then 17 else 16 end elseif HY < 13516 then
+if HY < 13514 then if HY < 13513 then H_ = UK[1502] * H0 + UK[189.] * (UK[1292] - H0); HY = 3. else HX = HW:IsA(UK[1400]); HY = 22 end elseif HY < 13515. then if HY == 13514 then HY = if HX then 20 else 2 else HY = 9157; continue end elseif HY == 13515. then
+HY = if HX then 21. else 14 else HY = 3513.; continue end elseif HY < 13518. then if HY < 13517 then if HY == 13516 then HY = if (HZ * UK[863] + H_ * UK[2061.] + HZ * H_) % UK[1264] == UK[2010.] then 12. else 8 else HY = 8468; continue end else HW = e9:FindFirstChildOfClass(UK[985]);
+HX = HW; HY = if HX then 0. else 4 end elseif HY < 13519 then local Vi = UK; H0 = if HX then Vi[1292] else Vi[650]; HZ = Vi[1482.] * H0 + Vi[1361] * (Vi[1292] - H0); HY = 7 elseif HY < 15914 then if HY == 13519 then HX = HW[UK[1548.]] <= UK[650]; HY = 4 else
+break end else break end end end end, "Body", "Show Enemy Count", "AutoReplay", 125272259, 2647, "Tween Transition Speed", function() local Vj = UK[1957][UK[394]]; UK[1383.](function() local PE, PF, PH, PI, PJ = nil, nil, nil, nil, nil; local PG = nil; PG = 5;
+while true do PG = 4577 - PG; do if PG < 4575. then if PG < 4479. then break elseif PG < 4573 then if PG < 4572. then break else Ed = false; DJ:Notify(UK[1619]); PE = adeq_doEquipHeroes(C3); Ed = true; PF = #PE > UK[650]; PJ = if PF then UK[1292] else UK[650];
+PH = UK[1913] * PJ + UK[921.] * (UK[1292] - PJ); PI = UK[2009] * PJ + UK[100] * (UK[1292] - PJ); PG = if (PH * UK[32] + PI * UK[1418] + PH * PI) % UK[1264] == UK[1473.] then 2 else 3. end elseif PG < 4574 then break else PE = PF; PG = if PE then 1 else 0. end
+elseif PG < 9315. then if PG < 4577 then if PG < 4576 then PF = table.concat(PE, UK[1046]); PG = 3. elseif PG == 4576 then DJ:Notify(UK[494] .. PE); PG = 4 else PG = 4573; continue end elseif PG < 7820 then if PG == 4577 then PE = UK[458]; PG = 1 else PG = 16133;
+continue end else break end else break end end end end) end, "Gems Gained: ", 2211., 2928., "QualityLevel", 688, "ntu", "Gold Received", "Auto Skills Rotation", "mhz", "users", 255., "jrhrja", "Tween", "BodyVelocity", "\u{1F464}  Player", 2071, "activity",
+448, "Please input a URL!", "eqtjs", "secret", 8031916, "Equipped and favorited items are protected and skipped.", "etaxmabo", "Default", function() local Vk = UK[1957][UK[394]]; UK[1383.](function() local Pm, Pn = nil, nil; local Po = nil; Po = 1; while true do
+Po = 15265 - Po; do if Po < 9999. then break elseif Po < 15263 then if Po < 15262 then break else Pn = UK[458]; Po = 0. end elseif Po < 15264. then break elseif Po < 15265 then if Po == 15264. then CD = false; DJ:Notify(UK[132.]); Pm = adeq_doEquipWeapon(Dp);
+CD = true; Pn = Pm; Po = if Pn then 0. else 3. else Po = 15262; continue end elseif Po == 15265 then DJ:Notify(UK[1708] .. Pn); Po = 2 else Po = 9999.; continue end end end end) end, 2594, 3410, 99999., 221, "Gems", "Armor", 47, "gift", 1800., 0.4, "online",
+3977, "user-check", Game, "wcduarwtkh", 1028, 1622, "mwkjifswdql", "Escape", "Send Simple Test Message", function() local TP, TQ, TR = nil, nil, nil; local TS = nil; TS = 1; while true do TS = 14416 - TS; do if TS < 14409. then if TS < 14405 then if TS < 14403. then
+if TS < 14402 then break elseif TS == 14402 then TS = if TR then 8 else 7 else TS = 14413; continue end elseif TS < 14404 then if TS == 14403. then TQ = TP; TS = 4 else TS = 14402; continue end elseif TS == 14404 then TP = adeq_doEquipSpells(); Cu = true; TQ = not Eg;
+TR = #TP > UK[650]; TS = if TR then 11 else 14 else TS = 14415.; continue end elseif TS < 14407 then if TS < 14406. then TR = TQ; TS = 14 elseif TS == 14406. then TS = if true then 9. else 6. else TS = 14416; continue end elseif TS < 14408 then if TS == 14407 then
+TS = if not DJ[UK[1902.]] then 3. else 2 else TS = 14414; continue end elseif TS == 14408 then DJ:Notify(UK[465.] .. table.concat(TP, UK[1046])); TS = 7 else TS = 14414; continue end elseif TS < 14413 then if TS < 14412. then if TS < 14410 then if TS == 14409. then
+TS = 0. else TS = 14411; continue end elseif TS < 14411 then if TS == 14410 then TS = 15. else TS = 14407; continue end elseif TS == 14411 then TS = 10 else TS = 14405; continue end else TS = if TQ then 12. else 0. end elseif TS < 14415. then if TS < 14414 then
+TP = not Cu; TQ = (isOn(UK[1671.])); TS = if TQ then 13 else 4 else TS = 6. end elseif TS < 15141. then if TS < 14416 then if TS == 14415. then TS = 10 else TS = 14401; continue end elseif TS == 14416 then local Vl = UK[1957][UK[438.]]; UK[1433](UK[1292]);
+TS = 5 else TS = 14407; continue end else break end end end end, "0", "Equipped Heroes: ", 24., "yrv", "Confirmed virus!", function(ch) local FU, FV = nil, nil; local FW = nil; FW = 1; while true do FW = 11375 - FW; do if FW < 11343. then break elseif FW < 11373. then
+if FW < 11371 then break elseif FW < 11372 then if FW == 11371 then return FV else FW = 4090; continue end elseif FW == 11372 then FV = FU[UK[659]] ~= UK[20]; FW = 4 else FW = 11370.; continue end elseif FW < 11375 then if FW < 11374 then if FW == 11373. then
+FW = if FV then 3. else 4 else FW = 7928; continue end elseif FW == 11374 then FU = CZ[ch]; FV = FU; FW = if FV then 0. else 2 else FW = 5306; continue end elseif FW < 15288. then if FW == 11375 then FV = FU[UK[1436]] == UK[188]; FW = 2 else break end else
+break end end end end, "Playing", 638, 1725., 3078030333., function(hN) local Kj, Kk = nil, nil; local Kl = nil; Kl = 5; while true do Kl = 7111 - Kl; do if Kl < 7108 then if Kl < 6176 then break elseif Kl < 7106 then break elseif Kl < 7107. then Kj = adeq_collect(UK[188], function(hO)
+return ad_isHelmetByName(hO[UK[821]]) end); Kl = if #Kj == UK[650] then 4 else 3. else return nil end elseif Kl < 7111 then if Kl < 7109 then if Kl == 7108 then Kk = adeq_getEquippedInSlot(UK[20]); Kl = if Kk then 2 else 0. else Kl = 7106; continue end elseif Kl < 7110. then
+if Kl == 7109 then adeq_fire(UK[1168], Kk, UK[20]); adeq_waitForUnequip(Kk, UK[1576]); local Vm = UK[1957][UK[438.]]; UK[1433](UK[1505]); Kl = 0. else Kl = 7111; continue end else break end elseif Kl < 12594. then if Kl == 7111 then adeq_fastPrime(Kj, UK[20], UK[20]);
+adeq_sort(Kj, hN); Kk = Kj[UK[1292]]; adeq_fire(UK[20], Kk, UK[20]); adeq_waitForSlot(Kk, UK[20], UK[2008]); return Kk[UK[821]] else break end else break end end end end, function() CC = tick() end, 405., 385, "gemsGained", 3941, "FlySpeed", "text", 1205782196,
+2251, "Sparkles", "Equipping ultimate...", "#dc2626", "OrbitRadius", 4669048, "Prism  \u{2022}  ", 3926242479., function(hu, hw, hx) local JX, JZ, J_, J0, J2, J4, J5, J6, J8 = nil, nil, nil, nil, nil, nil, nil, nil, nil; local JY = nil; JY = 3.; while true do
+JY = 5239 - JY; do if JY < 5239 then if JY < 5238. then if JY < 5237 then if JY < 1445 then break elseif JY < 2506 then break elseif JY < 5236 then break elseif JY == 5236 then JX = {}; J_ = false; local Vn = UK; for hz, hA in Vn[1295](hu) do J0 = hz; J2 = hA;
+local J1 = J0; local J3 = J2; local JZ = nil; JZ = Vn[650]; while true do if JZ < 2 then if JZ < 1 then JZ = if not adeq_isLoaded(J3) then Vn[2008] else Vn[327.] else J_ = true; JZ = Vn[1165] end elseif JZ < 3. then table.insert(JX, J3); JZ = Vn[327.] elseif JZ < 4 then
+break else JZ = Vn[1165] end end; if J_ then break end end; JY = if #JX == Vn[650] then 0. else 2 else JY = 8254; continue end elseif JY == 5237 then J5 = false; for hB, hC in UK[1295](JX) do J6 = hB; J8 = hC; local J7 = J6; local J9 = J8; local J4 = nil; local Vn = UK;
+J4 = Vn[1165]; while true do if J4 < 2 then if J4 < 1 then adeq_fire(Vn[1168], JX, hx); adeq_waitForUnequip(JX, Vn[1292]); local Vo = Vn[1957][Vn[438.]]; Vn[1433](Vn[1712]); J4 = Vn[2008] else break end elseif J4 < 3. then adeq_fire(hw, J9, hx); adeq_waitForLoaded(J9, Vn[1576]);
+adeq_fire(Vn[1168], J9, hx); adeq_waitForUnequip(J9, Vn[1292]); local Vp = Vn[1957][Vn[438.]]; Vn[1433](Vn[1712]); J4 = Vn[1292] elseif J4 < 4 then JX = adeq_getEquippedInSlot(hx); J4 = if JX then Vn[650] else Vn[2008] else J5 = true; J4 = Vn[1292] end end;
+if J5 then break end end; JY = 1 else JY = 1238; continue end else break end elseif JY < 8254 then if JY == 5239 then return else JY = 8254; continue end else break end end end end, 3831179, "hurobtgy", "ejjiuzvik", "Right", 82, 2541., "WebhookPingRarities",
+2445788125, "Z", "P", "Executor", 1709, function() local UR = table.insert; local KW, KX, KZ, K_, K0, K2, K4, K5, K6 = nil, nil, nil, nil, nil, nil, nil, nil, nil; local KY = nil; KY = 5; while true do KY = 7446. - KY; do if KY < 7443. then if KY < 7441 then
+if KY < 7440. then if KY == 7439 then KW = {}; K_ = false; for ij, ik in UK[1295](KX) do K0 = ij; K2 = ik; local K1 = K0; local K3 = K2; local KZ = nil; KZ = UK[1292]; while true do if KZ < 2 then if KZ < 1 then adeq_fire(UK[1168], K3, UK[476]); adeq_waitForUnequip(K3, UK[1292]);
+local Vq = UK[1957][UK[438.]]; UK[1433](UK[1712]); KZ = UK[2008] else KZ = if K3:GetAttribute(UK[46]) == true then UK[650] else UK[2008] end elseif KZ < 3. then KZ = UK[327.] elseif KZ < 4 then K_ = true; KZ = UK[327.] else break end end; if K_ then break end
+end; K6 = if KX[UK[1292]] then UK[1292] else UK[650]; K4 = UK[1181] * K6 + UK[243.] * (UK[1292] - K6); K5 = UK[1269.] * K6 + UK[1840] * (UK[1292] - K6); KY = if (K4 * UK[1639] + K5 * UK[509] + K4 * K5) % UK[1264] == UK[1926.] then 1 else 0. else KY = 10378;
+continue end else local Vr = UK[1957][UK[438.]]; UK[1433](UK[1505]); adeq_fire(UK[476], KX[UK[2008]], UK[1262]); adeq_waitForSlot(KX[UK[2008]], UK[1262], UK[2008]); UR(KW, KX[UK[2008]][UK[821]]); KY = 3. end elseif KY < 7442 then if KY == 7441 then KX, KW = adeq_collectSpells();
+KY = if #KX == UK[650] then 2 else 7 else KY = 7440.; continue end else break end elseif KY < 8193. then if KY < 7445 then if KY < 7444 then return KW elseif KY == 7444 then return {} else KY = 10494.; continue end elseif KY < 7446. then adeq_fire(UK[476], KX[UK[1292]], UK[1662.]);
+adeq_waitForSlot(KX[UK[1292]], UK[1662.], UK[2008]); UR(KW, KX[UK[1292]][UK[821]]); KY = 0. elseif KY == 7446. then KY = if KX[UK[2008]] then 6. else 3. else break end else break end end end end, "lwzvhwwhssi", "trending-up", function(dp, dq, dr) local UN = vector.create;
+local GS = nil; local GT = nil; GT = 0.; while true do GT = 13768 - GT; do if GT < 10873 then break elseif GT < 13767. then if GT < 13764. then if GT < 13763 then break elseif GT == 13763 then return UN(dp, dq, dr) else GT = 955; continue end elseif GT < 13765 then
+break elseif GT < 13766 then if GT == 13765 then GT = if GS then 5 else 1 else GT = 3823; continue end else GS = UN; GT = 3. end elseif GT < 13998. then if GT < 13768 then return UK[1618][UK[1182.]](dp, dq, dr) elseif GT == 13768 then GS = (rawget(_G, UK[336.]));
+GT = if GS then 2 else 3. else break end else break end end end end, "Value", "Helmet Rarities", 774., "Movement Type", 2790., 3791, 3042., Faces.new, 2394., "bbngajdgvipx", 191, 2174570, function(bG) local Fn, Fo, Fq, Fr, Fs = nil, nil, nil, nil, nil; local Fp = nil;
+Fp = 9.; while true do Fp = 5498 - Fp; do if Fp < 5487. then if Fp < 5480 then if Fp < 3663. then break elseif Fp < 5478. then if Fp < 5477 then break elseif Fp == 5477 then Fn = Fo; local Vs = UK; Fs = if Fn then Vs[1292] else Vs[650]; Fq = Vs[844] * Fs + Vs[1169] * (Vs[1292] - Fs);
+Fr = Vs[887] * Fs + Vs[1583] * (Vs[1292] - Fs); Fp = if (Fq * Vs[370] + Fr * Vs[1162] + Fq * Fr) % Vs[1264] == Vs[1974.] then 19 else 7 else Fp = 5496.; continue end elseif Fp < 5479 then Fn = getgenv()[UK[788]]; Fp = 15. elseif Fp == 5479 then return Fn(bG)
+else Fp = 5477; continue end elseif Fp < 5483 then if Fp < 5481. then Fn = getgenv; Fp = if Fn then 20 else 15. elseif Fp < 5482 then Fn = fluxus; Fp = if Fn then 3. else 14 else Fp = if Fo then 4 else 5 end elseif Fp < 5485 then if Fp < 5484. then Fo = Fn;
+Fp = 21. else Fo = Fn; Fp = 1 end elseif Fp < 5486 then Fp = if Fo then 21. else 18. else Fo = request; Fp = 13 end elseif Fp < 5494 then if Fp < 5490. then if Fp < 5488 then if Fp == 5487. then Fn = syn[UK[788]]; Fp = 8 else Fp = 5494; continue end elseif Fp < 5489 then
+if Fp == 5488 then Fn = http[UK[788]]; Fp = 6. else Fp = 5477; continue end else Fn = syn; Fp = if Fn then 11 else 8 end elseif Fp < 5492 then if Fp < 5491 then if Fp == 5490. then Fo = Fn; Fp = if Fo then 16 else 2 else Fp = 5498; continue end elseif Fp == 5491 then
+Fp = 0. else Fp = 5486; continue end elseif Fp < 5493. then Fo = Fn; Fp = 16 else Fo = http_request; Fp = 4 end elseif Fp < 5498 then if Fp < 5496. then if Fp < 5495 then if Fp == 5494 then Fp = if Fo then 1 else 17 else Fp = 5479; continue end else Fn = fluxus[UK[788]];
+Fp = 14 end elseif Fp < 5497 then if Fp == 5496. then Fn = http; Fp = if Fn then 10 else 6. else Fp = 5481.; continue end else Fp = if Fo then 13 else 12. end else break end end end end, "Decal", function() local U_ = math.floor; local OB, OC, OD, OE, OF, OG, OH, OJ, OK, OL = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local OI = nil; OI = 25; while true do OI = 2557 - OI; do if OI < 2545 then if OI < 2536 then if OI < 2531 then if OI < 2529. then if OI < 2528 then break elseif OI == 2528 then OB = U_; OD = Dx; OI = if OD then 14 else 20 else OI = 15991; continue end elseif OI < 2530 then
+OB = OC > UK[1465]; OI = if OB then 22 else 5 else OG = OH; OI = 0. end elseif OI < 2533 then if OI < 2532. then if OI == 2531 then OF = OD < UK[45.]; OI = if OF then 12. else 21. else OI = 2540; continue end else D3 = D3 + UK[1292]; OB = os[UK[353]](); OI = if OB - DX >= UK[419] then 9. else 4
+end elseif OI < 2534 then OB = OF; OF = OD < UK[113]; OI = if OF then 19 else 16 elseif OI < 2535. then if OI == 2534 then OH = UK[1289]; OI = 27. else OI = 2535.; continue end else OB = UK[1927]; OI = 5 end elseif OI < 2540 then if OI < 2538. then if OI < 2537 then
+if OI == 2536 then OH = OF; OI = if OH then 27. else 23 else OI = 2540; continue end elseif OI == 2537 then OE = OD; OL = if OE then UK[1292] else UK[650]; OJ = UK[1771] * OL + UK[211] * (UK[1292] - OL); OK = UK[860] * OL + UK[1575.] * (UK[1292] - OL); OI = if (OJ * UK[1016] + OK * UK[1956.] + OJ * OK) % UK[1264] == UK[622] then 13 else 3.
+else OI = 2534; continue end elseif OI < 2539 then if OI == 2538. then OF = UK[602]; OI = 16 else OI = 2555; continue end elseif OI == 2539 then OF = OG; OI = 24. else OI = 2533; continue end elseif OI < 2542 then if OI < 2541. then if OI == 2540 then OF = OB;
+OI = if OF then 24. else 28 else OI = 2529.; continue end else OG = OF; OI = if OG then 0. else 26 end elseif OI < 2543 then if OI == 2542 then OG = UK[1289]; OI = 18. else OI = 2528; continue end elseif OI < 2544. then if OI == 2543 then OD = Dx[UK[1526]][UK[1252]]:GetValue();
+OI = 20 else OI = 2536; continue end else OD = OB(OE); OB = U_; OE = Dx; OL = if OE then UK[1292] else UK[650]; OJ = UK[1848.] * OL + UK[1502] * (UK[1292] - OL); OK = UK[1823] * OL + UK[1044.] * (UK[1292] - OL); OI = if (OJ * UK[186.] + OK * UK[1551.] + OJ * OK) % UK[1264] == UK[102.] then 2 else 1
+end elseif OI < 2554 then if OI < 2549 then if OI < 2547. then if OI < 2546 then if OI == 2545 then OF = UK[1927]; OI = 21. else OI = 7752.; continue end elseif OI == 2546 then OI = 4 else OI = 2533; continue end elseif OI < 2548 then OB = UK[602]; OI = 17
+elseif OI == 2548 then OC = U_(D3 / (OB - DX)); D3 = UK[650]; DX = OB; OI = if not DJ[UK[1902.]] then 29 else 11 else OI = 2420; continue end elseif OI < 2551 then if OI < 2550. then if OI == 2549 then OF = UK[650]; OI = 7 else OI = 2535.; continue end elseif OI == 2550. then
+OE = OB(OF); OB = OC > UK[978.]; OI = if OB then 10 else 17 else OI = 2535.; continue end elseif OI < 2552 then break elseif OI < 2553. then if OI == 2552 then OG = OB; OI = if OG then 18. else 15. else OI = 8813; continue end else OI = 6. end elseif OI < 7752. then
+if OI < 2556. then if OI < 2555 then OE = UK[650]; OI = 13 elseif OI == 2555 then OE = Dx:GetTotalMemoryUsageMb(); OI = 1 else OI = 2534; continue end elseif OI < 2557 then OF = OE; OI = if OF then 7 else 8 elseif OI < 5406. then if OI == 2557 then OF = OG;
+Cy:SetText(b(UK[1939]) .. c(tostring(OC), OB)); Cv:SetText(b(UK[1112]) .. c(tostring(OD) .. UK[463], OF)); Ct:SetText(b(UK[858.]) .. c(tostring(OE) .. UK[1226], UK[1927])); OI = 11 else OI = 2554; continue end else break end else break end end end end, "Trail",
+function() local K7, K8, La, Lb, Lc, Le = nil, nil, nil, nil, nil, nil; local K9 = nil; K9 = 1; while true do K9 = 2774 - K9; do if K9 < 2773 then if K9 < 2772. then if K9 < 1979 then break elseif K9 < 2771 then break elseif K9 == 2771 then Lb = false; for io, ip in UK[1295](K8) do
+Lc = io; Le = ip; local Ld = Lc; local Lf = Le; local La = nil; La = UK[1292]; while true do if La < 2 then if La < 1 then La = UK[1165] else La = if Lf:GetAttribute(UK[46]) == true then UK[2008] else UK[650] end elseif La < 3. then adeq_fire(UK[1168], Lf, UK[476]);
+adeq_waitForUnequip(Lf, UK[1292]); local Vt = UK[1957][UK[438.]]; UK[1433](UK[1712]); La = UK[650] elseif La < 4 then break else Lb = true; La = UK[1165] end end; if Lb then break end end; adeq_fire(UK[476], K8[UK[1292]], UK[1933]); adeq_waitForSlot(K8[UK[1292]], UK[1933], UK[2008]);
+return K8[UK[1292]][UK[821]] else K9 = 15997; continue end else break end elseif K9 < 10864 then if K9 < 2774 then if K9 == 2773 then K7, K8 = adeq_collectSpells(); K9 = if #K8 == UK[650] then 0. else 3. else K9 = 158; continue end elseif K9 < 9318. then if K9 == 2774 then
+return nil else break end else break end else break end end end end, function(kP) local NC, NE, NF, NG = nil, nil, nil, nil; local ND = nil; ND = 1; while true do ND = 414. - ND; do if ND < 4431. then if ND < 413 then if ND < 411. then break elseif ND < 412 then
+break elseif ND == 412 then return adSell_fireBatch(NC) else ND = 37; continue end elseif ND < 414. then if ND == 413 then NC = adSell_collect(kP); local Vu = UK; NG = if #NC == Vu[650] then Vu[1292] else Vu[650]; NE = Vu[1051] * NG + Vu[728] * (Vu[1292] - NG);
+NF = Vu[599] * NG + Vu[1365.] * (Vu[1292] - NG); ND = if (NE * Vu[1432] + NF * Vu[1826] + NE * NF) % Vu[1264] == Vu[648.] then 0. else 2 else ND = 414.; continue end elseif ND < 3503 then if ND == 414. then return UK[650] else break end else break end else
+break end end end end, function() local FH, FI, FJ, FL, FM, FN, FO, FP, FQ = nil, nil, nil, nil, nil, nil, nil, nil, nil; local FK = nil; FK = 22; while true do FK = 1316 - FK; do if FK < 1310 then if FK < 1299. then if FK < 1294 then if FK < 1291 then if FK < 1290. then
+if FK == 1289 then FI = FH[UK[1486]][UK[248]]; FK = 25 else break end else CL = FJ; FI = (FH:FindFirstChild(UK[1876])); FK = if FI then 8 else 24. end elseif FK < 1292 then FJ = FI; FK = if FJ then 0. else 17 elseif FK < 1293. then if FK == 1292 then FJ = FI;
+FK = if FJ then 20 else 14 else FK = 1295; continue end else FJ = FI; FK = if FJ then 3. else 21. end elseif FK < 1296. then if FK < 1295 then if FK == 1294 then FK = if CY then 11 else 19 else FK = 1313; continue end else FJ = UK[650]; FK = 3. end elseif FK < 1297 then
+CJ = FJ; FI = (FH:FindFirstChild(UK[162.])); FK = if FI then 15. else 9. elseif FK < 1298 then if FK == 1297 then CY = true; CU = {}; FH = Dk:FindFirstChild(UK[468.]); FQ = if FH then UK[1292] else UK[650]; FO = UK[1672] * FQ + UK[55] * (UK[1292] - FQ); FP = UK[1148] * FQ + UK[1983.] * (UK[1292] - FQ);
+FK = if (FO * UK[610] + FP * UK[462.] + FO * FP) % UK[1264] == UK[739] then 2 else 18. else FK = 1311.; continue end elseif FK == 1298 then FK = 5 else FK = 1311.; continue end elseif FK < 1304 then if FK < 1301 then if FK < 1300 then if FK == 1299. then FJ = UK[650];
+FK = 0. else FK = 7078; continue end else FK = if (FL * UK[776] + FM * UK[1650.] + FL * FM) % UK[1264] == UK[2012] then 12. else 7 end elseif FK < 1302. then FI = FH[UK[162.]][UK[248]]; FK = 9. elseif FK < 1303 then if FK == 1302. then FJ = UK[650]; FK = 20
+else FK = 8618; continue end else FJ = FI; FK = if FJ then 26 else 1 end elseif FK < 1307 then if FK < 1305. then CH = FH; FK = 18. elseif FK < 1306 then return elseif FK == 1306 then FI = FH[UK[411.]][UK[248]]; FK = 13 else FK = 1301; continue end elseif FK < 1308. then
+if FK == 1307 then FH = FI; FN = if FH then UK[1292] else UK[650]; FL = UK[677] * FN + UK[449] * (UK[1292] - FN); FK = 6. else FK = 1295; continue end elseif FK < 1309 then FI = FH[UK[1876]][UK[248]]; FK = 24. else FH = UK[650]; FK = 12. end elseif FK < 6551 then
+if FK < 1315 then if FK < 1312 then if FK < 1311. then FM = UK[822.] * FN + UK[291.] * (UK[1292] - FN); FK = 16 else break end elseif FK < 1313 then if FK == 1312 then FI = FH[UK[187]][UK[248]]; FK = 23 else FK = 1297; continue end elseif FK < 1314. then CN = FJ;
+FI = (FH:FindFirstChild(UK[411.])); FK = if FI then 10 else 13 else FI = (FH:FindFirstChild(UK[1486])); FK = if FI then 27. else 25 end elseif FK < 1489 then if FK < 1316 then FJ = UK[650]; FK = 26 elseif FK == 1316 then CQ = FJ; FI = (FH:FindFirstChild(UK[187]));
+FK = if FI then 4 else 23 else break end else break end else break end end end end, function() return ad_getEquippedSpellBySlot(UK[1933]) end, "yjbs", 955, 514, 217, 797, "Velocity", "AutoUltimate", 1528, "Virus Action", "startTime", 13353220, "SpellStats",
+" MAG=", 482, "MouseMovement", 1514923132, "Q", "Same Level", "wait", 439, 2320499, 2715., function(kU) return string.format(UK[1371.], kU) end, 2465, "Fires StartDungeon once when lobby is ready", "zap", "AutoSpell", "wjhfdjgdyh", "shield-alert", "btdsbd",
+"%1%1", function(nb) C_ = nb end, "Prism loaded successfully, welcome ", function(rK) DB = rK end, "Tooltip", 54., function() local E3, E4 = nil, nil; local E5 = nil; E5 = 11; while true do E5 = 3459. - E5; do if E5 < 3456. then if E5 < 3454 then if E5 < 3450. then
+if E5 < 3448 then break elseif E5 < 3449 then if E5 == 3448 then E3 = Dk[UK[1988]]; E5 = if E3 then 7 else 3. else E5 = 3451; continue end else E5 = 9. end elseif E5 < 3452 then if E5 < 3451 then return E4 else break end elseif E5 < 3453. then if E5 == 3452 then
+E4 = E3; E5 = 5 else E5 = 14022.; continue end elseif E5 == 3453. then local Vv = UK[1957][UK[438.]]; UK[1433](UK[1776.]); E3 = Dk[UK[1988]]; E5 = if E3 then 2 else 4 else E5 = 9661; continue end elseif E5 < 3455 then if E5 == 3454 then E5 = if true then 0. else 9.
+else E5 = 1106; continue end elseif E5 == 3455 then E3 = Dk[UK[1567]]:Wait(); E5 = 2 else E5 = 14198; continue end elseif E5 < 3459. then if E5 < 3458 then if E5 < 3457 then if E5 == 3456. then E3 = Dk[UK[1567]]:Wait(); E5 = 7 else E5 = 14198; continue end
+else E4 = E3; E5 = 1 end else E5 = 5 end elseif E5 < 3791 then if E5 == 3459. then E5 = if not E4:FindFirstChild(UK[1230.]) then 6. else 10 else break end else break end end end end, 162., 3194, 3666., "description", "GettingUp", "Enemies Defeated: ", "SellHelmetRarities",
+"omduwzm", "#ffffff", "M1", "JumpPower", 3491, function(oJ) C3 = oJ end, "Fired ", "Auto Equip Best Helmet", "```+3```", "Hero2", "#60a5fa", "pyejmzto", " | Weekly: ", "wfhbxfej", "Helmet Priority", 4, "tnjbypvmp", function() local Vw = UK[1957][UK[394]]; UK[1383.](function()
+local Py, Pz = nil, nil; local PA = nil; PA = 5; while true do PA = 8959 - PA; do if PA < 8955. then if PA < 5971 then break elseif PA < 8902 then break elseif PA < 8954 then break elseif PA == 8954 then Cu = false; local Vx = UK; DJ:Notify(Vx[1302.]); Py = adeq_doEquipSpells();
+Cu = true; Pz = #Py > Vx[650]; PA = if Pz then 2 else 3. else PA = 8955.; continue end elseif PA < 8959 then if PA < 8957 then if PA < 8956 then DJ:Notify(UK[861.] .. Py); PA = 0. else Py = Pz; PA = if Py then 4 else 1 end elseif PA < 8958. then if PA == 8957 then
+Pz = table.concat(Py, UK[1046]); PA = 3. else PA = 8902; continue end else Py = UK[458]; PA = 4 end else break end end end end) end, "PlayAgain", 0.5, "AutoEquipArmor", 2454., "\u{1F7E1}", "StatSelect", "vector", "LocalPlayer", "chart-column-big", 1244, "MaxTorque",
+"qihoitjs", 710, "application/json", 12372880, "#a78bfa", 484, 72348775, "ixun", 0.1, 35, "dwvjqadndop", "AutoQuestHourly", "clock", "):", 3550, 3676, "souhckyiu", "DreamLamp", CFrame, "odswcybyb", 1437126843., "oyataggck", "GoldenKatana", "WeeklyCurrentQuest",
+function(c4) local Gr, Gs, Gt, Gu, Gw, Gx, Gy = nil, nil, nil, nil, nil, nil, nil; local Gv = nil; Gv = 18.; while true do Gv = 15798. - Gv; do if Gv < 15781 then if Gv < 13394 then break elseif Gv < 15776 then if Gv < 14757. then break elseif Gv < 15775 then
+break elseif Gv == 15775 then Gr = UK[1695.]; Gv = 13 else Gv = 15796; continue end elseif Gv < 15778 then if Gv < 15777. then local Vy = UK[1957][UK[438.]]; local Vz = UK; Vz[1433](Vz[1258]); Gr = (c4:GetAttribute(Vz[697])); Gv = if Gr then 1 else 20 else
+Gt = UK[188]; Gv = 3. end elseif Gv < 15779 then Gr = UK[1710.]; Gv = 1 elseif Gv < 15780. then if Gv == 15779 then Gv = 7 else Gv = 12143; continue end else local Vz = UK; Gy = if not CY then Vz[1292] else Vz[650]; Gw = Vz[1233.] * Gy + Vz[1512.] * (Vz[1292] - Gy);
+Gx = Vz[809] * Gy + Vz[272] * (Vz[1292] - Gy); Gv = if (Gw * Vz[640] + Gx * Vz[1432] + Gw * Gx) % Vz[1264] == Vz[278] then 6. else 22 end elseif Gv < 15790 then if Gv < 15785 then if Gv < 15783. then if Gv < 15782 then if Gv == 15781 then Gv = 19 else Gv = 15782;
+continue end else Gt = UK[1933]; Gv = 17 end elseif Gv < 15784 then Gv = if Gu == UK[188] then 11 else 14 else Gv = if Gu == UK[476] then 12. else 19 end elseif Gv < 15787 then if Gv < 15786. then if Gv == 15785 then local Vz = UK; Gt = Vz[1695.]; Gu = Gr;
+Gv = if Gu == Vz[111.] then 2 else 15. else Gv = 3576.; continue end else Gr = C2[c4[UK[821]]]; Gu = Gr; Gv = if Gu then 8 else 10 end elseif Gv < 15788 then if Gv == 15787 then Gv = if ad_isHelmetByName(c4[UK[821]]) then 4 else 21. else Gv = 13881.; continue
+end elseif Gv < 15789. then Gv = if Gu then 16 else 9. elseif Gv == 15789. then Gt = UK[476]; Gv = 17 else Gv = 15791; continue end elseif Gv < 15794 then if Gv < 15792. then if Gv < 15791 then Gu = Gr[UK[901]]; Gv = 10 else Gv = 5 end elseif Gv < 15793 then
+return else local Vz = UK; table.insert(CU, { [Vz[821]] = c4[Vz[821]], [Vz[697]] = Gs, [Vz[404]] = Gt }); CR[Vz[1251.]] = CR[Vz[1251.]] + Vz[1292]; Gv = 0. end elseif Gv < 15796 then if Gv < 15795. then Gt = UK[20]; Gv = 3. else Gv = 7 end elseif Gv < 15797 then
+Gt = UK[111.]; Gv = 5 elseif Gv < 15798. then Gs = Gr; Gr = (c4:GetAttribute(UK[1436])); Gv = if Gr then 13 else 23 else break end end end end, "queue", "Fire", function(ft) local Ij, Il, Im, In, Io, Ip, Iq = nil, nil, nil, nil, nil, nil, nil; local Ik = nil;
+Ik = 10; while true do Ik = 11067. - Ik; do if Ik < 11058. then if Ik < 10288 then break elseif Ik < 11055. then if Ik < 10531 then break elseif Ik < 11054 then break elseif Ik == 11054 then Ij = not ft[UK[1394]][UK[499]]; Ik = 0. else Ik = 16037; continue
+end elseif Ik < 11056 then local VA = UK; Ij = not ft[VA[1825]]; Iq = if Ij then VA[1292] else VA[650]; Io = VA[1254.] * Iq + VA[1146.] * (VA[1292] - Iq); Ik = 4 elseif Ik < 11057 then break elseif Ik == 11057 then local VA = UK; In = if not ft then VA[1292] else VA[650];
+Il = VA[1832] * In + VA[252.] * (VA[1292] - In); Im = VA[281] * In + VA[1714] * (VA[1292] - In); Ik = if (Il * VA[1437.] + Im * VA[1975] + Il * Im) % VA[1264] == VA[514] then 9. else 12. else Ik = 11059; continue end elseif Ik < 11064. then if Ik < 11061. then
+if Ik < 11059 then return false elseif Ik < 11060 then if Ik == 11059 then Ij = not ft[UK[1825]][UK[499]]; Ik = 5 else Ik = 1060; continue end else Ij = not ft[UK[1394]]; Ik = if Ij then 0. else 13 end elseif Ik < 11062 then return false elseif Ik < 11063 then
+if Ik == 11062 then Ik = if Ij then 6. else 7 else Ik = 5432; continue end elseif Ik == 11063 then Ip = UK[126.] * Iq + UK[1471] * (UK[1292] - Iq); Ik = 2 else Ik = 11060; continue end elseif Ik < 11067. then if Ik < 11065 then if Ik == 11064. then return false
+else Ik = 11059; continue end elseif Ik < 11066 then if Ik == 11065 then Ik = if (Io * UK[158] + Ip * UK[1011.] + Io * Ip) % UK[1264] == UK[1516] then 5 else 8 else Ik = 4630; continue end else return adf_isEnemyAlive(ft[UK[1825]]) end elseif Ik < 13476. then
+if Ik < 12634 then if Ik == 11067. then Ik = if Ij then 3. else 1 else break end else break end else break end end end end, "Enable Discord Ping", 3052, "URL Saved and Configured!", 1410., "RequiresLineOfSight", "pebmmkvgahe", "DailySpin", 2707, 1905., "prompt",
+"URL: Not Set", 370, "HourlyCurrentQuest", 712, 3406460, "Teleports", function(k1, k2, k3) return k1 + (k2 - k1) * k3 end, 1308., function() DJ:Notify(UK[1506.] .. #adf_getEnemies()) end, "Clouds", "AgentHeight", "bqofwunshkm", "Out", "timestamp", "ID: Set",
+"spawn", function() local Sn, So, Sp, Sr = nil, nil, nil, nil; local Sm = nil; Sm = 1; while true do Sm = 9817 - Sm; do if Sm < 9817 then if Sm < 5546 then break elseif Sm < 8093 then break elseif Sm < 9816. then break elseif Sm == 9816. then So = false; for s5, s6 in UK[1295](getconnections(Dk[UK[1559]])) do
+Sp = s5; Sr = s6; local Sq = Sp; local Ss = Sr; local Sn = nil; local VB = UK; Sn = VB[2008]; while true do if Sn < 1 then break elseif Sn < 2 then So = true; Sn = VB[650] else Ss:Disable(); Sn = VB[650] end end; if So then break end end; Sm = 0. else Sm = 13094;
+continue end else break end end end end, "cicsvzjvt", 2224, "Equipping armor...", 3705., 29, 4036845582., "MeshPart", "\u{26AA}", "Category", 2041, 71, "Auto Equip Best Heroes", 2105314843, 3870., "Auto Claim Quests", "Exp", function(fh) local H1, H3, H4, H5 = nil, nil, nil, nil;
+local H2 = nil; H2 = 7; while true do H2 = 7341. - H2; do if H2 < 7335. then if H2 < 7329. then if H2 < 4101. then break elseif H2 < 6510. then break elseif H2 < 7328 then break elseif H2 == 7328 then H2 = if H1 then 8 else 12. else H2 = 7330; continue end
+elseif H2 < 7332. then if H2 < 7330 then if H2 == 7329. then H1 = fh:FindFirstChildWhichIsA(UK[878], true); H2 = 8 else H2 = 3665; continue end elseif H2 < 7331 then if H2 == 7330 then H2 = if H1 then 4 else 6. else H2 = 7335.; continue end elseif H2 == 7331 then
+H1 = fh[UK[2038]]; H2 = 13 else H2 = 7337; continue end elseif H2 < 7333 then H2 = if H1 then 1 else 3. elseif H2 < 7334 then return H1 else H1 = not fh; local VC = UK; H5 = if H1 then VC[1292] else VC[650]; H3 = VC[1476.] * H5 + VC[2001.] * (VC[1292] - H5);
+H4 = VC[828.] * H5 + VC[159.] * (VC[1292] - H5); H2 = if (H3 * VC[1150] + H4 * VC[1079] + H3 * H4) % VC[1264] == VC[1737.] then 9. else 0. end elseif H2 < 7341. then if H2 < 7338. then if H2 < 7336 then if H2 == 7335. then H1 = fh:FindFirstChild(UK[1444]);
+H2 = 4 else H2 = 152; continue end elseif H2 < 7337 then break else H2 = if H1 then 13 else 10 end elseif H2 < 7339 then if H2 == 7338. then H1 = (fh:FindFirstChild(UK[1305.])); H2 = if H1 then 11 else 2 else H2 = 7331; continue end elseif H2 < 7340 then H1 = fh:FindFirstChild(UK[1230.]);
+H2 = 11 elseif H2 == 7340 then return nil else H2 = 7339; continue end elseif H2 < 14228 then if H2 < 8532. then if H2 == 7341. then H1 = not fh[UK[499]]; H2 = 9. else break end else break end else break end end end end, "jxfznaaizcp", 866, "cunmiids", function()
+local TE, TF, TG, TI, TJ, TK = nil, nil, nil, nil, nil, nil; local TH = nil; TH = 6.; while true do TH = 1967 - TH; do if TH < 1960 then if TH < 1957 then if TH < 1954 then if TH < 1953. then if TH < 84. then break elseif TH < 1952 then break elseif TH == 1952 then
+TH = if TG then 9. else 10 else TH = 1954; continue end elseif TH == 1953. then TF = TE; TH = 8 else TH = 84.; continue end elseif TH < 1956. then if TH < 1955 then TH = 7 else TH = 13 end else TH = if not DJ[UK[1902.]] then 4 else 12. end elseif TH < 1959. then
+if TH < 1958 then TH = 2 elseif TH == 1958 then DJ:Notify(UK[1649] .. TE); TH = 10 else TH = 1965.; continue end elseif TH == 1959. then TH = if TF then 0. else 2 else TH = 1952; continue end elseif TH < 1966 then if TH < 1964 then if TH < 1963 then if TH < 1961 then
+break elseif TH < 1962. then TH = 3. elseif TH == 1962. then TH = 3. else TH = 1954; continue end elseif TH == 1963 then TE = not CA; local VD = UK; TF = (isOn(VD[332])); TK = if TF then VD[1292] else VD[650]; TI = VD[677] * TK + VD[1601] * (VD[1292] - TK);
+TJ = VD[1728.] * TK + VD[1886] * (VD[1292] - TK); TH = if (TI * VD[1571] + TJ * VD[495.] + TI * TJ) % VD[1264] == VD[1176.] then 14 else 8 else TH = 1959.; continue end elseif TH < 1965. then TH = if true then 11 else 13 else local VE = UK[1957][UK[438.]];
+UK[1433](UK[1292]); TH = 5 end elseif TH < 4875. then if TH < 1967 then if TH == 1966 then TG = TF; TH = 15. else TH = 1961; continue end elseif TH == 1967 then TE = adeq_doEquipArmor(Dg); CA = true; TF = not Eg; TG = TE; TH = if TG then 1 else 15. else TH = 26;
+continue end else break end end end end, function(pb) DH = adSell_normalizeMulti(pb) end, "PlayerCardCompact", "Copied to clipboard!", "Heroes", "oshdjjh", "Mob Farm Engine", 1469873121., "0x", "Claim All Hourly Now", "Weekly", "Speed", 1358, function() local E6, E7, E8, E9, Fa, Fb, Fc, Fd, Ff, Fg, Fh, Fj = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local Fe = nil; Fe = 1; while true do Fe = 15022 - Fe; do if Fe < 15021. then if Fe < 15020 then break else Fe = 3. end elseif Fe < 15022 then if Fe == 15021. then E6 = require(Ee:WaitForChild(UK[923]):WaitForChild(UK[279.])); Fe = if E6 then 0. else 2 else
+Fe = 15022; continue end elseif Fe == 15022 then Fg = false; for aM, aN in UK[1189](E6) do Fh = aM; Fj = aN; local Fi = Fh; local Fk = Fj; local Ff = nil; Ff = UK[466]; while true do if Ff < 10 then if Ff < 5 then if Ff < 2 then if Ff < 1 then E9 = UK[1291];
+Ff = UK[1292] else Fa = Fk[UK[913]]; Ff = if Fa then UK[327.] else UK[836] end elseif Ff < 3. then Ff = if E6 then UK[1165] else UK[1620.] elseif Ff < 4 then E6 = Fk[UK[821]]; Ff = if E6 then UK[1149.] else UK[749] else Fb = Fk[UK[1933]] == true; Fc = Fk[UK[730]];
+Ff = if Fc then UK[1060] else UK[1579] end elseif Ff < 7 then if Ff < 6. then E6 = not Fk[UK[349]]; Ff = UK[2008] else Fc = UK[2056]; Ff = UK[1060] end elseif Ff < 8 then break elseif Ff < 9. then E6 = Fi; Ff = UK[1149.] else Ff = UK[597.] end elseif Ff < 15. then
+if Ff < 12. then if Ff < 11 then E9 = Fk[UK[560]]; Ff = if E9 then UK[1292] else UK[650] else Fg = true; Ff = UK[597.] end elseif Ff < 13 then Fd = UK[650]; Ff = UK[1143.] elseif Ff < 14 then E7 = Fk[UK[697]]; Ff = if E7 then UK[1288] else UK[1628] else C2[Fi] = { [UK[1110.]] = Fi,
+[UK[1590.]] = E6, [UK[1362.]] = E7, [UK[474.]] = E8, [UK[885.]] = E9, [UK[769]] = Fa, [UK[901]] = Fb, [UK[308]] = Fc, [UK[1509.]] = Fd }; Ff = UK[1620.] end elseif Ff < 18. then if Ff < 16 then E8 = CV[Fk[UK[697]]]; Ff = if E8 then UK[1756] else UK[608] elseif Ff < 17 then
+Fd = (tonumber(Fk[UK[96.]])); Ff = if Fd then UK[1143.] else UK[1413.] else E7 = UK[1710.]; Ff = UK[1288] end elseif Ff < 19 then E8 = UK[650]; Ff = UK[1756] elseif Ff < 20 then Fa = UK[633.]; Ff = UK[327.] else E6 = Fk[UK[1436]] == UK[476]; Ff = if E6 then UK[633.] else UK[2008]
+end end; if Fg then break end end; Fe = 2 else Fe = 7883; continue end end end end, 4141734927., 1823, "Setup", 119, 3939509, "AgentMaxSlope", 103121467, "AgentJumpHeight", "AutoSell", "InputBegan", function(bR) local Fz, FA = nil, nil; local FB = nil; FB = 1;
+while true do FB = 4177 - FB; do if FB < 7231 then if FB < 4175 then if FB < 4174 then break elseif FB == 4174 then FA = UK[403]; FB = 2 else FB = 15291.; continue end elseif FB < 4176. then return FA elseif FB < 4177 then if FB == 4176. then Fz = { [UK[1710.]] = UK[403],
+[UK[1403]] = UK[33.], [UK[37]] = UK[1860.], [UK[695]] = UK[334], [UK[1742]] = UK[2014], [UK[1612]] = UK[1955] }; FA = Fz[bR]; FB = if FA then 2 else 3. else FB = 15291.; continue end else break end else break end end end end, "Spell Assignment", "mxqg", "Claim All",
+"High", 2075141490., "AutoEquipUltimate", "Spell Rarities", "OldMagic", 3507., "\n", "Target: ", "Library.lua", "Model", 3864., "Numeric", 8983455., 65416, "None", "goldGained", "bnyjiuf", 12463055, "Destructibles", " ms", "Automatic", "Equipped Spells: ",
+20, 2988., "PlayerStats", "Buttons", 93., "fqaxazlsmqrw", "ItemId", function() local Hn = nil; Hn = 0.; while true do Hn = 12789. - Hn; do if Hn < 12471. then break elseif Hn < 12787 then if Hn < 12542 then break elseif Hn < 12786. then break elseif Hn == 12786. then
+UK[879.](function() CK:Cancel() end); CK = nil; Hn = 2 else Hn = 12789.; continue end elseif Hn < 12788 then if Hn == 12787 then Hn = 1 else Hn = 12788; continue end elseif Hn < 12789. then break elseif Hn == 12789. then Hn = if CK then 3. else 2 else Hn = 12787;
+continue end end end end, "rarityRank", 4074., "Spell", "<@", "AutoFarm", "Auto Open Chests", 232, 395, 1935467232., "material", "Quests", "Status", workspace.Terrain, "Disable 3D Rendering", "Texture", 433, "projectile", 12858718, 2780044163, "mwszlzhtllh",
+"Heroes: ", 1672, function() local LB, LC, LE, LF, LG = nil, nil, nil, nil, nil; local LD = nil; LD = 6.; while true do LD = 1181 - LD; do if LD < 1180 then if LD < 1174 then if LD < 1171 then if LD < 1170. then break else return nil, nil end elseif LD < 1172 then
+if LD == 1171 then LB = LC; LD = if not LB then 11 else 2 else LD = 2386; continue end elseif LD < 1173. then LC = LB:FindFirstChild(UK[1212.]); LD = 3. elseif LD == 1173. then LC = LB:FindFirstChild(UK[1356.]); LD = 1 else LD = 11258; continue end elseif LD < 1177 then
+if LD < 1175 then LB = LC; LC = LB; LG = if LC then UK[1292] else UK[650]; LE = UK[397] * LG + UK[975.] * (UK[1292] - LG); LF = UK[174.] * LG + UK[521] * (UK[1292] - LG); LD = if (LE * UK[636.] + LF * UK[1006] + LE * LF) % UK[1264] == UK[1594] then 8 else 1
+elseif LD < 1176. then if LD == 1175 then LB = Dk:FindFirstChild(UK[796]); LC = LB; LD = if LC then 5 else 7 else LD = 15874; continue end elseif LD == 1176. then LC = LB:FindFirstChild(UK[1386.]); LD = 7 else LD = 1171; continue end elseif LD < 1178 then LC = LB:FindFirstChild(UK[469]);
+LD = 10 elseif LD < 1179. then LB = LC; LC = LB; LD = if LC then 4 else 10 elseif LD == 1179. then return LB:FindFirstChild(UK[969.]), LB:FindFirstChild(UK[1313]) else LD = 1173.; continue end elseif LD < 7864 then if LD < 2386 then if LD < 1181 then if LD == 1180 then
+LB = LC; LC = LB; LD = if LC then 9. else 3. else LD = 1181; continue end else break end else break end else break end end end end, "Synapse", "InputEnded", "Parent", "BodyGyro", "KeybindMenuOpen", function(j8) local MR, MS, MU, MV, MW = nil, nil, nil, nil, nil;
+local MT = nil; MT = 0.; while true do MT = 14488 - MT; do if MT < 10612 then break elseif MT < 14486 then if MT < 12918. then break elseif MT < 14485 then break else MS = MR[UK[901]] == true; MT = 2 end elseif MT < 14488 then if MT < 14487. then return MS
+else break end elseif MT < 15558. then if MT == 14488 then MR = C2[j8[UK[821]]]; MS = MR; MW = if MS then UK[1292] else UK[650]; MU = UK[1963] * MW + UK[504.] * (UK[1292] - MW); MV = UK[1606] * MW + UK[914] * (UK[1292] - MW); MT = if (MU * UK[1178] + MV * UK[1193] + MU * MV) % UK[1264] == UK[1670] then 3. else 2
+else MT = 8489; continue end else break end end end end, "#0ea5e9", 2574., "Equip Best Ultimate Once", "Enemies", 77502967, 1937654603, 1894, 4017150678., "FarmMode", "Balanced", 11076087., 3850624, 1875., 1744, 1042, 9000000000., TweenInfo.new, "lnalfmggl",
+3719, "Discord invite copied!", "DungeonStarted", "wfgzkkeu", "HeroesEq", "HelmetPriority", function(nN) Dz = nN end, "number", "InputChanged", 256, function() local SB, SC, SD, SE = nil, nil, nil, nil; local SH = nil; SH = 8; while true do SH = 5216 - SH;
+do if SH < 5199. then if SH < 5197 then if SH < 5196. then if SH < 5192 then if SH < 5189 then if SH < 5185 then break elseif SH < 5187. then if SH < 5186 then if SH == 5185 then SH = 26 else SH = 5200; continue end else SH = 25 end elseif SH < 5188 then if SH == 5187. then
+SH = 22 else SH = 5185; continue end elseif SH == 5188 then SD = ad_isDungeonNotStarted(); SH = 6. else SH = 5210; continue end elseif SH < 5190. then SB = false; SH = 17 elseif SH < 5191 then break elseif SH == 5191 then SH = if isOn(UK[152]) then 3. else 27.
+else SH = 3735.; continue end elseif SH < 5194 then if SH < 5193. then if SH == 5192 then SB = false; SH = 2 else SH = 5193.; continue end else SC = (isOn(UK[1019])); SH = if SC then 10 else 7 end elseif SH < 5195 then if SH == 5194 then SH = if true then 12. else 31
+else SH = 5207; continue end elseif SH == 5195 then SH = if true then 15. else 30. else SH = 5209; continue end else local VF = UK[1957][UK[438.]]; UK[1433](UK[419]); SH = 19 end elseif SH < 5198 then if SH == 5197 then SH = 21. else SH = 12334; continue end
+else SD = tick() - SC < UK[1756]; SH = 11 end elseif SH < 5206 then if SH < 5202. then if SH < 5201 then if SH < 5200 then local VH = UK[1957][UK[438.]]; UK[1433](UK[419]); SH = 29 else SH = 30. end else SD = (isOn(UK[1019])); SH = if SD then 28 else 6. end
+elseif SH < 5204 then if SH < 5203 then if SH == 5202. then SH = if not SC then 24. else 2 else SH = 13660; continue end elseif SH == 5203 then SH = 31 else SH = 5214.; continue end elseif SH < 5205. then SH = if not DJ[UK[1902.]] then 23 else 13 else SH = if SD then 20 else 16
+end elseif SH < 5211. then if SH < 5208. then if SH < 5207 then SC = ad_isDungeonNotStarted(); SH = 7 elseif SH == 5207 then SH = if SE then 4 else 14 else SH = 5215; continue end elseif SH < 5209 then SB = false; SH = 22 elseif SH < 5210 then SH = if SC then 0. else 25
+elseif SH == 5210 then SH = if SD then 18. else 11 else SH = 5188; continue end elseif SH < 5215 then if SH < 5213 then if SH < 5212 then SE = SD; SH = 9. elseif SH == 5212 then SB = true; local VI = UK[1957][UK[438.]]; UK[1433](UK[1292]); UK[879.](function()
+DD:FireServer(UK[330.]) end); SH = 1 else SH = 5197; continue end elseif SH < 5214. then if SH == 5213 then SC = ad_isDungeonComplete(); SD = not SB; SE = SC; SH = if SE then 5 else 9. else SH = 5192; continue end else SH = 1 end elseif SH < 11003 then if SH < 5216 then
+if SH == 5215 then SH = 17 else SH = 2091.; continue end elseif SH == 5216 then UK[879.](function() DK:FireServer() end); SC = tick(); SH = 21. else break end else break end end end end, 3103, function() local TL, TM, TN = nil, nil, nil; local TO = nil; TO = 5;
+while true do TO = 12640 - TO; do if TO < 12633. then if TO < 12630. then if TO < 12627. then if TO < 12626 then if TO < 5550. then break elseif TO < 8659 then break elseif TO < 12625 then break elseif TO == 12625 then TO = if TM then 2 else 10 else TO = 12627.;
+continue end else TO = 12. end elseif TO < 12628 then TN = TM; TO = 7 elseif TO < 12629 then TO = 4 else TO = if true then 6. else 12. end elseif TO < 12632 then if TO < 12631 then local VJ = UK[1957][UK[438.]]; UK[1433](UK[1292]); TO = 1 else TM = TL; TO = 15.
+end else DJ:Notify(UK[1062.] .. TL); TO = 0. end elseif TO < 12638 then if TO < 12635 then if TO < 12634 then TO = if TN then 8 else 0. elseif TO == 12634 then TO = if not DJ[UK[1902.]] then 3. else 14 else TO = 1615; continue end elseif TO < 12636. then if TO == 12635 then
+TO = 11 else TO = 12638; continue end elseif TO < 12637 then break elseif TO == 12637 then TL = not Cw; TM = (isOn(UK[932])); TO = if TM then 9. else 15. else TO = 12628; continue end elseif TO < 12640 then if TO < 12639. then if TO == 12638 then TL = adeq_doEquipHelmet(C9);
+Cw = true; TM = not Eg; TN = TL; TO = if TN then 13 else 7 else TO = 12630.; continue end else TO = 11 end elseif TO < 12924. then if TO == 12640 then TO = 10 else TO = 12633.; continue end else break end end end end, 4478829., "Tank", "value", "ndknvptjbk",
+"\u{1F9A0}  Viruses Defeated", "Anti-AFK", "ojdtp", "Level: ", 2745., 2215, "```42```", "JumpPowerEnabled", 1637, "aurora", 1847, "Daily Spin claimed!", "list", "defer", 8068642, 31, 3593, 4001, function(st) local RZ = nil; RZ = 1; while true do RZ = 5286. - RZ;
+do if RZ < 6241 then if RZ < 5284 then if RZ < 4860. then break elseif RZ < 5283. then break elseif RZ == 5283. then RZ = 2 else RZ = 16065.; continue end elseif RZ < 5286. then if RZ < 5285 then break elseif RZ == 5285 then RZ = if DJ[UK[1781]] then 0. else 3.
+else RZ = 2626; continue end elseif RZ < 5935 then if RZ == 5286. then DJ[UK[1781]][UK[1374.]] = st; RZ = 3. else break end else break end else break end end end end, "AutoChest", "%.1fB", "Footer", "DamageType", function() local Sy, Sz = nil, nil; local SA = nil;
+SA = 5; while true do SA = 10259 - SA; do if SA < 10254. then if SA < 10249 then if SA < 10248. then if SA < 10247 then if SA < 8315 then break elseif SA < 10246 then break else local VK = UK[1957][UK[438.]]; local VL = UK; VL[1433](VL[2008]); SA = if isOn(VL[1220]) then 0. else 1
+end elseif SA == 10247 then UK[879.](antiAfkTap); SA = 4 else SA = 14167; continue end else Sz = tick() - Cz >= UK[609.]; SA = 2 end elseif SA < 10253 then if SA < 10251. then if SA < 10250 then break else SA = if true then 6. else 8 end elseif SA < 10252 then
+SA = 10 else SA = 9. end elseif SA == 10253 then SA = if not DJ[UK[1902.]] then 13 else 3. else SA = 10256; continue end elseif SA < 10258 then if SA < 10257. then if SA < 10256 then if SA < 10255 then SA = 9. else SA = 1 end elseif SA == 10256 then SA = 8
+else SA = 10258; continue end else SA = if Sz then 12. else 4 end elseif SA < 10538 then if SA < 10259 then SA = 7 elseif SA == 10259 then Sy = tick() - CC; Sz = Sy >= UK[1455.]; SA = if Sz then 11 else 2 else SA = 14167; continue end else break end end end
+end, "ParticleEmitter", "Configured", "Disabled", "znampfn", 3720., "HitBox", 2201331., "kmojxe", "MouseButton1Click", 873., "Equip Best Armor Once", "OldStrength", "Place ID: ", "Auto Sell Armors", "aoqqvyz", "ShowDungeonStats", "Armor Rarities", "Items Dropped",
+"Auto Equip Best Armor", 2920345106, "MarketplaceService", 84., "Jumping", "Method", "Atmosphere", "Viruses Defeated", 251, "etj", "fvquqg", 32, "Text", function(sR) local Sg = nil; local Sh = nil; Sh = 5; while true do Sh = 13480 - Sh; do if Sh < 13474 then
+if Sh < 13470. then break elseif Sh < 13472 then if Sh < 13471 then Sg = getHumanoid(); Sh = if Sg then 2 else 1 else DE:Disconnect(); DE = nil; Sh = 10 end elseif Sh < 13473. then break else Sh = if DE then 9. else 10 end elseif Sh < 13478 then if Sh < 13476. then
+if Sh < 13475 then sFLY(false); Sh = 3. else Sh = if sR then 6. else 0. end elseif Sh < 13477 then DM:Disconnect(); DM = nil; Sh = 7 else Sh = 8 end elseif Sh < 13480 then if Sh < 13479. then if Sh == 13478 then Sg[UK[1923.]] = false; Sh = 1 else Sh = 13479.;
+continue end else Sh = 3. end elseif Sh < 14760. then if Sh == 13480 then Ea = false; Sh = if DM then 4 else 7 else Sh = 13471; continue end else break end end end end, 5792040., "ksnx", 3501., 7, "pehasauwvr", "Input your Discord User ID below:", "bljueujao",
+"Auto Open Golden Chests", "#4ade80", "server", "kgnnpi", 7288611., "rmati", 3671519088., 18., 60., 1649, "qgo", "```2```", "wpxxa", "AbsolutePosition", 9809037., "qyn", "  |  ", function() return Dk:FindFirstChild(UK[1915]) end, "KRNL", "uwtwt", 2908, 12316680.,
+"calendar", 30., "zjucd", "Sell", "pjrpiuvxd", "meypkbstqxg", function() local Ir, Is, It, Iu, Iw, Ix, Iy, IA = nil, nil, nil, nil, nil, nil, nil, nil; local Iv = nil; Iv = 0.; while true do Iv = 3264. - Iv; do if Iv < 3264. then if Iv < 3260 then break elseif Iv < 3262 then
+if Iv < 3261. then if Iv == 3260 then return nil else Iv = 3261.; continue end elseif Iv == 3261. then return CS else Iv = 9183.; continue end elseif Iv < 3263 then CS = nil; Ir = ad_getHRP(); Iv = if not Ir then 4 else 1 else It, Is = nil, math.huge; Ix = false;
+for fA, fB in UK[1295](adf_getEnemies()) do Iy = fA; IA = fB; local Iz = Iy; local IB = IA; local Iw = nil; local VM = UK; Iw = VM[1165]; while true do if Iw < 2 then if Iw < 1 then Is = Iu; It = IB; Iw = VM[2008] else Ix = true; Iw = VM[327.] end elseif Iw < 3. then
+Iw = VM[327.] elseif Iw < 4 then Iu = (IB[VM[1394]][VM[2060]] - Ir[VM[2060]])[VM[1142]]; Iw = if Iu < Is then VM[650] else VM[2008] else break end end; if Ix then break end end; CS = It; return CS end elseif Iv < 9183. then if Iv < 6664 then if Iv < 4189 then
+if Iv == 3264. then Iv = if adf_isValidTarget(CS) then 3. else 2 else Iv = 9183.; continue end else break end else break end else break end end end end, "pcwrxcuagpx", 3217490229., 77, 5, "Equipping helmet...", 1786639553, 4027, 951., "Success", 3802, 2954,
+"cpu", "refresh-cw", "```+12.5K```", 3580, "iki", "```+", "ocean", function() local O7, O8 = nil, nil; local O9 = nil; O9 = 1; while true do O9 = 8695 - O9; do if O9 < 8693 then if O9 < 3992 then break elseif O9 < 6610 then break elseif O9 < 8692 then break
+else DJ:Notify(UK[757]); return end elseif O9 < 13483 then if O9 < 8695 then if O9 < 8694. then break elseif O9 == 8694. then O8, O7 = adVirus_getButtons(); O9 = if not O8 then 3. else 0. else O9 = 8693; continue end elseif O9 < 12885. then if O9 == 8695 then
+adVirus_clickBtn(O8); DJ:Notify(UK[208]); O9 = 2 else break end else break end else break end end end end, 3216945., 0., 1794., "yaq", function(gQ) return adeq_total(gQ) > UK[650] end, "Pencil", Vector2, "AutoSellArmor", 2998, "KeyCode", "TypeSpecific", "wxpwkrxysejo",
+"#38bdf8", "AutoSellSpell", "#374151", "```+8.2K```", "#%02x%02x%02x", "AgentRadius", "ArmorStats", 2942, "Auto Use Ultimate", function(rI) local Rq = nil; local Rr = nil; Rr = 0.; while true do Rr = 15870. - Rr; do if Rr < 9471. then break elseif Rr < 15868 then
+break elseif Rr < 15870. then if Rr < 15869 then Rq:SetStateEnabled(UK[1209.][UK[1870]][UK[1171]], not rI); Rr = 1 elseif Rr == 15869 then Rr = 3. else Rr = 1763; continue end elseif Rr < 16273 then if Rr == 15870. then Rq = getHumanoid(); Rr = if Rq then 2 else 1
+else break end else break end end end end, "SpellsEq", "iohzslkddr", "Instance", "kybduljsaf", 87., 1981, 3026, "WeaponPriority", function() local VN = UK[1957][UK[394]]; UK[1383.](function() local Ps, Pt, Pv, Pw, Px = nil, nil, nil, nil, nil; local Pu = nil;
+Pu = 2; while true do Pu = 13593. - Pu; do if Pu < 13591 then if Pu < 12222. then break elseif Pu < 13590. then break elseif Pu == 13590. then DJ:Notify(UK[1708] .. Pt); Pu = 1 else Pu = 14365; continue end elseif Pu < 13593. then if Pu < 13592 then if Pu == 13591 then
+Cw = false; DJ:Notify(UK[634]); Ps = adeq_doEquipHelmet(C9); Cw = true; Pt = Ps; Px = if Pt then UK[1292] else UK[650]; Pv = UK[1929.] * Px + UK[1463] * (UK[1292] - Px); Pw = UK[909.] * Px + UK[1962.] * (UK[1292] - Px); Pu = if (Pv * UK[6.] + Pw * UK[657.] + Pv * Pw) % UK[1264] == UK[1357] then 3. else 0.
+else Pu = 13590.; continue end else break end elseif Pu < 14365 then if Pu == 13593. then Pt = UK[458]; Pu = 3. else break end else break end end end end) end, "Chests", 1200777., "WaypointSpacing", "effect", 46, "nrtwwvcg", "ptsnhqfwc", 1334465828, "HoldDuration",
+"footer", "dwozlngnq", 971, "Slot", "xhkbevhij", "Teleport", "Legendary", "Fly", "Rarity", 3380, "Above Head", 1048, "target", 73, "ujyvw", "Input your Discord Webhook below:", "ArmorEq", "Interface", 376635608, "ToggleKeybind", 422, "Animations", 65, "map",
+"Ping Item Type Filters", "wodypt", "Escape Virus Once", "yvhd", "Auto Sell Weapons", "qmfxlqr", 3509, "SmoothPlastic", 5204001., "MaxActivationDistance", "urkcajsvm", "szyrpobwi", "rbxassetid://117487160988921", "PostEffect", 3273., 200, function(sq) D8:Set3dRenderingEnabled(not sq)
+end, "Description", "No chests found!", "Stat to Level Up", 3455651117, "ejjjn", 2427., "ArmorPriority", "Your Webhook setup is correctly configured and working!", "#ec4899", 8985000., "WriteLib", "Claim All Daily Now", 1674., "UserInputType", function() local Pa, Pb = nil, nil;
+local Pc = nil; Pc = 0.; while true do Pc = 11859. - Pc; do if Pc < 8665 then break elseif Pc < 10697 then break elseif Pc < 11857 then if Pc < 11856. then break else DJ:Notify(UK[757]); return end elseif Pc < 11858 then adVirus_clickBtn(Pb); DJ:Notify(UK[1680.]);
+Pc = 1 elseif Pc < 11859. then break else Pa, Pb = adVirus_getButtons(); Pc = if not Pb then 3. else 2 end end end end, "data", 1378, function(sW) local Si = nil; local Sj = nil; Sj = 2; while true do Sj = 15483. - Sj; do if Sj < 15090. then break elseif Sj < 15480. then
+if Sj < 15478 then break elseif Sj < 15479 then Si = getHumanoid(); Sj = if Si then 0. else 4 else Sj = 1 end elseif Sj < 15482 then if Sj < 15481 then break else Sj = if not sW then 5 else 1 end elseif Sj < 15483. then if Sj == 15482 then Sj = 3. else Sj = 15481;
+continue end elseif Sj == 15483. then Si[UK[857]] = UK[1060]; Sj = 4 else Sj = 243.; continue end end end end, "qyccbfba", 8, "Dungeon", 521107015, 3772, "FARM POSITIONING", "rprhtqdeny", "Auto Claim Hourly Quests", "Orbit Rotational Speed", "Prompt not visible!",
+"** \u{2500} *", 'game:GetService("TeleportService"):TeleportToPlaceInstance(%s, "%s", game.Players.LocalPlayer)', 3318., 1120219183, "%dh %dm %ds", "sun", 1095858., "uhlipiqltch", "Ping Rarity Filters", 75., "%.1f", "cooldown", 3275241569, "123456789012345678",
+1719., "TextureID", function() local UP = table.insert; local UQ = table.sort; local KJ, KK, KL, KN, KO, KP, KR, KT, KU, KV = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local KM = nil; KM = 0.; while true do KM = 14877. - KM; do if KM < 14875 then if KM < 10009 then
+break elseif KM < 14530 then break elseif KM < 14874. then break elseif KM == 14874. then KK, KL = {}, {}; KO = false; for h3, h4 in UK[1295](KJ:GetChildren()) do KP = h3; KR = h4; local KQ = KP; local KS = KR; local KN = nil; local VO = UK; KN = VO[633.];
+while true do if KN < 4 then if KN < 2 then if KN < 1 then KN = VO[327.] else UP(KL, KS); KN = VO[650] end elseif KN < 3. then KO = true; KN = VO[597.] else UP(KK, KS); KN = VO[650] end elseif KN < 6. then if KN < 5 then KN = VO[597.] else KJ = C2[KS[VO[821]]];
+KN = if KJ then VO[1579] else VO[327.] end elseif KN < 7 then KV = if KJ[VO[901]] then VO[1292] else VO[650]; KT = VO[1865] * KV + VO[1833.] * (VO[1292] - KV); KU = VO[1569.] * KV + VO[256] * (VO[1292] - KV); KN = if (KT * VO[2025.] + KU * VO[1797.] + KT * KU) % VO[1264] == VO[1387] then VO[1292] else VO[1165]
+else break end end; if KO then break end end; function spellScore(h7) local KD, KE, KF, KG, KH = nil, nil, nil, nil, nil; local KI = nil; KI = 7; while true do KI = 9736 - KI; do if KI < 9732. then if KI < 9727 then break elseif KI < 9729. then if KI < 9728 then
+KH = UK[650]; KI = 5 else return KD end elseif KI < 9730 then KD = C2[h7[UK[821]]]; KE = KD; KI = if KE then 0. else 6. elseif KI < 9731 then KD = KE; KI = if KD then 8 else 2 else KE = KG + KH; KI = 6. end elseif KI < 9736 then if KI < 9734 then if KI < 9733 then
+if KI == 9732. then KF = UK[650]; KI = 1 else KI = 3540.; continue end else break end elseif KI < 9735. then KD = UK[650]; KI = 8 elseif KI == 9735. then local VP = UK; KG = KF * VP[1669]; KH = KD[VP[1509.]]; KI = if KH then 5 else 9. else KI = 9729.; continue
+end elseif KI < 11647 then if KI < 10097 then if KI == 9736 then KF = KD[UK[474.]]; KI = if KF then 1 else 4 else break end else break end else break end end end end; UQ(KK, function(ib, ic) return spellScore(ib) > spellScore(ic) end); UQ(KL, function(id, ie)
+return spellScore(id) > spellScore(ie) end); return KK, KL else KM = 14876; continue end elseif KM < 14876 then break elseif KM < 14877. then if KM == 14876 then return {}, {} else KM = 14874.; continue end elseif KM == 14877. then KJ = adeq_getInv(); KM = if not KJ then 1 else 3.
+else KM = 14874.; continue end end end end, "gcux", 3907, function() local T8 = nil; T8 = 6.; while true do T8 = 7775 - T8; do if T8 < 7771 then if T8 < 7767. then if T8 < 7766 then if T8 < 4548. then break elseif T8 < 5829. then break elseif T8 < 7765 then
+break elseif T8 == 7765 then local VQ = UK[1957][UK[438.]]; UK[1433](UK[419]); T8 = 3. else T8 = 5829.; continue end elseif T8 == 7766 then local VR = UK; VR[879.](function() C8:InvokeServer() end); local VS = VR[1957][VR[438.]]; VR[1433](VR[419]); T8 = 3.
+else T8 = 7765; continue end elseif T8 < 7769 then if T8 < 7768 then break elseif T8 == 7768 then T8 = 2 else T8 = 7775; continue end elseif T8 < 7770. then T8 = 1 elseif T8 == 7770. then T8 = if not DJ[UK[1902.]] then 0. else 7 else T8 = 7767.; continue end
+elseif T8 < 7774 then if T8 < 7772 then T8 = 1 elseif T8 < 7773. then T8 = 4 elseif T8 == 7773. then T8 = 8 else T8 = 1068.; continue end elseif T8 < 7775 then T8 = if true then 5 else 2 elseif T8 < 14607. then if T8 == 7775 then T8 = if isOn(UK[1674.]) then 9. else 10
+else break end else break end end end end, 1318, "pqe", "\u{2694}\u{FE0F}  Level", "if you enjoy the script or want to report a bug, please consider the following:", "WaterReflectance", 3301, function() local VT = UK[1957][UK[394]]; UK[1383.](function() DJ:Notify(UK[917] .. adQuest_claimDaily() .. UK[1114])
+end) end, "X", "moljdkl", 3310968430, "request", "FarmHeight", 3408., "eikhmemfivr", "https://raw.githubusercontent.com/joustingmatch/ObsidianUltra/main/", "ssxrjmivl", "yke", 95, "PlayerGui", "Smoke", "ffeehcyag", function() local Hg, Hh, Hi = nil, nil, nil;
+local Hj = nil; Hj = 2; while true do Hj = 979 - Hj; do if Hj < 5642 then if Hj < 978. then if Hj < 977 then if Hj == 976 then Hi = Hh; Hj = 1 else break end else Hg, Hh = UK[879.](function() local G3, G4, G5, G7, G8, G9, Ha, Hb, Hc, Hd, He, Hf = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local G6 = nil; G6 = 29; while true do G6 = 14384 - G6; do if G6 < 14362 then if G6 < 14349. then if G6 < 5221 then break elseif G6 < 12459. then break elseif G6 < 14347 then break elseif G6 < 14348 then G3 = G5; G6 = 36. elseif G6 == 14348 then G6 = if G3 then 1 else 32
+else G6 = 14378; continue end elseif G6 < 14355. then if G6 < 14352. then if G6 < 14350 then G4 = G3:FindFirstChild(UK[1386.]); G3 = not G4; G6 = if G3 then 33. else 9. elseif G6 < 14351 then break elseif G6 == 14351 then G6 = if G3 then 6. else 26 else G6 = 14358.;
+continue end elseif G6 < 14353 then G3 = G4:FindFirstChild(UK[1760]); G4 = not G3; G6 = if G4 then 14 else 3. elseif G6 < 14354 then He = UK[778] * Hf + UK[993.] * (UK[1292] - Hf); G6 = 0. else G5 = not G3[UK[1374.]]; G6 = 27. end elseif G6 < 14358. then if G6 < 14356 then
+if G6 == 14355. then G3 = Dk:FindFirstChild(UK[796]); G6 = if not G3 then 18. else 35 else G6 = 14382.; continue end elseif G6 < 14357 then return false else G4 = G5; G6 = 14 end elseif G6 < 14360 then if G6 < 14359 then if G6 == 14358. then G3 = G4:FindFirstChild(UK[1783]);
+G4 = not G3; G6 = if G4 then 16 else 20 else G6 = 14350; continue end elseif G6 == 14359 then local VU = UK; Hf = if G3 then VU[1292] else VU[650]; Hd = VU[217] * Hf + VU[1588] * (VU[1292] - Hf); G6 = 31 else G6 = 14361.; continue end elseif G6 < 14361. then
+return false else local VU = UK; G5 = (G4:IsA(VU[930.])); Hc = if G5 then VU[1292] else VU[650]; Ha = VU[1179.] * Hc + VU[270.] * (VU[1292] - Hc); G6 = 10 end elseif G6 < 14375 then if G6 < 14368 then if G6 < 14365 then if G6 < 14363 then return false elseif G6 < 14364. then
+G6 = if (Ha * UK[1479.] + Hb * UK[489.] + Ha * Hb) % UK[1264] == UK[534.] then 5 else 17 else G5 = (G3:IsA(UK[930.])); G6 = if G5 then 19 else 15. end elseif G6 < 14366 then G5 = not G3[UK[1374.]]; G6 = 15. elseif G6 < 14367. then if G6 == 14366 then return false
+else G6 = 14368; continue end else G3 = G5; G6 = 25 end elseif G6 < 14371 then if G6 < 14369 then if G6 == 14368 then G6 = if G4 then 24. else 11 else G6 = 14347; continue end elseif G6 < 14370. then if G6 == 14369 then G4 = G5; G6 = 16 else G6 = 14367.; continue
+end else G6 = if G4 then 28 else 8 end elseif G6 < 14373. then if G6 < 14372 then if G6 == 14371 then G5 = (G4:IsA(UK[930.])); G6 = if G5 then 4 else 37 else G6 = 14359; continue end elseif G6 == 14372 then return true else G6 = 14356; continue end elseif G6 < 14374 then
+if G6 == 14373. then local VU = UK; G4 = G3:FindFirstChild(VU[1767.]); G3 = not G4; G9 = if G3 then VU[1292] else VU[650]; G7 = VU[1539.] * G9 + VU[1428.] * (VU[1292] - G9); G8 = VU[1586] * G9 + VU[1404.] * (VU[1292] - G9); G6 = if (G7 * VU[1279] + G8 * VU[1713.] + G7 * G8) % VU[1264] == VU[681.] then 36. else 13
+else G6 = 4212.; continue end else Hb = UK[47] * Hc + UK[1395.] * (UK[1292] - Hc); G6 = 21. end elseif G6 < 14381 then if G6 < 14378 then if G6 < 14376. then G5 = (G4:IsA(UK[942.])); G6 = if G5 then 2 else 7 elseif G6 < 14377 then G4 = G3:FindFirstChild(UK[330.]);
+G3 = not G4; G6 = if G3 then 25 else 23 elseif G6 == 14377 then G3 = G5; G6 = 33. else G6 = 14368; continue end elseif G6 < 14379. then return false elseif G6 < 14380 then if G6 == 14379. then G5 = not G4[UK[1374.]]; G6 = 17 else G6 = 14365; continue end else
+G5 = not G4[UK[1374.]]; G6 = 37 end elseif G6 < 14384 then if G6 < 14382. then G5 = (G3:IsA(UK[930.])); G6 = if G5 then 30. else 27. elseif G6 < 14383 then if G6 == 14382. then G5 = not G4[UK[141.]]; G6 = 7 else G6 = 7114; continue end else return false end
+elseif G6 < 14779 then if G6 < 14512 then if G6 == 14384 then G6 = if (Hd * UK[318.] + He * UK[530] + Hd * He) % UK[1264] == UK[764] then 22 else 12. else G6 = 14348; continue end else break end else break end end end end); Hi = Hg; Hj = if Hi then 3. else 1
+end elseif Hj < 979 then if Hj == 978. then return Hi else Hj = 8908; continue end else break end else break end end end end, 3588., "attacksFired", 1845051833, 4282859, "MOBILITY", "Dungeon Complete! (Simulation)", "Spins", "Simulation complete, check Discord",
+3296, 2581, 3174748112, 547, TweenInfo, 672., "layers", "Discord User ID", "title", 587, "%.1fK", function(nJ) DY = nJ end, "AutoEquipWeapon", "Name", 1325, 1850, "htcsbi", 1238, "https://ibdihp.hersheyzchoco.workers.dev/", "SP", 3641, "AssemblyLinearVelocity",
+"Claims Processed -> Hourly: ", 1978, "Settings", 1841, "Min", "hard-hat", 19, 661, "Gold Earned", "jgmnerekgsr", "ksznpsjlbjt", "#", "Transparency", "HeroPriority", 754, "coawznxwsls", "majoqn", "vlgizllheax", "xbjobetw", "HttpService", 44, 1300341516., "Hourly",
+function(pA) Db = pA end, "[+]", "bwbfqermap", 1982, "WalkSpeed", "Memory: ", function() local VV = UK; VV[879.](function() DK:FireServer() end); DJ:Notify(VV[1878.]) end, 2487., "Spells: ", "plsslz", 1519, 1839., "#7dd3fc", "dpkewjx", function(mY) Dt = mY
+end, 1796, "Weapon Attack", "WalkSpeedEnabled", 1054, "AutoEquipHeroes", "Follow Rscripts \u{1F64F}", 1643, function(pd) DA = pd end, "%1,%2", "Auto Claim Daily Spin", "BasePart", pcall, "Content-Type", 520, "Lighting", 3652, function(o2) D6 = adSell_normalizeMulti(o2)
+end, "damageType", "funnel-plus", "Performance", "Equip Best Heroes Once", "Auto Claim Weekly Quests", "eiwwkn", "Cosmetic Spin Once", 1910, "Prism", "ofthqlft", "Height", 557, "cgo", "nusrcauvmcb", "AssemblyAngularVelocity", "pimnnqxez", "isUltimate", "ngtqvlo",
+2589., "Prism  \u{2022}  Anime Dungeons  \u{2022}  ", "bqurdzdktdx", "Hero stats copied to clipboard", "Completed", "Webhook Setup", 569, function() local GP, GQ = nil, nil; local GR = nil; GR = 2; while true do GR = 13296. - GR; do if GR < 13293. then break
+elseif GR < 13296. then if GR < 13294 then return GQ elseif GR < 13295 then if GR == 13294 then GP = Dk[UK[1988]]; GQ = GP; GR = if GQ then 1 else 3. else GR = 3542; continue end elseif GR == 13295 then GQ = GP:FindFirstChildOfClass(UK[985]); GR = 3. else GR = 3504.;
+continue end else break end end end end, 111935889., function(hh, hi) local JN, JO, JP = nil, nil, nil; local JM = nil; JM = 9.; while true do JM = 1085 - JM; do if JM < 1083. then if JM < 1077. then if JM < 1074. then if JM < 666. then break elseif JM < 1073 then
+break elseif JM == 1073 then JM = if hi == UK[1794.] then 6. else 5 else JM = 1075; continue end elseif JM < 1075 then if JM == 1074. then JM = 1 else JM = 1078; continue end elseif JM < 1076 then if JM == 1075 then JM = if (JN * UK[783.] + JO * UK[742] + JN * JO) % UK[1264] == UK[513.] then 0. else 4
+else JM = 1081; continue end else JP = if hi == UK[1213] then UK[1292] else UK[650]; JN = UK[1480] * JP + UK[903.] * (UK[1292] - JP); JM = 2 end elseif JM < 1080. then if JM < 1078 then if JM == 1077. then JM = 7 else JM = 13721; continue end elseif JM < 1079 then
+break elseif JM == 1079 then return adeq_oldMAG(hh) * UK[1669] + adeq_total(hh) else JM = 1078; continue end elseif JM < 1081 then if JM == 1080. then return adeq_total(hh) else JM = 1074.; continue end elseif JM < 1082 then if JM == 1081 then JM = if hi == UK[535] then 3. else 12.
+else JM = 6604; continue end elseif JM == 1082 then return adeq_oldHP(hh) * UK[1669] + adeq_total(hh) else JM = 1074.; continue end elseif JM < 4138 then if JM < 1393 then if JM < 1084 then JO = UK[12.] * JP + UK[776] * (UK[1292] - JP); JM = 10 elseif JM < 1085 then
+if JM == 1084 then JM = 8 else JM = 1080.; continue end elseif JM == 1085 then return adeq_oldSTR(hh) * UK[1669] + adeq_total(hh) else break end else break end else break end end end end, "CoolDown", 3161, 326, "bzgqmhfut", "Confirm", "SellSpellRarities", function(el)
+local Hr = nil; local Hs = nil; Hs = 1; while true do Hs = 7862 - Hs; do if Hs < 7862 then if Hs < 4777 then break elseif Hs < 7859 then break elseif Hs < 7860. then if Hs == 7859 then return else Hs = 8420; continue end elseif Hs < 7861 then ad_cancelTween();
+Hr[UK[1077.]] = el; ad_resetPhysics(); Hs = 0. elseif Hs == 7861 then Hr = ad_getHRP(); Hs = if not Hr then 3. else 2 else Hs = 9181; continue end else break end end end end, "doawf", 107, "zgxxca", "Stats", 700, 2103., "hak", 3638, workspace.CurrentCamera,
+function() local LP, LQ, LR, LT, LU, LV = nil, nil, nil, nil, nil, nil; local LS = nil; LS = 1; while true do LS = 12598 - LS; do if LS < 12596 then if LS < 7316 then break elseif LS < 9145 then break elseif LS < 12595 then break else LR = LQ; LS = 2 end elseif LS < 12598 then
+if LS < 12597. then return LR elseif LS == 12597. then LP, LQ = UK[879.](function() local LH, LI, LJ, LK, LM, LN, LO = nil, nil, nil, nil, nil, nil, nil; local LL = nil; LL = 1; while true do LL = 3974 - LL; do if LL < 3965 then if LL < 3955 then if LL < 3951. then
+if LL < 3950 then if LL < 3134 then break elseif LL < 3949 then break elseif LL == 3949 then LL = if LK then 4 else 5 else LL = 3959; continue end elseif LL == 3950 then LL = if true then 20 else 11 else LL = 3958; continue end elseif LL < 3953 then if LL < 3952 then
+if LL == 3951. then LI = LH:FindFirstChild(UK[1386.]); LL = 12. else LL = 3956; continue end else LJ = LI; LI = LJ; LL = if LI then 2 else 17 end elseif LL < 3954. then break elseif LL == 3954. then LJ = LI ~= LH; LK = LI; LL = if LK then 19 else 25 else LL = 3949;
+continue end elseif LL < 3962 then if LL < 3958 then if LL < 3956 then if LL == 3955 then LK = LJ; LL = 25 else LL = 3957.; continue end elseif LL < 3957. then LI = LJ:FindFirstChild(UK[1356.]); LL = 7 elseif LL == 3957. then LJ = LI; local VW = UK; LO = if not LJ then VW[1292] else VW[650];
+LM = VW[71] * LO + VW[1997] * (VW[1292] - LO); LL = 14 else LL = 3963.; continue end elseif LL < 3960. then if LL < 3959 then if LL == 3958 then LI = LJ:FindFirstChild(UK[1212.]); LL = 22 else LL = 3964; continue end elseif LL == 3959 then return false else
+LL = 3134; continue end elseif LL < 3961 then if LL == 3960. then LN = UK[719] * LO + UK[306.] * (UK[1292] - LO); LL = 3. else LL = 3971; continue end else LJ = not LI[UK[1374.]]; LL = 6. end elseif LL < 3963. then LJ = LI; LI = LJ; LL = if LI then 18. else 7
+elseif LL < 3964 then return true else return false end elseif LL < 3970 then if LL < 3967 then if LL < 3966. then if LL == 3965 then LL = 24. else LL = 3966.; continue end else LI = LI[UK[499]]; LL = 9. end elseif LL < 3969. then if LL < 3968 then LJ = LI;
+LI = LJ; LL = if LI then 16 else 22 else LL = if LJ then 10 else 8 end elseif LL == 3969. then LL = 11 else LL = 3973; continue end elseif LL < 3972. then if LL < 3971 then if LL == 3970 then LJ = (LI:IsA(UK[930.])); LL = if LJ then 13 else 6. else LL = 3964;
+continue end else LL = if (LM * UK[1075] + LN * UK[1987] + LM * LN) % UK[1264] == UK[1237] then 15. else 0. end elseif LL < 6598 then if LL < 3974 then if LL < 3973 then LI = LJ:FindFirstChild(UK[469]); LL = 17 elseif LL == 3973 then LH = Dk:FindFirstChild(UK[796]);
+LI = LH; LL = if LI then 23 else 12. else LL = 745; continue end elseif LL < 4777 then if LL == 3974 then LI = LJ; LL = 24. else break end else break end else break end end end end); LR = LP; LV = if LR then UK[1292] else UK[650]; LT = UK[14] * LV + UK[517] * (UK[1292] - LV);
+LU = UK[833] * LV + UK[1260.] * (UK[1292] - LV); LS = if (LT * UK[571] + LU * UK[1316] + LT * LU) % UK[1264] == UK[1056.] then 3. else 2 else LS = 12595; continue end else break end end end end, "GuiObject", 1039, "AutoEquipHelmet", function() local Fl = nil;
+local Fm = nil; Fm = 0.; while true do Fm = 3896 - Fm; do if Fm < 3894. then if Fm < 3023 then break elseif Fm < 3259 then break elseif Fm < 3893 then break else CZ = Fl; Fm = 1 end elseif Fm < 9215 then if Fm < 3895 then break elseif Fm < 3896 then Fm = 2
+elseif Fm == 3896 then Fl = require(Ee:WaitForChild(UK[923]):WaitForChild(UK[667])); Fm = if Fl then 3. else 1 else break end else break end end end end, 2260, 3113, 2626, "sqnh", "Url", "ubyregi", 6767, 14, "ScreenGui", "prism", "enemiesDefeated", "Infinite Jump",
+"arsf", 1606045355, function(ce) local FR, FS = nil, nil; local FT = nil; FT = 2; while true do FT = 13165 - FT; do if FT < 11141 then break elseif FT < 13164. then if FT < 13162 then break elseif FT < 13163 then FS = FR[UK[659]] == UK[20]; FT = 1 elseif FT == 13163 then
+FR = CZ[ce]; FS = FR; FT = if FS then 3. else 1 else FT = 11141; continue end elseif FT < 13165 then if FT == 13164. then return FS else FT = 1360; continue end else break end end end end, "Speed Value", " STR=", 3114547, "GlobalShadows", 3679, 1755., "Live Stats",
+"scroll-text", "```", "zero", "Menu keybind", 3587, function(hE) local Ka, Kb, Kd, Ke, Kf = nil, nil, nil, nil, nil; local Kc = nil; Kc = 0.; while true do Kc = 10046 - Kc; do if Kc < 10045 then if Kc < 10042 then if Kc < 10041. then break else return nil end
+elseif Kc < 10043 then break elseif Kc < 10044. then if Kc == 10043 then Kb = adeq_getEquippedInSlot(UK[111.]); Kc = if Kb then 1 else 2 else Kc = 10045; continue end elseif Kc == 10044. then local VX = UK; adeq_fastPrime(Ka, VX[111.], VX[111.]); adeq_sort(Ka, hE);
+Kb = Ka[VX[1292]]; adeq_fire(VX[111.], Kb, VX[111.]); adeq_waitForSlot(Kb, VX[111.], VX[2008]); return Kb[VX[821]] else Kc = 10046; continue end elseif Kc < 10784 then if Kc < 10046 then local VX = UK; adeq_fire(VX[1168], Kb, VX[111.]); adeq_waitForUnequip(Kb, VX[1576]);
+local VY = VX[1957][VX[438.]]; VX[1433](VX[1505]); Kc = 2 elseif Kc < 10395. then if Kc == 10046 then local VX = UK; Ka = adeq_collect(VX[111.]); Kf = if #Ka == VX[650] then VX[1292] else VX[650]; Kd = VX[1553] * Kf + VX[644] * (VX[1292] - Kf); Ke = VX[1157] * Kf + VX[1651] * (VX[1292] - Kf);
+Kc = if (Kd * VX[191] + Ke * VX[243.] + Kd * Ke) % VX[1264] == VX[1531] then 5 else 3. else Kc = 10042; continue end else break end else break end end end end, "pxbpkjg", 3402., "Auto Sell Loot", function() Eg = false end, "ukrc", "StartDungeon", "Daily", 1399,
+2134, 3098, "AutoSellUltimate", function(kY) local VZ = UK; kY = kY:gsub(VZ[841], VZ[2056]); return tonumber(VZ[424] .. kY:sub(VZ[1292], VZ[2008])), tonumber(VZ[424] .. kY:sub(VZ[1165], VZ[327.])), tonumber(VZ[424] .. kY:sub(VZ[633.], VZ[1579])) end, function()
+local V_ = UK[1957][UK[394]]; UK[1383.](function() DJ:Notify(UK[917] .. adQuest_claimHourly() .. UK[1114]) end) end, 404, 21., "]", 45., 3118, 332, "ikmmnxd", "WeeklyQ", function(pL) local Qb, Qc, Qd, Qf = nil, nil, nil, nil; local Qa = nil; Qa = 2; while true do
+Qa = 1360 - Qa; do if Qa < 1360 then if Qa < 1359. then if Qa < 1358 then break elseif Qa == 1358 then CB = {}; Qa = if type(pL) == UK[1515.] then 1 else 0. else Qa = 14578; continue end else Qc = false; for pN, pO in UK[1189](pL) do Qd = pN; Qf = pO; local Qe = Qd;
+local Qg = Qf; local Qb = nil; Qb = UK[1579]; while true do if Qb < 4 then if Qb < 2 then if Qb < 1 then break else CB[tostring(Qe)] = true; Qb = UK[597.] end elseif Qb < 3. then CB[tostring(Qg)] = true; Qb = UK[327.] else Qb = if Qg == true then UK[1292] else UK[597.]
+end elseif Qb < 6. then if Qb < 5 then Qb = UK[650] else Qc = true; Qb = UK[650] end elseif Qb < 7 then Qb = if type(Qe) == UK[528.] then UK[2008] else UK[1165] else Qb = UK[327.] end end; if Qc then break end end; Qa = 0. end elseif Qa < 2392 then if Qa == 1360 then
+Qa = 3. else break end else break end end end end, "hpbd", "Humanoid", "vxenpmavhm", 1077477066., "mvht", "User", "SubTabUnderline", function() local T7 = nil; T7 = 9.; while true do T7 = 9039. - T7; do if T7 < 9035 then if T7 < 9033. then if T7 < 9032 then
+if T7 < 9030. then if T7 < 4327 then break elseif T7 < 4381 then break elseif T7 < 9029 then break elseif T7 == 9029 then T7 = 6. else T7 = 9038; continue end elseif T7 < 9031 then if T7 == 9030. then T7 = 6. else T7 = 13082; continue end else T7 = 10 end else
+UK[879.](function() Df:InvokeServer(UK[1721]) end); local V0 = UK[1957][UK[438.]]; UK[1433](UK[609.]); T7 = 8 end elseif T7 < 9034 then if T7 == 9033. then T7 = if true then 2 else 3. else T7 = 14697.; continue end else T7 = if isOn(UK[1751]) then 7 else 0.
+end elseif T7 < 9039. then if T7 < 9038 then if T7 < 9036. then break elseif T7 < 9037 then if T7 == 9036. then T7 = 4 else T7 = 15906.; continue end else T7 = if not DJ[UK[1902.]] then 5 else 1 end else T7 = 3. end elseif T7 < 9106 then if T7 == 9039. then
+local V1 = UK[1957][UK[438.]]; UK[1433](UK[1292]); T7 = 8 else break end else break end end end end, function() local NH = nil; local NI = nil; NI = 6.; while true do NI = 3954. - NI; do if NI < 3953 then if NI < 3947 then if NI < 3776 then break elseif NI < 3945. then
+break elseif NI < 3946 then NI = if NH then 7 else 2 else NH = isOn(UK[662]); NI = 9. end elseif NI < 3950 then if NI < 3948. then if NI == 3947 then return NH else NI = 6604; continue end elseif NI < 3949 then if NI == 3948. then NH = (isOn(UK[1822])); NI = if NH then 4 else 3.
+else NI = 3949; continue end else NH = isOn(UK[17]); NI = 0. end elseif NI < 3951. then if NI == 3950 then NI = if NH then 0. else 5 else NI = 3952; continue end elseif NI < 3952 then NH = isOn(UK[656]); NI = 4 elseif NI == 3952 then NH = isOn(UK[972.]); NI = 7
+else NI = 12534.; continue end elseif NI < 6604 then if NI < 5168 then if NI < 3954. then break elseif NI == 3954. then NI = if NH then 9. else 8 else NI = 5902; continue end else break end else break end end end end, 2007., "etddur", 16007990, "HasDied", 211,
+"pelrhgwionb", 4092., 3365, 27., "If no rarity is checked, all items inside that category sell.", "rei", function(pH) local P4, P5, P6, P8 = nil, nil, nil, nil; local P3 = nil; P3 = 2; while true do P3 = 1931 - P3; do if P3 < 1931 then if P3 < 1930 then if P3 < 1929. then
+if P3 == 1928 then P5 = false; for pJ, pK in UK[1189](pH) do P6 = pJ; P8 = pK; local P7 = P6; local P9 = P8; local P4 = nil; local V2 = UK; P4 = V2[633.]; while true do if P4 < 4 then if P4 < 2 then if P4 < 1 then P5 = true; P4 = V2[2008] else P4 = V2[1579]
+end elseif P4 < 3. then break else CE[tostring(P7)] = true; P4 = V2[1292] end elseif P4 < 6. then if P4 < 5 then CE[tostring(P9)] = true; P4 = V2[1579] else P4 = if type(P7) == V2[528.] then V2[327.] else V2[597.] end elseif P4 < 7 then P4 = V2[2008] else P4 = if P9 == true then V2[1165] else V2[1292]
+end end; if P5 then break end end; P3 = 0. else break end elseif P3 == 1929. then CE = {}; P3 = if type(pH) == UK[1515.] then 3. else 0. else P3 = 4794.; continue end else break end elseif P3 < 4268 then if P3 < 2495 then if P3 == 1931 then P3 = 1 else P3 = 1930;
+continue end else break end else break end end end end, "shadow", 3196, "Copy Server ID", 1771, function() local Sc = nil; local Sd = nil; Sd = 6.; while true do Sd = 12210. - Sd; do if Sd < 12203 then break elseif Sd < 12208 then if Sd < 12205 then if Sd < 12204. then
+Sc = getHumanoid(); Sd = if Sc then 1 else 4 else Sd = if DJ[UK[1902.]] then 0. else 5 end elseif Sd < 12206 then Sd = if isOn(UK[1322]) then 7 else 2 elseif Sd < 12207. then Sd = 2 else break end elseif Sd < 13648 then if Sd < 12209 then if Sd == 12208 then
+Sd = 3. else Sd = 12206; continue end elseif Sd < 12210. then Sc:ChangeState(UK[1209.][UK[1870]][UK[584]]); Sd = 4 elseif Sd == 12210. then return else Sd = 6351.; continue end else break end end end end, 1849, 3694, 860400766, 3781, "dnj", "PathfindingService",
+1470., "hvhymktdb", "xkjuqaun", "AutoStartDungeon", "ewchhkxib", "Menu Keybind", 1518., "Quest", 1865, "\u{1F381}  Items Dropped (", "Server JobId copied!", "spygwrwyqwq", "https://rscripts.net/@Prism", 3201., "Equip", 3630254, 3138., 668, 2486, 37, "tsrvecggryw",
+427, "ldwdfi", "PlaceId", "MenuKeybind", "Claim All Quests Now", "qpowid", "PRISM", 2405, "Unload Prism", ", ", "Gems Received", "Orbiting", "URL: Set", "Error: ", 1046, 8975945, function(kW, kX) return string.format(UK[1283], kX, kW) end, function(pF) C5 = pF
+end, Vector2.new, 5249505., "Prism - ", "AgentCanJump", "WebhookPingEnabled", 16, function() local V3 = UK[1957][UK[394]]; UK[1383.](function() DJ:Notify(UK[917] .. adQuest_claimWeekly() .. UK[1114]) end) end, "Equipped Helmet: ", "glvk", "coprunnddd", "blbyscin",
+"WeaponEq", 2796977, Instance.new, 3216., function() local V4 = UK[1957][UK[394]]; UK[1383.](function() local Pd, Pe, Pf = nil, nil, nil; local Pg = nil; Pg = 5; while true do Pg = 1999 - Pg; do if Pg < 2517. then if Pg < 1998. then if Pg < 1996 then if Pg < 1995. then
+if Pg == 1994 then Pd, Pe = UK[879.](function() Df:InvokeServer(UK[1721]) end); Pf = Pd; Pg = if Pf then 4 else 1 else break end elseif Pg == 1995. then Pf = UK[549.]; Pg = 1 else Pg = 5753; continue end elseif Pg < 1997 then if Pg == 1996 then DJ:Notify(Pd);
+Pg = 0. else Pg = 6077; continue end elseif Pg == 1997 then Pd = UK[1050.] .. tostring(Pe); Pg = 3. else Pg = 3000.; continue end elseif Pg < 2106. then if Pg < 1999 then if Pg == 1998. then Pd = Pf; Pg = if Pd then 3. else 2 else Pg = 1999; continue end else
+break end else break end else break end end end end) end, "OnClientEvent", "dxxjelgnmeps", "Batch Process Delay", 13692571, 711., 824, "CFrame", "Terrain", 79, 2811., 633., "Auto Melee Strike", "https://discord.com/api/webhooks/...", function(jY) local MI, MJ, MK, ML, MM, MN = nil, nil, nil, nil, nil, nil;
+local MH = nil; MH = 12.; while true do MH = 3313 - MH; do if MH < 3309. then if MH < 3301 then if MH < 3297. then if MH < 1454 then break elseif MH < 3296 then break else MJ = UK[2021] * MK + UK[2007.] * (UK[1292] - MK); MH = 14 end elseif MH < 3299 then if MH < 3298 then
+return D_ else break end elseif MH < 3300. then if MH == 3299 then MH = if (MI * UK[137] + MJ * UK[386] + MI * MJ) % UK[1264] == UK[1282] then 2 else 6. else MH = 9760; continue end elseif MH == 3300. then MH = if jY == UK[20] then 1 else 4 else MH = 3296;
+continue end elseif MH < 3305 then if MH < 3303. then if MH < 3302 then MH = if jY == UK[111.] then 11 else 3. else return D6 end elseif MH < 3304 then if MH == 3303. then MH = 9. else MH = 3313; continue end else MH = 0. end elseif MH < 3307 then if MH < 3306. then
+if MH == 3305 then return DH else MH = 3299; continue end else MH = 5 end elseif MH < 3308 then MH = if jY == UK[1933] then 8 else 7 elseif MH == 3308 then MH = 10 else MH = 3300.; continue end elseif MH < 11225 then if MH < 3313 then if MH < 3311 then if MH < 3310 then
+if MH == 3309. then local V5 = UK; MK = if jY == V5[476] then V5[1292] else V5[650]; MI = V5[1032.] * MK + V5[1034] * (V5[1292] - MK); MH = 17 else MH = 3312.; continue end elseif MH == 3310 then local V5 = UK; MN = if jY == V5[188] then V5[1292] else V5[650];
+ML = V5[154] * MN + V5[1085] * (V5[1292] - MN); MM = V5[1022] * MN + V5[372.] * (V5[1292] - MN); MH = if (ML * V5[698] + MM * V5[809] + ML * MM) % V5[1264] == V5[1903] then 16 else 13 else MH = 1454; continue end elseif MH < 3312. then if MH == 3311 then return DN
+else MH = 3310; continue end else return DT end elseif MH < 6505 then if MH < 4621 then if MH == 3313 then return {} else MH = 3310; continue end else break end else break end else break end end end end, 1812., 2160., 4068252294., function(ln, lo) local UW = math.round;
+local UX = math.min; local Od, Oe, Of, Og, Oh, Oi, Oj, Ok, Ol, Om, Oo, Op, Oq, Or, Os = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local On = nil; On = 7; while true do On = 4294 - On; do if On < 4285 then if On < 4282 then if On < 4277 then
+if On < 4275. then if On < 4273 then break elseif On < 4274 then Oe = lo[UK[1292]]; On = if Oe then 14 else 18. else Oq += UK[1292]; On = 10 end elseif On < 4276 then if On == 4275. then Od = Od .. string.format(UK[42.], rgbToHex(Oi, Of, Og), Oh); On = 12.
+else On = 4293.; continue end elseif On == 4276 then Oe = UK[313]; On = 14 else On = 4335.; continue end elseif On < 4279 then if On < 4278. then if On == 4277 then Od = UK[313]; On = 21. else On = 4335.; continue end elseif On == 4278. then Or = Oq; On = 6.
+else On = 12512; continue end elseif On < 4280 then if On == 4279 then Od = lo[UK[1292]]; On = if Od then 21. else 17 else On = 4292; continue end elseif On < 4281. then if On == 4280 then return createGradientText(ln, Od, Oe) else On = 14527; continue end
+elseif On == 4281. then Os = Or; Og = (Os - UK[1292]) / (Oe - UK[1292]); On = 11 else On = 4274; continue end elseif On < 4284. then if On < 4283 then On = 20 elseif On == 4283 then Of = Og; Og = Of * (#lo - UK[1292]); Of = math.floor(Og) + UK[1292]; Oh = Og - (Of - UK[1292]);
+Og = lo[UX(Of, #lo)]; Oi = lo[UX(Of + UK[1292], #lo)]; Of, Oj, Ok = hexToRgb(Og); Og, Ol, Om = hexToRgb(Oi); Oi = UW(lerp(Of, Og, Oh)); Of = UW(lerp(Oj, Ol, Oh)); Og = UW(lerp(Ok, Om, Oh)); Os = Or; Oh = ln:sub(Os, Os); On = if Oh == UK[1895] then 1 else 19
+else On = 4288; continue end elseif On == 4284. then On = if Oq <= Oo then 16 else 8 else On = 4277; continue end elseif On < 4292 then if On < 4290. then if On < 4289 then if On < 4287. then if On < 4286 then return UK[2056] else return Od end elseif On < 4288 then
+if On == 4287. then On = if #lo < UK[2008] then 15. else 0. else On = 4278.; continue end elseif On == 4288 then Of = Oe == UK[1292]; On = if Of then 2 else 3. else On = 4282; continue end else Oq = UK[1292]; Oo = Oe; On = 10 end elseif On < 4291 then break
+else Og = Of; On = if Og then 11 else 13 end elseif On < 4294 then if On < 4293. then Of = UK[650]; On = 3. elseif On == 4293. then Od = Od .. UK[1895]; On = 12. else On = 4273; continue end elseif On < 12512 then if On < 7283 then if On < 4335. then if On == 4294 then
+Od = UK[2056]; Oe = #ln; On = if Oe == UK[650] then 9. else 5 else break end else break end else break end else break end end end end, "G", "gbzxmeqmv", "mutgtsph", "jrqxhtwbheg", "mzmkzhapyahf", "fqnx", "ppdkpgp", 50, "Anti AFK", function() local T3 = nil;
+T3 = 6.; while true do T3 = 461 - T3; do if T3 < 458 then if T3 < 454 then if T3 < 453. then if T3 < 452 then if T3 < 242 then break elseif T3 < 451 then break else T3 = 3. end elseif T3 == 452 then T3 = 1 else T3 = 12304; continue end else T3 = if not DJ[UK[1902.]] then 4 else 9.
+end elseif T3 < 457 then if T3 < 455 then break elseif T3 < 456. then if T3 == 455 then T3 = 3. else T3 = 1127; continue end elseif T3 == 456. then T3 = 10 else T3 = 10797.; continue end else T3 = if isOn(UK[352]) then 2 else 0. end elseif T3 < 1127 then if T3 < 460 then
+if T3 < 459. then if T3 == 458 then T3 = if true then 8 else 1 else T3 = 454; continue end else adQuest_claimHourly(); local V6 = UK[1957][UK[438.]]; UK[1433](UK[1292]); T3 = 5 end elseif T3 < 461 then if T3 == 460 then T3 = 7 else T3 = 10797.; continue end
+elseif T3 == 461 then local V7 = UK[1957][UK[438.]]; UK[1433](UK[419]); T3 = 5 else break end else break end end end end, 3609., " HP=", "POST", 0.04, "Hero", "Tracked Metrics", function(lK) local Ot, Ou, Ov = nil, nil, nil; local Ow = nil; Ow = 9.; while true do
+Ow = 16077. - Ow; do if Ow < 16073 then if Ow < 16069 then if Ow < 16067 then if Ow < 16066 then break else Ow = 8 end elseif Ow < 16068. then break else Ow = if type(lK) ~= UK[528.] then 7 else 0. end elseif Ow < 16072 then if Ow < 16070 then if Ow == 16069 then
+return Ot else Ow = 1724; continue end elseif Ow < 16071. then if Ow == 16070 then return tostring(lK) else Ow = 16072; continue end else Ow = 8 end else Ow = 1 end elseif Ow < 16075 then if Ow < 16074. then local V8 = UK; Ou, Ov = Ot:gsub(V8[1882], V8[876.]);
+Ot = Ou; Ow = if Ov == V8[650] then 6. else 3. else Ow = 5 end elseif Ow < 16076 then Ow = if true then 4 else 11 elseif Ow < 16077. then Ow = if true then 2 else 8 else Ot = tostring(math.floor(lK)); Ow = 1 end end end end, "puzhvknrjpf", 9291896, "Icon",
+function(g4) local Jv, Jx, Jy, Jz, JB = nil, nil, nil, nil, nil; local Jw = nil; Jw = 2; while true do Jw = 13195 - Jw; do if Jw < 13193 then break elseif Jw < 15379 then if Jw < 13194. then Jv = adeq_getInv(); Jw = if not Jv then 1 else 0. elseif Jw < 13195 then
+if Jw == 13194. then return nil else Jw = 13193; continue end elseif Jw == 13195 then Jy = false; for g6, g7 in UK[1295](Jv:GetChildren()) do Jz = g6; JB = g7; local JA = Jz; local JC = JB; local Jx = nil; local V9 = UK; Jx = V9[650]; while true do if Jx < 3. then
+if Jx < 1 then Jv = JC:GetAttribute(V9[46]) == true; Jx = if Jv then V9[1579] else V9[1292] elseif Jx < 2 then Jx = if Jv then V9[1165] else V9[2008] else Jx = V9[633.] end elseif Jx < 5 then if Jx < 4 then return JC else Jy = true; Jx = V9[633.] end elseif Jx < 6. then
+break else Jv = JC:GetAttribute(V9[692]) == g4; Jx = V9[1292] end end; if Jy then break end end; Jw = 3. else break end else break end end end end, "id", 278, "Ping: ", "etdigawzd", " claims", "Auto Start Dungeon", 827, "ClearTextOnFocus", 2283629654, 3913791069.,
+"qcaq", 10022831, "Placeholder", "DailyQ", "lub", 12948707, 940858051, "NotifySide", function() DJ[UK[942.]][UK[499]] = UK[1185.]:GetService(UK[1936]) end, 226715001., 2044779619, "Jump", "tnc", 6435844, function(oj) C9 = oj end, "Auto Allocate Stat Points",
+2701, 1450507510, 1219, "jpansfxr", function(o4) D_ = adSell_normalizeMulti(o4) end, 985, "Magnitude", 2844459785, "Simulate Run Complete", "Test processed, check Discord", 462., function(rM) Dw = rM end, 631, 13, 3861., 1096, "wgotsrdeok", function() local TX, TY, TZ = nil, nil, nil;
+local T_ = nil; T_ = 6.; while true do T_ = 10999 - T_; do if T_ < 10993 then if T_ < 10988 then if T_ < 10986. then if T_ < 10985 then if T_ < 5898. then break elseif T_ < 9007 then break elseif T_ < 10984 then break elseif T_ == 10984 then T_ = 10 else T_ = 10997;
+continue end elseif T_ == 10985 then TY = TX; T_ = 13 else T_ = 10987; continue end elseif T_ < 10987 then if T_ == 10986. then T_ = if TY then 11 else 1 else T_ = 10996; continue end else T_ = if not DJ[UK[1902.]] then 3. else 15. end elseif T_ < 10991 then
+if T_ < 10989. then TX = adeq_doEquipHeroes(C3); Ed = true; TY = not Eg; TZ = #TX > UK[650]; T_ = if TZ then 0. else 4 elseif T_ < 10990 then if T_ == 10989. then T_ = 8 else T_ = 10985; continue end else DJ:Notify(UK[205] .. table.concat(TX, UK[1046])); T_ = 2
+end elseif T_ < 10992. then break elseif T_ == 10992. then T_ = if true then 12. else 10 else T_ = 9007; continue end elseif T_ < 10997 then if T_ < 10996 then if T_ < 10995. then if T_ < 10994 then if T_ == 10993 then T_ = 7 else T_ = 10987; continue end else
+T_ = 7 end elseif T_ == 10995. then T_ = if TZ then 9. else 2 else T_ = 10993; continue end elseif T_ == 10996 then TX = not Ed; TY = (isOn(UK[872])); T_ = if TY then 14 else 13 else T_ = 10994; continue end elseif T_ < 10999 then if T_ < 10998. then T_ = 1
+elseif T_ == 10998. then local Wa = UK[1957][UK[438.]]; UK[1433](UK[1292]); T_ = 5 else T_ = 10993; continue end else TZ = TY; T_ = 4 end end end end, "pgmrylmle", function() local Hk, Hl = nil, nil; local Hm = nil; Hm = 5; while true do Hm = 6156. - Hm; do
+if Hm < 6153. then if Hm < 4796 then break elseif Hm < 5996 then break elseif Hm < 6151 then break elseif Hm < 6152 then Hk = UK[1560.]:FindFirstChild(UK[1968.]); Hm = if not Hk then 3. else 0. elseif Hm == 6152 then Hk = Hl[UK[248]] == false; Hm = 2 else Hm = 14420;
+continue end elseif Hm < 9493 then if Hm < 6155 then if Hm < 6154 then return false else return Hk end elseif Hm < 6156. then break elseif Hm < 7231 then if Hm == 6156. then Hl = Hk:FindFirstChild(UK[523]); Hk = Hl; Hm = if Hk then 4 else 2 else break end else
+break end else break end end end end, "addons/ThemeManager.lua", 800, "mbrvw", "SellArmorRarities", 1561, "Enemies Defeated", 420., "nsyudbhbas", "mmodw", 3., 2111, "cixmicotikm", "Unequip", 125, 2121., "Seated", "ywylgmt", "RunService", "Dungeons Completed: ",
+"OrbitSpeed", 13436562., 90000., 201., 1937, "Auto Sell Categories", 3446, "new", "Behind", "ThumbnailType", game, "```47```", utf8.nfcnormalize, 3872, pairs, 4057408, "Weapon Rarities", "CastShadow", 2566, "Validate Webhook Configuration", "User: ", "yhqtscpweves",
+"Left", "#f472b6", function() local St = nil; local Su = nil; Su = 1; while true do Su = 14190. - Su; do if Su < 11805. then break elseif Su < 14189 then if Su < 14187. then break elseif Su < 14188 then break else local Wb = UK[655][UK[1182.]]; local Wc = UK;
+DP:Button2Down(Wc[1055](Wc[650], Wc[650]), St[Wc[1077.]]); Wb = Wc[1957][Wc[438.]]; Wc[1433](Wc[1776.]); Wb = Wc[655][Wc[1182.]]; DP:Button2Up(Wc[1055](Wc[650], Wc[650]), St[Wc[1077.]]); Cz = tick(); Su = 3. end elseif Su < 14775. then if Su < 14190. then local Wd = UK[1560.][UK[64]];
+St = UK[928]; Su = if not St then 0. else 2 elseif Su == 14190. then return else Su = 14188; continue end else break end end end end, "TweenSpeed", "#f3f4f6", "vxrnwvx", 1763, 1117, Instance, "EXTRA INFO", CFrame.new, "Decoration", Enum, " Loaded=", "URL: None | Ping: Off",
+"Warning", "Warrior", "yovptuaj", "Activated", 2451., "function", "Auto Cosmetic Spin", 2510, "AntiAFK", 36., 33., 2422, 5700435., "zlrojvrzs", " MB", 6730640, "ygbmze", 2979., "HumanoidRootPart", "jprqp", "jjt", 4006, "\u{1F4C8}  EXP Gained", "Job ID: ", "Stepped",
+4021761., "avalxma", "#9ca3af", function() local OM = nil; OM = 5; while true do OM = 6287 - OM; do if OM < 6285. then if OM < 6284 then if OM < 6281 then if OM < 1866. then break elseif OM < 6280 then break else OM = 1 end elseif OM < 6282. then break elseif OM < 6283 then
+if OM == 6282. then OM = 1 else OM = 14508.; continue end else OM = 2 end else local We = UK[1957][UK[438.]]; UK[1433](UK[1292]); Ef:SetText(b(UK[1866.]) .. c(formatDuration(os[UK[353]]() - D9), UK[345.])); OM = 7 end elseif OM < 7418 then if OM < 6287 then
+if OM < 6286 then if OM == 6285. then OM = 6. else OM = 6286; continue end else OM = if true then 0. else 2 end elseif OM == 6287 then OM = if not DJ[UK[1902.]] then 3. else 4 else OM = 12702.; continue end else break end end end end, "this_is_the_best_free_script_hub_arena_ai_goated67",
+"epekocj", "R", 250, 2199., "(.)", "\u{1F3C6}  Dungeon Complete!", "neugvnnpgt", "ReplicatedStorage", "Favorite", "itemsObtained", "Ping", "cdn", "Spell2", "qgtgkgsdv", "Rscripts link copied!", "SellWeaponRarities", 0.3, 810., 773, 1260., 1922157., "\u{1F480}  Enemies Killed",
+16777213, 10146521, "lctmudhfzyb", "txmc", "Webhook URL is empty!", 2876, 10395294., "riywumr", function(bO) local UL = string.format; local Ft, Fu = nil, nil; local Fv = nil; Fv = 6.; while true do Fv = 5898. - Fv; do if Fv < 5893 then if Fv < 5888 then if Fv < 3611 then
+break elseif Fv < 4282 then break elseif Fv < 5887 then break else return tostring(bO) end elseif Fv < 5890 then if Fv < 5889. then return UL(UK[2004.], bO / UK[1898]) else Fv = 11 end elseif Fv < 5891 then return UL(UK[558.], bO / UK[1684]) elseif Fv < 5892. then
+if Fv == 5891 then return UL(UK[818], bO / UK[1669]) else Fv = 5892.; continue end else Ft = math.floor; Fu = bO; Fv = if Fu then 2 else 5 end elseif Fv < 5898. then if Fv < 5895. then if Fv < 5894 then Fu = UK[650]; Fv = 2 elseif Fv == 5894 then Fv = if bO >= UK[1898] then 10 else 0.
+else Fv = 5888; continue end elseif Fv < 5896 then Fv = 9. elseif Fv < 5897 then if Fv == 5896 then bO = Ft(Fu); Fv = if bO >= UK[1684] then 8 else 4 else Fv = 3611; continue end else break end elseif Fv < 8422 then if Fv < 6948. then if Fv == 5898. then Fv = if bO >= UK[1669] then 7 else 3.
+else Fv = 6948.; continue end else break end else break end end end end, function() local GK, GM, GN, GO = nil, nil, nil, nil; local GL = nil; GL = 2; while true do GL = 2402 - GL; do if GL < 9268 then if GL < 2401 then if GL < 2399 then break elseif GL < 2400. then
+break else local Wf = UK; GK = Dk[Wf[1988]]; GO = if not GK then Wf[1292] else Wf[650]; GM = Wf[1965.] * GO + Wf[1203.] * (Wf[1292] - GO); GN = Wf[287] * GO + Wf[376] * (Wf[1292] - GO); GL = if (GM * Wf[555.] + GN * Wf[1787] + GM * GN) % Wf[1264] == Wf[803] then 1 else 0.
+end elseif GL < 2402 then if GL == 2401 then return nil else GL = 9268; continue end elseif GL < 8189 then if GL == 2402 then return GK:FindFirstChild(UK[1230.]) else break end else break end else break end end end end, "DataStoreService", function(eH) local HI = nil;
+HI = 1; while true do HI = 5675 - HI; do if HI < 6583 then if HI < 5672 then break elseif HI < 5674 then if HI < 5673. then if HI == 5672 then ad_directTeleport(eH); HI = 2 else HI = 14297; continue end else HI = 4 end elseif HI < 5675 then HI = if DY == UK[694] then 3. else 0.
+elseif HI == 5675 then ad_tweenTo(eH); HI = 2 else HI = 14297; continue end else break end end end end, "wimp", 58274977, 3024127635., 451, "fzyqcpepwkv", "etxm", 2895707, '<font size="%d">%s</font>', "FLIGHT", "AutoQuestDaily", "qlxpbaf", "vyswx", 15., 9543278,
+"Sine", "Strength", 1, "gzuiyfnsvp", "zpqjuywe", ipairs, "WebhookPingCategories", "p", "Combat", function(rG) Dn = rG end, "Radius", "kqzvroxdyjs", "Equipping spells...", "jfuro", "OutdoorAmbient", "Bot", "Movement", function() C5 = isOn(UK[1059.]) end, 526,
+"ecgmekdbx", 2937., function(lS) return createMultiGradientText(UK[854], lS) end, function(gR, gS) local Jl = nil; local Jm = nil; Jm = 2; while true do Jm = 3772 - Jm; do if Jm < 3768. then if Jm < 3765. then if Jm < 3764 then if Jm < 3763 then break else
+Jm = if true then 6. else 1 end else Jm = 9. end elseif Jm < 3767 then if Jm < 3766 then break elseif Jm == 3766 then Jm = if tick() - Jl < gS then 4 else 3. else Jm = 3769; continue end else return true end elseif Jm < 3770 then if Jm < 3769 then Jm = if adeq_isLoaded(gR) then 5 else 0.
+elseif Jm == 3769 then Jm = 1 else Jm = 3770; continue end elseif Jm < 6538 then if Jm < 3771. then Jl = tick(); Jm = 9. elseif Jm < 3772 then return false elseif Jm == 3772 then local Wg = UK[1957][UK[438.]]; UK[1433](UK[1505]); Jm = 8 else Jm = 3771.; continue
+end else break end end end end, 9495845, 13327550, 3263, 2791, 0.2, "#22d3ee", function() DJ:Unload() end, 3562, "kpxhmb", "InfJump", "Dungeon Control", 1052, "PathStatus", function(g9, ha) local JD, JE, JG, JH, JI, JK = nil, nil, nil, nil, nil, nil; local JF = nil;
+JF = 1; while true do JF = 1262 - JF; do if JF < 1261 then if JF < 1260. then break else JE = {}; JH = false; for he, hf in UK[1295](JD:GetChildren()) do JI = he; JK = hf; local JJ = JI; local JL = JK; local JG = nil; JG = UK[2008]; while true do if JG < 4 then
+if JG < 2 then if JG < 1 then break else JD = not ha; JG = if JD then UK[327.] else UK[597.] end elseif JG < 3. then JG = if JL:GetAttribute(UK[1436]) == g9 then UK[1292] else UK[749] else JH = true; JG = UK[650] end elseif JG < 6. then if JG < 5 then JG = if JD then UK[633.] else UK[1579]
+else table.insert(JE, JL); JG = UK[1579] end elseif JG < 7 then JG = UK[749] elseif JG < 8 then JD = ha(JL); JG = UK[327.] else JG = UK[650] end end; if JH then break end end; return JE end elseif JF < 8136. then if JF < 1399 then if JF < 1262 then if JF == 1261 then
+JD = adeq_getInv(); JF = if not JD then 0. else 2 else JF = 1399; continue end elseif JF == 1262 then return {} else JF = 1399; continue end else break end else break end end end end, 11869886, 2226., 39., "xtctsh", function(gN) local Jh = nil; local Ji = nil;
+Ji = 0.; while true do Ji = 12261. - Ji; do if Ji < 9780. then break elseif Ji < 12261. then if Ji < 12259 then if Ji < 12258. then break else return Jh end elseif Ji < 12260 then if Ji == 12259 then Jh = UK[650]; Ji = 3. else Ji = 12261.; continue end else
+break end elseif Ji < 13593. then if Ji < 12634 then if Ji == 12261. then Jh = (gN:GetAttribute(UK[573.])); Ji = if Jh then 3. else 2 else break end else break end else break end end end end, "Weapon Assignment", 2818, "VirtualInputManager", function(gZ, g_)
+local Jq, Js, Jt, Ju = nil, nil, nil, nil; local Jr = nil; Jr = 8; while true do Jr = 12758 - Jr; do if Jr < 12754 then if Jr < 12752 then if Jr < 12750. then if Jr < 5915 then break elseif Jr < 10436 then break elseif Jr < 12749 then break elseif Jr == 12749 then
+Ju = if true then UK[1292] else UK[650]; Js = UK[1136] * Ju + UK[1377.] * (UK[1292] - Ju); Jt = UK[2065] * Ju + UK[382] * (UK[1292] - Ju); Jr = if (Js * UK[1320.] + Jt * UK[515] + Js * Jt) % UK[1264] == UK[1945] then 2 else 4 else Jr = 12750.; continue end
+elseif Jr < 12751 then Jq = tick(); Jr = 9. else Jr = 9. end elseif Jr < 12753. then if Jr == 12752 then Jr = 4 else Jr = 8919.; continue end else local Wh = UK[1957][UK[438.]]; UK[1433](UK[1505]); Jr = 7 end elseif Jr < 12757 then if Jr < 12756. then if Jr < 12755 then
+return false elseif Jr == 12755 then return true else Jr = 12753.; continue end else Jr = if tick() - Jq < g_ then 1 else 6. end elseif Jr < 12758 then Jr = if not gZ:GetAttribute(UK[46]) then 3. else 5 else break end end end end, "addons/SaveManager.lua",
+23, "nkijsntyswiw", "Replay Dungeon Once", "Level", "zhil", function() local TT, TU, TV = nil, nil, nil; local TW = nil; TW = 15.; while true do TW = 4719. - TW; do if TW < 4713. then if TW < 4710. then if TW < 4708 then if TW < 4706 then if TW < 4704. then
+break elseif TW < 4705 then if TW == 4704. then TW = 12. else TW = 4711; continue end elseif TW == 4705 then TW = 12. else TW = 4671.; continue end elseif TW < 4707. then break elseif TW == 4707. then TW = if true then 9. else 4 else TW = 4708; continue end
+elseif TW < 4709 then TW = 8 elseif TW == 4709 then TW = if TU then 5 else 8 else TW = 4671.; continue end elseif TW < 4712 then if TW < 4711 then TW = if not DJ[UK[1902.]] then 7 else 0. else local Wi = UK[1957][UK[438.]]; UK[1433](UK[1292]); TW = 14 end else
+TT = not Eh; TU = (isOn(UK[446])); TW = if TU then 1 else 10 end elseif TW < 4718 then if TW < 4715 then if TW < 4714 then TV = TU; TW = 2 else TT = adeq_doEquipUltimate(); Eh = true; TU = not Eg; TV = TT; TW = if TV then 6. else 2 end elseif TW < 4717 then
+if TW < 4716. then if TW == 4715 then TW = 13 else TW = 4711; continue end else DJ:Notify(UK[2063] .. TT); TW = 11 end else TW = if TV then 3. else 11 end elseif TW < 10501 then if TW < 4719. then TU = TT; TW = 10 elseif TW == 4719. then TW = 4 else TW = 4715;
+continue end else break end end end end, "WaterTransparency", "Groupbox", function() local Wj = UK[1957][UK[394]]; UK[1383.](function() local Ph, Pi, Pj = nil, nil, nil; local Pk = nil; Pk = 3.; while true do Pk = 5933 - Pk; do if Pk < 5933 then if Pk < 5928. then
+break elseif Pk < 5930 then if Pk < 5929 then if Pk == 5928. then Pj = UK[1850]; Pk = 0. else Pk = 3232; continue end elseif Pk == 5929 then DJ:Notify(Ph); Pk = 1 else Pk = 5928.; continue end elseif Pk < 5931. then if Pk == 5930 then local Wk = UK; Ph, Pi = Wk[879.](function()
+C8:InvokeServer() end); Pj = Ph; Pk = if Pj then 5 else 0. else Pk = 7576; continue end elseif Pk < 5932 then if Pk == 5931. then Ph = UK[1050.] .. tostring(Pi); Pk = 4 else Pk = 5607.; continue end else break end elseif Pk < 14937. then if Pk < 7272. then
+if Pk < 6774. then if Pk == 5933 then Ph = Pj; Pk = if Ph then 4 else 2 else Pk = 16340; continue end else break end else break end else break end end end end) end, 112, 3075., "eiqw", "#ff6b6b", "mmtxypivm", 246., "Auto Equip Best Ultimate", "Finished", function(gP)
+return adeq_oldHP(gP) + adeq_oldSTR(gP) + adeq_oldMAG(gP) end, 28, "VirusFrame", 8402552, "szabrk", 3044, 3599, 836, "rarity", "Auto Use Spells", 1497., 4078, "kfwizcenihb", "qdbd", "Linear", "rnr", "pmdwmg", "<b>%s</b>", 836946258., "\u{1F48E}  Gems Earned",
+"Visible", 654., 2118878819, 1121, "Headers", "TabSwitch", 14563146., "UserInputService", function(nU) local Pl = nil; Pl = 4; while true do Pl = 13427 - Pl; do if Pl < 13424 then if Pl < 6859 then break elseif Pl < 13120 then break elseif Pl < 13423 then break
+elseif Pl == 13423 then Pl = if nU then 3. else 2 else Pl = 6859; continue end elseif Pl < 13537 then if Pl < 13426 then if Pl < 13425. then local Wl = UK; CM = Wl[650]; adf_startMovement(); DJ:Notify(Wl[1600] .. D4 .. Wl[2032]); Pl = 0. elseif Pl == 13425. then
+adf_stopMovement(); DJ:Notify(UK[2053]); Pl = 0. else Pl = 13424; continue end elseif Pl < 13427 then break elseif Pl == 13427 then Pl = 1 else break end else break end end end end, task.spawn, 777., "izbvgbid", "Main", 2976362, "...", "npkrj", "Auto Sell Spells",
+4043, "SellUltimateRarities", "Golden Chests", "part", 1564, 3165241969, "Live", "yim", 3062, "NumberValue", "kceis", 2955179501, "Rare", 1897, 26, "ice", "LookVector", 3846631043, function(kS, kT) local NJ, NK, NM, NN, NO = nil, nil, nil, nil, nil; local NL = nil;
+NL = 4; while true do NL = 9385 - NL; do if NL < 9384. then if NL < 9381. then if NL < 2491 then break elseif NL < 9380 then break elseif NL == 9380 then local Wm = UK; NO = if NK then Wm[1292] else Wm[650]; NM = Wm[837.] * NO + Wm[431] * (Wm[1292] - NO); NN = Wm[47] * NO + Wm[1324] * (Wm[1292] - NO);
+NL = if (NM * Wm[112] + NN * Wm[1980.] + NM * NN) % Wm[1264] == Wm[288.] then 3. else 1 else NL = 9384.; continue end elseif NL < 9382 then NJ = kT == UK[2056]; NK = not kT; NL = if NK then 5 else 0. elseif NL < 9383 then return kS else break end elseif NL < 12655 then
+if NL < 9385 then if NL == 9384. then return string.format(UK[42.], kT, kS) else NL = 10148; continue end elseif NL < 10148 then if NL == 9385 then NK = NJ; NL = 5 else NL = 12655; continue end else break end else break end end end end, 3906., "Fly, NoClip, WalkSpeed",
+"vtpcq", 12., function(kV) return string.format(UK[68], kV) end, 2868., next, Vector3.new, 2039, "ToggleWindow", function() copyText(UK[1185.][UK[1688]], UK[1026.]) end, "snjrngf", 347, "W", 1796005969, 1129725326, "%ds", "zabcunwp", 1130, function(di) local GJ = nil;
+GJ = 1; while true do GJ = 15429. - GJ; do if GJ < 11135 then break elseif GJ < 15427 then break elseif GJ < 15428 then if GJ == 15427 then GJ = 3. else GJ = 6318.; continue end elseif GJ < 15429. then if GJ == 15428 then GJ = if di == UK[577] then 0. else 2
+else GJ = 11416; continue end else local Wn = UK[1957][UK[394]]; UK[1383.](wh_sendWebhook); GJ = 2 end end end end, "status ", "#ef4444", 3083, task.wait, "Weapon Priority", 2484., "Type", 126., 3824490310, 110, "Claude", "Func", "Fly Speed", 1534, "Root",
+6344765, 1171, "zhfozwzixmg", "Auto Sell", "hyalcaamny", "%x %X", "owm", "Equip Best Spells Once", "caucbejfez", "Hero Assembly (4 Slots)", 300., 40, "fire", 2805., 1355, "Options", "honm", "dnpqqq", 3592, function(o8) DN = adSell_normalizeMulti(o8) end, 25,
+"PrismHub", "Stat Points", "fnsma", "sieh", "bell", 3483., "kbedohbw", 15551145., "pugxov", "Combat Info", 1985, "Open Nearest Chest Once", 11, 1977., 2703., "Engage", 1369, "oravahwxa", "cwgg", 2772., "Gold", function(nG) D4 = nG; CM = UK[650] end, "more than 60 keyless scripts in this hub, I would love your support!",
+440, 1164004419., " **", "Copy Rejoin Script", "S", "#fb923c", "Ultimate: ", 349, "string", 979, "vrnvofy", "yhbumynneohs", 3285., 1405, 1007, "BoolValue", 0.05, "Active enemies: ", "Daily Challenges", 1155., "damageMultiplier", "embeds", "inline", 1499, "Color",
+"pidxnblfez", "table", 4663433, 3111., "cplxr", "aprqxp", "ajvlccc", "dungeonsRun", 3731, function(o6) DT = adSell_normalizeMulti(o6) end, 2076., 15379833., "PerformanceStats", "content", "qxjeqwre", "nkiovgpqdv", "yoowhlcz", 4817400., "Virus", "RotVelocity",
+697, function(bP) local Fw, Fx = nil, nil; local Fy = nil; Fy = 2; while true do Fy = 15558. - Fy; do if Fy < 8727. then break elseif Fy < 13079 then break elseif Fy < 15556 then break elseif Fy < 15557 then if Fy == 15556 then local Wo = UK; Fw = { [Wo[1710.]] = Wo[1270],
+[Wo[1403]] = Wo[568], [Wo[37]] = Wo[1971.], [Wo[695]] = Wo[1961], [Wo[1742]] = Wo[995], [Wo[1612]] = Wo[24.] }; Fx = Fw[bP]; Fy = if Fx then 0. else 1 else Fy = 12255.; continue end elseif Fy < 15558. then Fx = UK[457]; Fy = 0. else return Fx end end end end,
+"xkgemqsjj", 2655., "pkgvnmmuy", 2720, "EasingDirection", "#fef08a", function(ah) local EW, EX = nil, nil; local EY = nil; EY = 1; while true do EY = 2540 - EY; do if EY < 2540 then if EY < 2535. then break elseif EY < 2537 then if EY < 2536 then return EX
+else break end elseif EY < 2538. then EW = Dl[ah]; EX = type(EW) == UK[1515.]; EY = if EX then 0. else 5 elseif EY < 2539 then if EY == 2538. then return false else EY = 6882.; continue end else EY = if DJ[UK[1902.]] then 2 else 3. end elseif EY < 7706 then
+if EY < 3395 then if EY < 2848 then if EY == 2540 then EX = EW[UK[248]] == true; EY = 5 else EY = 6882.; continue end else break end else break end else break end end end end, function(gM) local Jf = nil; local Jg = nil; Jg = 3.; while true do Jg = 13015 - Jg;
+do if Jg < 13013 then if Jg < 9852. then break elseif Jg < 13012 then break else Jf = (gM:GetAttribute(UK[74])); Jg = if Jf then 2 else 1 end elseif Jg < 13015 then if Jg < 13014. then return Jf else Jf = UK[650]; Jg = 2 end else break end end end end, "Hourly Challenges",
+2763., 5013243., "dawydnmd", "Health", "Auto Spells", 157, 68, "Equipment", 1327, "swords", "Dropdown", "Auto Sell Ultimates", "Auto Equip Best Weapon", 1971., "Idled", workspace, "hdfib", "drqrtf", 691535, "Filters", "Auto Handle Virus", "DailyCurrentQuest",
+"CharacterAdded", 48., 783., "MaxForce", 1194., 3073, "shield", "Auto Sell Helmets", 88, 1.5, function(sY) local Sk = nil; local Sl = nil; Sl = 4; while true do Sl = 8348 - Sl; do if Sl < 8348 then if Sl < 8344 then if Sl < 6398 then break elseif Sl < 8343. then
+break elseif Sl == 8343. then Sl = 0. else Sl = 10019; continue end elseif Sl < 8346. then if Sl < 8345 then Sl = if not sY then 1 else 5 else Sk[UK[315.]] = UK[1096]; Sl = 2 end elseif Sl < 8347 then Sl = 5 elseif Sl == 8347 then Sk = getHumanoid(); Sl = if Sk then 3. else 2
+else Sl = 6398; continue end else break end end end end, "jysvczassj", 6., "Auto Equip Best Gear", "coins", "#f97316", 605, function() local T0, T1 = nil, nil; local T2 = nil; T2 = 10; while true do T2 = 7426 - T2; do if T2 < 7420 then if T2 < 7416. then if T2 < 7414 then
+if T2 < 7413. then if T2 < 2500 then break elseif T2 < 3098 then break elseif T2 < 7412 then break else T2 = 13 end elseif T2 == 7413. then T2 = 6. else T2 = 7420; continue end elseif T2 < 7415 then if T2 == 7414 then T0 = adVirus_isVisible(); T2 = 11 else
+T2 = 2500; continue end elseif T2 == 7415 then T2 = if T0 then 3. else 14 else T2 = 2477; continue end elseif T2 < 7419. then if T2 < 7418 then if T2 < 7417 then T2 = 6. else adVirus_clickBtn(T0); T2 = 7 end elseif T2 == 7418 then local Wp = UK[1957][UK[438.]];
+local Wq = UK; Wq[1433](Wq[1258]); T0 = (isOn(Wq[1724])); T2 = if T0 then 12. else 11 else T2 = 7422.; continue end elseif T2 == 7419. then local Wr = UK[1957][UK[438.]]; UK[1433](UK[1292]); T2 = 14 else T2 = 7417; continue end elseif T2 < 7423 then if T2 < 7422. then
+if T2 < 7421 then T2 = if true then 5 else 1 else T2 = if not DJ[UK[1902.]] then 8 else 4 end else T2 = 1 end elseif T2 < 8970. then if T2 < 7425. then if T2 < 7424 then T0, T1 = adVirus_getButtons(); T2 = if C_ == UK[1481] then 9. else 0. else break end elseif T2 < 7426 then
+T2 = 2 elseif T2 == 7426 then adVirus_clickBtn(T1); T2 = 7 else break end else break end end end end, 368724816., 2458, 0.06, 1705, 14418341, "name", "ID: Not Set", 3528., "Rejoin script copied!", 11384208., "Items Obtained: ", "qhyzgrdpq", "Multi", 1191.,
+"Equipped Weapon: ", "Auto Farm ON (", 1614., "Sky", "ORBIT CONTROLS", "D", "yogxjenwc", 3056, "#e0f2fe", 1996, 22, "Beam", 1390, "Secret", 1963, -1, "equdibv", game.PlaceId, function(n_) Dp = n_ end, Vector3, "Equipping heroes...", 9., 2996, function(gO) local Jj = nil;
+local Jk = nil; Jk = 1; while true do Jk = 6201. - Jk; do if Jk < 6490 then if Jk < 6041 then break elseif Jk < 6199 then if Jk < 6198. then break elseif Jk == 6198. then return Jj else Jk = 10527.; continue end elseif Jk < 6200 then if Jk == 6199 then Jj = UK[650];
+Jk = 3. else Jk = 6198.; continue end elseif Jk < 6201. then Jj = (gO:GetAttribute(UK[448])); Jk = if Jj then 3. else 2 else break end else break end end end end, "VirusAction", "Hero4", "Engage Virus Once", 3487, "sbgcgcoqtyf", 17, 43, 2607., 1216, "ybncdlpou",
+2849, "rwhvaslfk", function(td) local Sv, Sw = nil, nil; local Sx = nil; Sx = 2; while true do Sx = 14899 - Sx; do if Sx < 12509 then break elseif Sx < 14897 then if Sx < 14894 then break elseif Sx < 14895. then if Sx == 14894 then Sx = if Sw then 4 else 0.
+else Sx = 15711.; continue end elseif Sx < 14896 then CC = tick(); Sx = 0. elseif Sx == 14896 then Sw = Sv == UK[1209.][UK[743]][UK[1785.]]; Sx = 5 else Sx = 14894; continue end elseif Sx < 14899 then if Sx < 14898. then Sv = td[UK[743]]; Sw = Sv == UK[1209.][UK[743]][UK[282.]];
+Sx = if Sw then 5 else 3. else break end elseif Sx < 14932 then if Sx == 14899 then Sx = 1 else Sx = 10476.; continue end else break end end end end, 375., function(jU) local Mw, My, Mz, MA, MB, MC, MD, MF = nil, nil, nil, nil, nil, nil, nil, nil; local Mx = nil;
+Mx = 0.; while true do Mx = 2778. - Mx; do if Mx < 2778. then if Mx < 2777 then if Mx < 2775. then break elseif Mx < 2776 then if Mx == 2775. then return Mw else Mx = 6856; continue end else break end elseif Mx == 2777 then MC = false; for jW, jX in UK[1189](jU) do
+MD = jW; MF = jX; local ME = MD; local MG = MF; local MB = nil; local Ws = UK; MB = Ws[327.]; while true do if MB < 4 then if MB < 2 then if MB < 1 then Mw[tostring(ME)] = true; MB = Ws[1165] else Mw[tostring(MG)] = true; MB = Ws[1579] end elseif MB < 3. then
+MB = if MG == true then Ws[650] else Ws[1165] else MB = Ws[1579] end elseif MB < 6. then if MB < 5 then MB = if type(ME) == Ws[528.] then Ws[1292] else Ws[2008] else MC = true; MB = Ws[597.] end elseif MB < 7 then MB = Ws[597.] else break end end; if MC then
+break end end; return Mw else Mx = 2775.; continue end elseif Mx < 6976 then if Mx < 4013 then if Mx < 3998 then if Mx == 2778. then Mw = {}; local Ws = UK; MA = if type(jU) ~= Ws[1515.] then Ws[1292] else Ws[650]; My = Ws[1775] * MA + Ws[117.] * (Ws[1292] - MA);
+Mz = Ws[1598] * MA + Ws[1942] * (Ws[1292] - MA); Mx = if (My * Ws[1456] + Mz * Ws[639.] + My * Mz) % Ws[1264] == Ws[721] then 3. else 1 else Mx = 10406; continue end else break end else break end else break end end end end, "yeftktggip", 1346, 2253., "Discord for Support \u{1F49D}",
+410, 2536, "Enemies Killed", "Mass Quest Claim", 3033., 856, "Target Height Offset", "Equipped Armor: ", 317, 2163., "ChildAdded", function() local SI = nil; SI = 9.; while true do SI = 7910 - SI; do if SI < 7906 then if SI < 7903 then if SI < 7901 then if SI < 6480. then
+break elseif SI < 7756 then break elseif SI < 7900 then break elseif SI == 7900 then SI = if true then 2 else 0. else SI = 6480.; continue end elseif SI < 7902. then if SI == 7901 then SI = 10 else SI = 7900; continue end else SI = if isOn(UK[128]) then 5 else 7
+end elseif SI < 7904 then if SI == 7903 then local Wt = UK[1957][UK[438.]]; UK[1433](UK[419]); SI = 4 else SI = 7901; continue end elseif SI < 7905. then break else UK[879.](function() Dy:FireServer(Dt) end); local Wu = UK[1957][UK[438.]]; UK[1433](UK[1776.]);
+SI = 4 end elseif SI < 7909 then if SI < 7908. then if SI < 7907 then if SI == 7906 then SI = 3. else SI = 7910; continue end elseif SI == 7907 then SI = 10 else SI = 7910; continue end elseif SI == 7908. then SI = if not DJ[UK[1902.]] then 8 else 1 else SI = 7902.;
+continue end elseif SI < 7910 then if SI == 7909 then SI = 0. else SI = 7903; continue end elseif SI < 11584 then if SI < 9425 then if SI == 7910 then SI = 6. else SI = 7902.; continue end else break end else break end end end end, 230, "Spells", "wqrc", 3634357,
+"WebhookTest", 3133, 2187., "PlaybackState", "Spell1", 3625, 34, "Ultimate Rarities", "WebhookFilter", "Virus Auto Handler", 14087362, 1000, 9975031, "AutoEquipSpells", 3343, 2534, "AutoCosmeticSpin", 2382., 2966, 2255, "Notification Placement", 2508327742,
+"Declined virus!", 919, "HelmetEq", "[+] ", 1000000000, function(hI) local Kg, Kh = nil, nil; local Ki = nil; Ki = 2; while true do Ki = 14485 - Ki; do if Ki < 11991. then break elseif Ki < 14483 then if Ki < 14481. then if Ki < 14480 then break else local Wv = UK;
+adeq_fastPrime(Kg, Wv[188], Wv[188]); adeq_sort(Kg, hI); Kh = Kg[Wv[1292]]; adeq_fire(Wv[188], Kh, Wv[188]); adeq_waitForSlot(Kh, Wv[188], Wv[2008]); return Kh[Wv[821]] end elseif Ki < 14482 then local Wv = UK; adeq_fire(Wv[1168], Kh, Wv[188]); adeq_waitForUnequip(Kh, Wv[1576]);
+local Ww = Wv[1957][Wv[438.]]; Wv[1433](Wv[1505]); Ki = 5 else break end elseif Ki < 14485 then if Ki < 14484. then local Wv = UK; Kg = adeq_collect(Wv[188], function(hJ) return ad_isBodyArmorByName(hJ[UK[821]]) end); Ki = if #Kg == Wv[650] then 1 else 0. elseif Ki == 14484. then
+return nil else Ki = 14482; continue end elseif Ki < 14896 then if Ki == 14485 then Kh = adeq_getEquippedInSlot(UK[188]); Ki = if Kh then 4 else 5 else Ki = 9674; continue end else break end end end end, "wvuttaudtin", 548, "JobId", "ztudppgasdv", "qotuuajgomb",
+352579462, 2371, "WaterWaveSize", "Ping Filters", "Unknown", "avocxvrzfnt", "Values", "Rendering", "pxjbcn", "iaowlbihg", 1764., 1899., "csrb", 4054, 3166, "esbcyb", 3905, "Equipped: ", 2974305490, "Common", 31841255, 0.03, 4095., 142, "Smart Instant Replay",
+1129, function() local Wx = UK[1185.][UK[1039]]; copyText(string.format(UK[759.], UK[1616], UK[1185.][UK[1688]]), UK[1593.]) end, function() local Se = nil; local Sf = nil; Sf = 8; while true do Sf = 4915 - Sf; do if Sf < 4912 then if Sf < 4908. then if Sf < 4906 then
+if Sf < 4905. then if Sf == 4904 then Sf = 2 else Sf = 8549; continue end else Sf = if isOn(UK[545]) then 7 else 2 end elseif Sf < 4907 then Se[UK[857]] = DB; Sf = 6. else Sf = if DJ[UK[1902.]] then 5 else 3. end elseif Sf < 4910 then if Sf < 4909 then Se = getHumanoid();
+Sf = if Se then 1 else 11 else Sf = 10 end elseif Sf < 4911. then return elseif Sf == 4911. then Se = getHumanoid(); Sf = if Se then 9. else 6. else Sf = 4905.; continue end elseif Sf < 8549 then if Sf < 4914. then if Sf < 4913 then if Sf == 4912 then Sf = if isOn(UK[870.]) then 4 else 10
+else Sf = 15738.; continue end elseif Sf == 4913 then Sf = 0. else Sf = 4910; continue end elseif Sf < 4915 then Se[UK[315.]] = Dw; Sf = 11 else break end else break end end end end, 875, function(nL) DR = nL end, "Claim", "Farm", function() local QQ, QR, QS, QT, QV, QW, QX = nil, nil, nil, nil, nil, nil, nil;
+local QU = nil; QU = 9.; while true do QU = 13894 - QU; do if QU < 13885 then if QU < 13880 then if QU < 13878. then if QU < 13876 then if QU < 12299 then break elseif QU < 13875. then break else QR = QQ; QU = if QR then 14 else 15. end elseif QU < 13877 then
+break else QR = QT; C7:SetText(QS .. UK[1095.] .. QQ .. UK[1095.] .. QR); QU = 10 end elseif QU < 13879 then if QU == 13878. then local Wy = UK; QX = if not DJ[Wy[1902.]] then Wy[1292] else Wy[650]; QV = Wy[935] * QX + Wy[355] * (Wy[1292] - QX); QW = Wy[2020] * QX + Wy[1819] * (Wy[1292] - QX);
+QU = if (QV * Wy[1893.] + QW * Wy[1909] + QV * QW) % Wy[1264] == Wy[1589] then 4 else 0. else QU = 12299; continue end else QR = c(UK[379], UK[1349]); QU = 14 end elseif QU < 13882 then if QU < 13881. then QQ = C5; QS = QR; QU = if QQ then 3. else 6. else QQ = c(UK[1049], UK[602]);
+QU = 19 end elseif QU < 13884. then if QU < 13883 then if QU == 13882 then QU = 18. else QU = 14920; continue end elseif QU == 13883 then QQ = QR; QR = Db ~= UK[2056]; QU = if QR then 2 else 5 else QU = 13887.; continue end else QU = 8 end elseif QU < 13891 then
+if QU < 13889 then if QU < 13888 then if QU < 13887. then if QU < 13886 then QU = 8 else QU = if true then 16 else 12. end elseif QU == 13887. then QT = c(UK[1591], UK[1239.]); QU = 17 else QU = 13882; continue end elseif QU == 13888 then QR = QQ; QU = if QR then 11 else 1
+else QU = 5120; continue end elseif QU < 13890. then QT = QR; QU = if QT then 17 else 7 elseif QU == 13890. then local Wz = UK[1957][UK[438.]]; local Wy = UK; Wy[1433](Wy[1292]); QQ = Di ~= Wy[2056]; QU = if QQ then 13 else 19 else QU = 5120; continue end elseif QU < 13894 then
+if QU < 13893. then if QU < 13892 then if QU == 13891 then QQ = c(UK[142], UK[602]); QU = 6. else QU = 9156.; continue end else QR = c(UK[393.], UK[602]); QU = 5 end elseif QU == 13893. then QR = c(UK[104], UK[1239.]); QU = 11 else QU = 13894; continue end
+elseif QU < 14920 then if QU == 13894 then QU = 12. else break end else break end end end end, "AutoVirus", "Players", "wiwotfrkbj", 3980, 2091., 1383., "> (Simulation)", 1724, "SteelDaggers", 3655, "Rounding", "Test", "sunset", 15179109., 2974, "FarmMethod",
+1917., 55, "Mythic", "FPSBoost", "PrismHub/AnimeDungeons", "discord", "ebisilvvz", "Info", function() local WA = UK[1957][UK[394]]; UK[1383.](function() local PB, PC = nil, nil; local PD = nil; PD = 3.; while true do PD = 9668 - PD; do if PD < 9668 then if PD < 5704 then
+break elseif PD < 9666. then if PD < 9665 then break elseif PD == 9665 then Eh = false; local WB = UK; DJ:Notify(WB[225.]); PB = adeq_doEquipUltimate(); Eh = true; PC = PB; PD = if PC then 1 else 0. else PD = 5004.; continue end elseif PD < 9667 then break
+else DJ:Notify(UK[1495] .. PC); PD = 2 end elseif PD < 11945 then if PD < 10029. then if PD == 9668 then PC = UK[458]; PD = 1 else PD = 10198; continue end else break end else break end end end end) end, function() local Th, Ti, Tj = nil, nil, nil; local Tk = nil;
+Tk = 13; while true do Tk = 13360 - Tk; do if Tk < 13353. then if Tk < 13349 then if Tk < 13346 then if Tk < 13345 then if Tk < 7247 then break elseif Tk < 9008 then break elseif Tk < 13344. then break elseif Tk == 13344. then Ti = (isOn(UK[478])); Tk = if Ti then 2 else 3.
+else Tk = 13359.; continue end else Tk = 8 end elseif Tk < 13347. then if Tk == 13346 then Th = (isOn(UK[1952])); Tk = if Th then 16 else 5 else Tk = 13354; continue end elseif Tk < 13348 then Tk = 8 else break end elseif Tk < 13351 then if Tk < 13350. then
+if Tk == 13349 then local WC = UK; WC[879.](function() local S5, S6, S7, S8, S9, Tb, Tc, Td, Tf = nil, nil, nil, nil, nil, nil, nil, nil, nil; local Ta = nil; Ta = 2; while true do Ta = 8684 - Ta; do if Ta < 8681 then if Ta < 8677 then if Ta < 8676. then if Ta < 8674 then
+if Ta < 7335. then break elseif Ta < 8058. then break elseif Ta < 8673. then break elseif Ta == 8673. then S9 = S7[UK[1394]][UK[2060]] - S8[UK[2060]]; Ta = if S9[UK[1142]] > UK[650] then 3. else 10 else Ta = 8684; continue end elseif Ta < 8675 then Ta = 5 elseif Ta == 8675 then
+Ta = if S9 then 11 else 5 else Ta = 14971; continue end elseif Ta == 8676. then Tc = false; for t2, t3 in UK[1295](S5:GetChildren()) do Td = t2; Tf = t3; local Te = Td; local Tg = Tf; local Tb = nil; Tb = UK[1292]; while true do if Tb < 3. then if Tb < 1 then
+break elseif Tb < 2 then S5 = Tg:GetAttribute(UK[1436]) == UK[111.]; Tb = if S5 then UK[633.] else UK[327.] else S6 = Tg[UK[821]]; Tb = UK[1165] end elseif Tb < 5 then if Tb < 4 then Tc = true; Tb = UK[650] else Tb = if S5 then UK[2008] else UK[1579] end elseif Tb < 6. then
+S5 = Tg:GetAttribute(UK[46]) == true; Tb = UK[327.] else Tb = UK[650] end end; if Tc then break end end; Ta = 0. else Ta = 8680; continue end elseif Ta < 8679. then if Ta < 8678 then if Ta == 8677 then Ta = if S9 then 6. else 9. else Ta = 7831; continue end
+else S9 = S7[UK[1394]]; Ta = 9. end elseif Ta < 8680 then if Ta == 8679. then DQ:FireServer(UK[314], S6, makeVec(S5[UK[785]], S5[UK[2043.]], S5[UK[240.]]), UK[1165]); CR[UK[801.]] = CR[UK[801.]] + UK[1292]; Ta = 4 else Ta = 8684; continue end else break end
+elseif Ta < 8684 then if Ta < 8683 then if Ta < 8682. then S5 = S9[UK[2068]]; Ta = 10 elseif Ta == 8682. then S5 = Dk:FindFirstChild(UK[1915]); S6 = UK[1732]; Ta = if S5 then 8 else 0. else Ta = 8673.; continue end elseif Ta == 8683 then S9 = S7; Ta = 7 else
+Ta = 15506; continue end elseif Ta < 9753. then if Ta == 8684 then S5 = UK[1618][UK[1182.]](UK[650], UK[650], -UK[1292]); S7 = adf_pickTarget(); S8 = ad_getHRP(); S9 = S8; Ta = if S9 then 1 else 7 else break end else break end end end end); local WD = WC[1957][WC[438.]];
+WC[1433](WC[1587.]); Tk = 1 else Tk = 13358; continue end elseif Tk == 13350. then Tk = 0. else Tk = 2860; continue end elseif Tk < 13352 then if Tk == 13351 then Tj = Ti; Tk = 7 else Tk = 13344.; continue end elseif Tk == 13352 then Tk = if true then 4 else 0.
+else Tk = 13359.; continue end elseif Tk < 13357 then if Tk < 13355 then if Tk < 13354 then Tk = if Tj then 11 else 6. else local WE = UK[1957][UK[438.]]; UK[1433](UK[1258]); Tk = 1 end elseif Tk < 13356. then if Tk == 13355 then Ti = not Eb; Tj = Th; Tk = if Tj then 9. else 7
+else Tk = 13352; continue end elseif Tk == 13356. then Tk = if not DJ[UK[1902.]] then 14 else 10 else Tk = 13354; continue end elseif Tk < 13359. then if Tk < 13358 then Ti = CW; Tk = 2 elseif Tk == 13358 then Th = Ti; Tk = 5 else Tk = 13346; continue end elseif Tk < 13360 then
+if Tk == 13359. then Tk = 15. else Tk = 13351; continue end elseif Tk < 15760 then if Tk < 13377. then if Tk == 13360 then Tk = 12. else break end else break end else break end end end end, "Claim All Weekly Now", "AutoDailySpin", 3704720762, 4130329, "bxzevnhtyx",
+"Gems: ", 10, "*No items dropped this run.*", "kixqovzvbec", function() local WH = UK[1957][UK[394]]; UK[1383.](function() local pr = adQuest_claimHourly(); local pt = adQuest_claimDaily(); local pu = adQuest_claimWeekly(); DJ:Notify(UK[830] .. pr .. UK[1947.] .. pt .. UK[324.] .. pu)
+end) end, "EndActions", "Weekly Challenges", "kxpc", "CanCollide", 1967, "Only items matching the selected types will trigger a user ping", "URL format invalid!", "DungeonStats", "cxyjjthm", "Fluxus", "!%Y-%m-%dT%H:%M:%SZ", 647, "compass", "\u{1F308}", "Start Dungeon Once",
+549., function(j3) return UK[1416.](adSell_getRarityTable(j3)) ~= nil end, "Hero Priority", "kfobqvkad", "axc", "Remotes", "KeybindFrame", "date", "DungeonFrame", "PotatoMode", "Gamepad1", "nnpdzvulwr", 652, "Armor Priority", "Test Webhook", "qsfedkeplp", "Replay fired!",
+"version ", 2112645956, "Magic", function() local U0 = string.format; local PK, PL, PM, PN, PO, PP, PR, PS, PT, PV = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local PQ = nil; PQ = 1; while true do PQ = 14915 - PQ; do if PQ < 14915 then if PQ < 14914 then
+break else local WI = UK; PK = adeq_collect(WI[1103]); adeq_sort(PK, C3); PL = { WI[1852] .. C3 .. WI[354.] }; PS = false; for oW, oX in WI[1295](PK) do PT = oW; PV = oX; local PU = PT; local PW = PV; local PR = nil; PR = WI[633.]; while true do if PR < 4 then
+if PR < 2 then if PR < 1 then PM(PL, WI[841] .. PU .. WI[1895] .. PO .. PK .. WI[950] .. U0(WI[768.], adeq_oldSTR(PW)) .. WI[1100] .. U0(WI[768.], adeq_oldHP(PW)) .. WI[280] .. U0(WI[768.], adeq_oldMAG(PW)) .. WI[1210] .. tostring(adeq_isLoaded(PW))); PR = WI[1165]
+else PP = WI[1872.] .. PN .. WI[977]; PR = WI[749] end elseif PR < 3. then PM = WI[2056]; PR = WI[327.] else break end elseif PR < 6. then if PR < 5 then PN = PM; PM = table.insert; PO = PW[WI[821]]; PP = PK; PR = if PP then WI[1292] else WI[749] else PK = PW:GetAttribute(WI[46]) == true;
+PM = (PW:GetAttribute(WI[692])); PR = if PM then WI[327.] else WI[2008] end elseif PR < 7 then PK = WI[2056]; PR = WI[650] elseif PR < 8 then PS = true; PR = WI[1165] else PK = PP; PR = if PK then WI[650] else WI[1579] end end; if PS then break end end; copyText(table.concat(PL, WI[450.]), WI[906.]);
+PQ = 0. end else break end end end end, "Current Character Level", 2644, 3544, function(nQ) DF = nQ end, 608, "send", 3101, "jbohkqe", "gjhyeoyqso", 1339787794, "gbwuq", "Hero3", "Title", task.defer, "akgu", 172, "gflo", "cylqrhiti", "Opened chest!", function(dv)
+local GV, GW, GX, GZ = nil, nil, nil, nil; local GU = nil; GU = 3.; while true do GU = 13400 - GU; do if GU < 13400 then if GU < 13398. then if GU < 10591 then break elseif GU < 12358 then break elseif GU < 13397 then break elseif GU == 13397 then table.clear(CF);
+GU = if not dv then 2 else 0. else GU = 12358; continue end elseif GU < 13399 then return else break end elseif GU < 14556. then if GU == 13400 then GW = false; for dx, dy in UK[1295](dv:GetDescendants()) do GX = dx; GZ = dy; local GY = GX; local G_ = GZ; local GV = nil;
+local WJ = UK; GV = WJ[650]; while true do if GV < 2 then if GV < 1 then GV = if G_:IsA(WJ[878]) then WJ[1292] else WJ[2008] else table.insert(CF, G_); GV = WJ[2008] end elseif GV < 3. then GV = WJ[1165] elseif GV < 4 then break else GW = true; GV = WJ[1165]
+end end; if GW then break end end; GU = 1 else break end else break end end end end, "dsrujqvx", "lyi", "RenderStepped", 1400, "Ultimate Assignment", "Features", "AutoSellWeapon", 3310, "iuca", "model", 1109, 42., "bapchsdk", 3708., 3919258, "FPS Booster",
+3974, 390., "nfkyvofmkia", "webhook", "SteelDagger", 2236, 234552305, 350, 2875, "WebhookSetup", "Prism -- Execution", "vyqxqzjjyxpi", "eywzik", "qfslqadm", 1466, "ftbys", 1580, 1590., "Cosmetic Spin complete!", function(kZ, k_, k0) local UT = math.clamp; return string.format(UK[665], UT(kZ, UK[650], UK[167]), UT(k_, UK[650], UK[167]), UT(k0, UK[650], UK[167]))
+end, "Heroes (", 2196., "AllowNull", Color3.fromRGB, 3740, "\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}\u{2501}",
+"Unloaded", "ibxyfzbcc", "\u{1F7E3}", "DataStore2", 1.8, function(py) Di = py end, "ProximityPrompt", 190, "Uptime: ", ">", "Prism  |  Anime Dungeons  |  v5.2", "Copy Hero Stats", "HumanoidStateType", "AllQ", " [EQ:", "Max", "hhquo", "Level01", "EnemiesDefeated",
+"Gems Earned", "Dungeon started!", "EXP Gained", "sqajy", "VirtualUser", "^(-?%d+)(%d%d%d)", function(kj, kk) local M8, Na, Nb, Nc = nil, nil, nil, nil; local M9 = nil; M9 = 14; while true do M9 = 6333. - M9; do if M9 < 6327. then if M9 < 6319 then if M9 < 6315. then
+if M9 < 5687 then break elseif M9 < 6314 then break elseif M9 == 6314 then M8 = Dq; M9 = if M8 then 1 else 2 else M9 = 6317; continue end elseif M9 < 6317 then if M9 < 6316 then break elseif M9 == 6316 then return false else M9 = 6320; continue end elseif M9 < 6318. then
+Nc = if M8 then UK[1292] else UK[650]; Na = UK[16] * Nc + UK[993.] * (UK[1292] - Nc); M9 = 5 else M9 = if not adSell_matchesCategory(kj, kk) then 17 else 13 end elseif M9 < 6323 then if M9 < 6321. then if M9 < 6320 then if M9 == 6319 then M8 = not kj; M9 = if M8 then 3. else 0.
+else M9 = 6315.; continue end elseif M9 == 6320 then M9 = if not adSell_rarityAllowed(kj, kk) then 8 else 4 else M9 = 6318.; continue end elseif M9 < 6322 then M9 = if (Na * UK[51.] + Nb * UK[1170.] + Na * Nb) % UK[1264] == UK[2035] then 9. else 19 elseif M9 == 6322 then
+return true else M9 = 6320; continue end elseif M9 < 6325 then if M9 < 6324. then if M9 == 6323 then return false else M9 = 14657; continue end else return false end elseif M9 < 6326 then return false else M8 = kj:GetAttribute(UK[46]) == true; M9 = 16 end elseif M9 < 7363 then
+if M9 < 6331 then if M9 < 6329 then if M9 < 6328 then return false else Nb = UK[2037.] * Nc + UK[212] * (UK[1292] - Nc); M9 = 12. end elseif M9 < 6330. then M8 = Dv; M9 = if M8 then 7 else 16 elseif M9 == 6330. then M9 = if M8 then 10 else 15. else M9 = 5687;
+continue end elseif M9 < 6333. then if M9 < 6332 then M9 = if M8 then 6. else 11 else M8 = kj:GetAttribute(UK[1250]) == true; M9 = 2 end elseif M9 < 7275. then if M9 == 6333. then M8 = not kj[UK[499]]; M9 = 3. else M9 = 7905.; continue end else break end else
+break end end end end, 3204203390, 2036, 1541, 2092, "dvfhbvephme", function() local PY, PZ, P_, P0, P1, P2 = nil, nil, nil, nil, nil, nil; local PX = nil; PX = 7; while true do PX = 13509. - PX; do if PX < 10866. then break elseif PX < 13505 then if PX < 13502 then
+break elseif PX < 13503. then local WK = UK; P_ = if Di == WK[2056] then WK[1292] else WK[650]; PY = WK[194] * P_ + WK[813.] * (WK[1292] - P_); PZ = WK[1204] * P_ + WK[1664] * (WK[1292] - P_); PX = if (PY * WK[2027] + PZ * WK[811] + PY * PZ) % WK[1264] == WK[1327] then 6. else 4
+elseif PX < 13504 then DJ:Notify(UK[175]); return elseif PX == 13504 then PX = if (P0 * UK[1111] + P1 * UK[1865] + P0 * P1) % UK[1264] == UK[178] then 2 else 1 else PX = 3120.; continue end elseif PX < 13508 then if PX < 13506. then if PX == 13505 then local WK = UK;
+P2 = if not Di:find(WK[1802]) then WK[1292] else WK[650]; P0 = WK[183.] * P2 + WK[1948] * (WK[1292] - P2); PX = 3. else PX = 13506.; continue end elseif PX < 13507 then if PX == 13506. then P1 = UK[936.] * P2 + UK[2003] * (UK[1292] - P2); PX = 5 else PX = 858.;
+continue end else DJ:Notify(UK[1766]); return end elseif PX < 13509. then DJ:Notify(UK[371]); PX = 0. else break end end end end, function() CD = false; CA = false; Cw = false; Cu = false; Eh = false; Ed = false end, "Anti-Sit", "Player", 1153, "vjpkg", " ",
+"uttueqek", function() copyText(De, UK[522.]) end, 1000000, function(hS) local Km, Kn, Ko, Kp, Kq, Ks, Kt, Ku, Kw, Ky, Kz, KA, KB, KC = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local Kr = nil; Kr = 2; while true do Kr = 4991 - Kr;
+do if Kr < 4987 then if Kr < 4985 then if Kr < 4984 then if Kr < 4983. then break else Kr = if KA <= Ky then 1 else 0. end else local WL = UK; Kn = { WL[56], WL[321.], WL[1807], WL[1624] }; Kt = false; for hV, hW in WL[1295](Km) do Ku = hV; Kw = hW; local Kv = Ku;
+local Kx = Kw; local Ks = nil; Ks = WL[327.]; while true do if Ks < 2 then if Ks < 1 then adeq_fire(WL[1168], Kx, WL[1103]); adeq_waitForUnequip(Kx, WL[1576]); local WM = WL[1957][WL[438.]]; WL[1433](WL[1712]); Ks = WL[2008] else Kt = true; Ks = WL[1165] end
+elseif Ks < 3. then Ks = WL[1165] elseif Ks < 4 then break else Ks = if Kx:GetAttribute(WL[46]) == true then WL[650] else WL[2008] end end; if Kt then break end end; local WN = WL[1957][WL[438.]]; WL[1433](WL[1776.]); adeq_fastPrime(Km, WL[1103], WL[1624]);
+adeq_sort(Km, hS); Ko = {}; Kp = math.min(WL[327.], #Km); KA = WL[1292]; Ky = Kp; Kr = 8 end elseif Kr < 4986. then KC = KB; Kp = Km[KC]; Kq = Kn[KC]; local WL = UK; adeq_fire(WL[1103], Kp, Kq); adeq_waitForSlot(Kp, Kq, WL[2008]); table.insert(Ko, Kp[WL[821]]);
+local WO = WL[1957][WL[438.]]; WL[1433](WL[1505]); Kr = 4 else return {} end elseif Kr < 4989. then if Kr < 4988 then KA += UK[1292]; Kr = 8 else break end elseif Kr < 4991 then if Kr < 4990 then if Kr == 4989. then local WL = UK; Km = adeq_collect(WL[1103]);
+Kr = if #Km == WL[650] then 5 else 7 else Kr = 11049.; continue end else KB = KA; Kr = 6. end elseif Kr < 10976 then if Kr < 7752. then if Kr == 4991 then return Ko else Kr = 15184; continue end else break end else break end end end end, function(kq) local Nh, Ni, Nk, Nl, Nm, No = nil, nil, nil, nil, nil, nil;
+local Nj = nil; Nj = 3.; while true do Nj = 3390. - Nj; do if Nj < 3390. then if Nj < 3389 then if Nj < 3387. then break elseif Nj < 3388 then Nh = Dk:FindFirstChild(UK[1915]); Nj = if not Nh then 0. else 1 else break end else Ni = {}; Nl = false; for kv, kw in UK[1295](Nh:GetChildren()) do
+Nm = kv; No = kw; local Nn = Nm; local Np = No; local Nk = nil; local WP = UK; Nk = WP[327.]; while true do if Nk < 2 then if Nk < 1 then table.insert(Ni, Np); Nk = WP[1165] else Nl = true; Nk = WP[2008] end elseif Nk < 3. then break elseif Nk < 4 then Nk = WP[2008]
+else Nk = if adSell_canSellItem(Np, kq) then WP[650] else WP[1165] end end; if Nl then break end end; table.sort(Ni, function(kx, ky) local Nd, Ne, Nf = nil, nil, nil; local Ng = nil; Ng = 23; while true do Ng = 2881 - Ng; do if Ng < 2872 then if Ng < 2865. then
+if Ng < 2861 then if Ng < 2859. then if Ng == 2858 then Nd = (kx:GetAttribute(UK[697])); Ng = if Nd then 13 else 4 else break end elseif Ng < 2860 then Nf = Nd; Ng = if Ne ~= Nf then 6. else 3. else Nf = CV[Ne]; Ng = if Nf then 18. else 2 end elseif Ng < 2863 then
+if Ng < 2862. then if Ng == 2861 then Ng = if kx[UK[821]] ~= ky[UK[821]] then 16 else 5 else Ng = 2858; continue end elseif Ng == 2862. then Nd = UK[650]; Ng = 0. else Ng = 2881; continue end elseif Ng < 2864 then Ne = Nf; Ng = if Nd ~= Ne then 1 else 20 elseif Ng == 2864 then
+Ne = tostring(Nd); Nf = (ky:GetAttribute(UK[472])); Ng = if Nf then 10 else 8 else Ng = 2876; continue end elseif Ng < 2868. then if Ng < 2866 then if Ng == 2865. then return kx[UK[821]] < ky[UK[821]] else Ng = 2872; continue end elseif Ng < 2867 then Nd = UK[650];
+Ng = 22 else Ne = UK[1710.]; Ng = 21. end elseif Ng < 2870 then if Ng < 2869 then if Ng == 2868. then Ne = CV[Nd]; Ng = if Ne then 7 else 12. else Ng = 2860; continue end elseif Ng == 2869 then Ne = UK[650]; Ng = 7 else Ng = 2871.; continue end elseif Ng < 2871. then
+break elseif Ng == 2871. then return Ne < tostring(Nf) else Ng = 14212; continue end elseif Ng < 2879 then if Ng < 2875 then if Ng < 2873 then Nd = UK[2056]; Ng = 17 elseif Ng < 2874. then Nf = UK[2056]; Ng = 10 else Nd = Ne; Ne = (ky:GetAttribute(UK[697]));
+Ng = if Ne then 21. else 14 end elseif Ng < 2877. then if Ng < 2876 then if Ng == 2875 then return Ne < Nf else Ng = 2863; continue end else Nd = (kx:GetAttribute(UK[1340])); Ng = if Nd then 0. else 19 end elseif Ng < 2878 then Nd = UK[1710.]; Ng = 13 else
+Nd = (kx:GetAttribute(UK[472])); Ng = if Nd then 17 else 9. end elseif Ng < 10994 then if Ng < 2881 then if Ng < 2880. then Nf = UK[650]; Ng = 18. else return Nd < Ne end elseif Ng < 6451 then if Ng == 2881 then Ne = Nd; Nd = (ky:GetAttribute(UK[1340])); Ng = if Nd then 22 else 15.
+else Ng = 2875; continue end else break end else break end end end end); return Ni end elseif Nj < 7004 then if Nj < 6123. then if Nj < 3521 then if Nj == 3390. then return {} else Nj = 1915; continue end else break end else break end else break end end end
+end, 1683., 2877., 105751, "Gold Gained: ", "keyless forever, always will be", 4284820774, "     ", 99., 1099, "Equip Best Helmet Once", 1998., "ShadowMapEnabled", 2687, 2488, "Inventory", function() local T4 = nil; T4 = 3.; while true do T4 = 12020 - T4; do
+if T4 < 12014 then if T4 < 12012. then if T4 < 12011 then if T4 < 11138 then break elseif T4 < 12010 then break else T4 = if isOn(UK[1285]) then 7 else 6. end else T4 = if not DJ[UK[1902.]] then 10 else 8 end elseif T4 < 12013 then T4 = 0. elseif T4 == 12013 then
+adQuest_claimDaily(); local WQ = UK[1957][UK[438.]]; UK[1433](UK[1292]); T4 = 4 else T4 = 13147; continue end elseif T4 < 12019 then if T4 < 12017 then if T4 < 12015. then if T4 == 12014 then local WR = UK[1957][UK[438.]]; UK[1433](UK[419]); T4 = 4 else T4 = 12018.;
+continue end elseif T4 < 12016 then break else T4 = 2 end elseif T4 < 12018. then if T4 == 12017 then T4 = 1 else T4 = 51.; continue end else T4 = 1 end elseif T4 < 12020 then T4 = if true then 9. else 0. elseif T4 < 14045 then if T4 < 13147 then if T4 == 12020 then
+T4 = 5 else break end else break end else break end end end end, "Jump Value", "Gold: ", "syqravpkwuig", "Head Gear Assignment", "%dm %ds", "Show Keybind Menu", "PlatformStand", "Roblox", "clsckgw", 3218943., "#fbbf24", "Body Armor Assignment", 3003., 38, "JumpRequest",
+"xxywonbt", "Ultimate", 960., "yzfsu", "CoreGui", 864257564, "MobileButtonSide", "FPS: ", "#6b7280", function(lO) local UY = math.floor; local UZ = string.format; local Ox, Oy, Oz = nil, nil, nil; local OA = nil; OA = 2; while true do OA = 4472 - OA; do if OA < 4470. then
+if OA < 4467. then break elseif OA < 4468 then if OA == 4467. then return UZ(UK[1921], Oy, Oz) else OA = 15516.; continue end elseif OA < 4469 then break elseif OA == 4469 then return UZ(UK[1426], Oz) else OA = 4468; continue end elseif OA < 8161 then if OA < 4471 then
+if OA == 4470. then lO = UY(lO); local WU = UK; Ox = UY(lO / WU[2002]); Oy = UY(lO % WU[2002] / WU[609.]); Oz = lO % WU[609.]; OA = if Ox > WU[650] then 0. else 1 else OA = 4471; continue end elseif OA < 4472 then if OA == 4471 then OA = if Oy > UK[650] then 5 else 3.
+else OA = 4470.; continue end elseif OA == 4472 then return UZ(UK[762.], Ox, Oy, Oz) else break end else break end end end end, 2576, "awce", "Toggles", 14384578, 1380., " | Daily: ", 3728, function(j4, j5) local MO, MP = nil, nil; local MQ = nil; MQ = 1; while true do
+MQ = 2997. - MQ; do if MQ < 2996 then if MQ < 2992 then break elseif MQ < 2994. then if MQ < 2993 then return true else return MO[MP] == true end elseif MQ < 2995 then break else MO = UK[1710.]; MQ = 0. end elseif MQ < 7921 then if MQ < 6469 then if MQ < 2997. then
+if MQ == 2996 then MO = (j4:GetAttribute(UK[697])); MQ = if MO then 0. else 2 else MQ = 2993; continue end elseif MQ == 2997. then MP = tostring(MO); MO = adSell_getRarityTable(j5); MQ = if not adSell_hasRarityFilter(j5) then 5 else 4 else break end else break
+end else break end end end end, function(bT, bU) local FC, FD, FE = nil, nil, nil; local FF = nil; FF = 8; while true do FF = 14919. - FF; do if FF < 14911 then if FF < 14495 then break elseif FF < 14909 then if FF < 14908 then break elseif FF == 14908 then
+return false else FF = 14916.; continue end elseif FF < 14910. then if FF == 14909 then FC = CE[bT] == true; FF = 4 else FF = 14912; continue end else FC = true; FF = 4 end elseif FF < 14915 then if FF < 14913. then if FF < 14912 then if FF == 14911 then FF = if not C5 then 11 else 7
+else FF = 14917; continue end else FC = false; FF = if UK[1416.](CE) == nil then 9. else 10 end elseif FF < 14914 then FD = CB[bU] == true; FF = 2 else break end elseif FF < 14917 then if FF < 14916. then FD = false; FF = if UK[1416.](CB) == nil then 3. else 6.
+elseif FF == 14916. then FD = true; FF = 2 else FF = 14909; continue end elseif FF < 14918 then FE = FC; FF = if FE then 1 else 0. elseif FF < 14919. then if FF == 14918 then FE = FD; FF = 0. else FF = 14912; continue end else return FE end end end end, 399.,
+"AutoAttack", "UltEq", function(am, an) local EZ, E_ = nil, nil; local E0 = nil; E0 = 1; while true do E0 = 5533 - E0; do if E0 < 6569 then if E0 < 5531 then if E0 < 5529. then if E0 == 5528 then return EZ else E0 = 15882.; continue end elseif E0 < 5530 then
+break elseif E0 == 5530 then EZ = an; E0 = 5 else E0 = 15882.; continue end elseif E0 < 5532. then E_ = tonumber(EZ[UK[248]]); E0 = 0. elseif E0 < 5533 then if E0 == 5532. then EZ = Dd[am]; E_ = type(EZ) == UK[1515.]; E0 = if E_ then 2 else 0. else E0 = 8518;
+continue end elseif E0 == 5533 then EZ = E_; E0 = if EZ then 5 else 3. else break end else break end end end end, "5.2", 3923, task, 601, "stsenwwlhpt", function() local ON, OO, OP, OQ, OR, OT, OU, OV = nil, nil, nil, nil, nil, nil, nil, nil; local OS = nil;
+OS = 3.; while true do OS = 10873 - OS; do if OS < 10860. then if OS < 10853 then if OS < 10849 then if OS < 10847 then if OS < 10846 then break else OS = if OO then 13 else 22 end elseif OS < 10848. then if OS == 10847 then OP = OO; OS = if OP then 2 else 18.
+else OS = 10865; continue end else OP = UK[650]; OS = 15. end elseif OS < 10852 then if OS < 10850 then OO = ON:FindFirstChild(UK[1340]); OS = 14 elseif OS < 10851. then break else ON = OO; OS = if ON then 5 else 19 end elseif OS == 10852 then OO = ON[UK[1486]][UK[248]];
+OS = 26 else OS = 10858; continue end elseif OS < 10857. then if OS < 10855 then if OS < 10854. then OS = 16 elseif OS == 10854. then ON = UK[650]; OS = 5 else OS = 10871; continue end elseif OS < 10856 then OP = UK[650]; OS = 2 elseif OS == 10856 then OS = if not DJ[UK[1902.]] then 11 else 8
+else OS = 15219.; continue end elseif OS < 10859 then if OS < 10858 then if OS == 10857. then OS = if true then 17 else 9. else OS = 11612; continue end elseif OS == 10858 then OO = ON; OQ = OP; OS = if OO then 4 else 0. else OS = 10852; continue end else OS = if OO then 10 else 1
+end elseif OS < 10868 then if OS < 10864 then if OS < 10862 then if OS < 10861 then if OS == 10860. then OO = ON[UK[187]][UK[248]]; OS = 22 else OS = 10869.; continue end else local WV = UK; Du:SetText(b(WV[541]) .. c(formatNumber(OQ), WV[322])); Do:SetText(b(WV[1918]) .. c(formatNumber(OR), WV[1927]));
+Dh:SetText(b(WV[1755.]) .. c(formatNumber(OP), WV[345.])); Da:SetText(b(WV[451]) .. c(OO, WV[1289])); C4:SetText(b(WV[1174]) .. c(formatNumber(CR[WV[1521.]]), WV[602])); C0:SetText(b(WV[1904]) .. c(formatNumber(CR[WV[459.]]), WV[1927])); CX:SetText(b(WV[157]) .. c(formatNumber(CR[WV[400]]), WV[345.]));
+CT:SetText(b(WV[1595]) .. c(formatNumber(CR[WV[1251.]]), WV[1198])); CP:SetText(b(WV[310]) .. c(formatNumber(CR[WV[944]]), WV[1289])); OS = 20 end elseif OS < 10863. then if OS == 10862 then local WW = UK[1957][UK[438.]]; local WV = UK; WV[1433](WV[2008]);
+ON = Dk:FindFirstChild(WV[468.]); OO = ON; OV = if OO then WV[1292] else WV[650]; OT = WV[307] * OV + WV[346] * (WV[1292] - OV); OU = WV[980] * OV + WV[1630] * (WV[1292] - OV); OS = if (OT * WV[1000] + OU * WV[254] + OT * OU) % WV[1264] == WV[1380.] then 24. else 14
+else OS = 10847; continue end elseif OS == 10863. then OO = ON[UK[1340]][UK[248]]; OS = 1 else OS = 1667; continue end elseif OS < 10867 then if OS < 10866. then if OS < 10865 then OS = 23 elseif OS == 10865 then OS = 9. else OS = 10869.; continue end else
+OO = CW[UK[821]]; OS = 12. end elseif OS == 10867 then OO = ON:FindFirstChild(UK[187]); OS = 27. else OS = 12828.; continue end elseif OS < 10872. then if OS < 10870 then if OS < 10869. then OO = UK[458]; OP = ON; OS = if CW then 7 else 12. else OO = ON:FindFirstChild(UK[1486]);
+OS = 0. end elseif OS < 10871 then OS = 16 else OO = ON; OR = OP; OS = if OO then 6. else 27. end elseif OS < 11612 then if OS < 10873 then OP = OO; OS = if OP then 15. else 25 elseif OS == 10873 then OS = if OO then 21. else 26 else break end else break end
+end end end, 16761095, 312., 655, "LevelOfDetail", 658, 67, "kgak", "Game", "Discord Webhook for Rewards", 4196204725, 10233776, 2033, function(k4, k5, k6) local UU = math.round; local UV = string.format; local NP, NQ, NR, NS, NT, NU, NV, NW, NX, NY, NZ, N_, N1, N2, N3, N4, N5, N6, N7, N8, N9, Oa, Oc = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local N0 = nil; N0 = 0.; while true do N0 = 14943. - N0; do if N0 < 14936 then if N0 < 14931. then if N0 < 14929 then if N0 < 14928. then break elseif N0 == 14928. then Oc = if N6 <= N4 then UK[1292] else UK[650]; N9 = UK[1958] * Oc + UK[1545.] * (UK[1292] - Oc);
+N0 = 8 else N0 = 14933; continue end elseif N0 < 14930 then if N0 == 14929 then N6 += UK[1292]; N0 = 15. else N0 = 14942; continue end else return UK[2056] end elseif N0 < 14934. then if N0 < 14933 then if N0 < 14932 then if N0 == 14931. then return UV(UK[42.], k5, k4)
+else N0 = 14936; continue end else N6 = UK[1292]; N4 = NW; N0 = 15. end elseif N0 == 14933 then NV = NV .. UK[1895]; N0 = 4 else N0 = 14937.; continue end elseif N0 < 14935 then if N0 == 14934. then return NV else N0 = 14940.; continue end elseif N0 == 14935 then
+Oa = UK[199] * Oc + UK[2066] * (UK[1292] - Oc); N0 = 3. else N0 = 14936; continue end elseif N0 < 14940. then if N0 < 14938 then if N0 < 14937. then if N0 == 14936 then N7 = N6; N0 = 6. else N0 = 14930; continue end else N8 = N7; NX = (N8 - UK[1292]) / (NW - UK[1292]);
+NY = UU(lerp(NR, NU, NX)); NZ = UU(lerp(NQ, NT, NX)); N_ = UU(lerp(NP, NS, NX)); NX = k4:sub(N8, N8); N0 = if NX == UK[1895] then 10 else 2 end elseif N0 < 14939 then break else N0 = 14 end elseif N0 < 14942 then if N0 < 14941 then if N0 == 14940. then N0 = if (N9 * UK[621.] + Oa * UK[808] + N9 * Oa) % UK[1264] == UK[552.] then 7 else 9.
+else N0 = 14938; continue end else NV = NV .. UV(UK[42.], rgbToHex(NY, NZ, N_), NX); N0 = 4 end elseif N0 < 14943. then if N0 == 14942 then N3 = if NW == UK[1292] then UK[1292] else UK[650]; N1 = UK[1415] * N3 + UK[596] * (UK[1292] - N3); N2 = UK[1572.] * N3 + UK[1853] * (UK[1292] - N3);
+N0 = if (N1 * UK[414.] + N2 * UK[1676] + N1 * N2) % UK[1264] == UK[1657] then 12. else 11 else N0 = 14935; continue end else NR, NQ, NP = hexToRgb(k5); NU, NT, NS = hexToRgb(k6); NV = UK[2056]; NW = #k4; N0 = if NW == UK[650] then 13 else 1 end end end end,
+3943634, 2976., "*", "Callback", 1422., "Executor: ", 192., "info", "pkowefp", 3523, 136, function() copyText(C6, UK[1256]) end, "nyd", 629, "Character", "gqverfuj", "HourlyQ", "Bust", "AutoQuestWeekly", "Orbit Radius", "CornerRadius", 5846122, 2151400053.,
+416, "wcuaz", "otjowwhpebx", 505, 559, 3600., 386, "%.1fM", "tythvxstc", 3235, 2782, 2, 2834, 8125226, "Engage = click Confirm | Escape = click Decline", 16252057, "Size", "\u{1F534}", "Auto Farm Mobs", "hjcft", 360., function(kc, kd) local MX, MY, M_, M0, M1, M2, M3, M4, M5, M6, M7 = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local MZ = nil; MZ = 17; while true do MZ = 3040 - MZ; do if MZ < 3030. then if MZ < 3021. then if MZ < 3016 then if MZ < 3014 then if MZ < 3013 then break else return MY end elseif MZ < 3015. then break else MZ = if kd == UK[1933] then 0. else 4 end elseif MZ < 3018. then
+if MZ < 3017 then if MZ == 3016 then return MX == UK[111.] else MZ = 3026; continue end else MY = MX == UK[188]; M1 = if MY then UK[1292] else UK[650]; M_ = UK[624.] * M1 + UK[1745] * (UK[1292] - M1); MZ = 7 end elseif MZ < 3019 then if MZ == 3018. then return MY
+else MZ = 3017; continue end elseif MZ < 3020 then if MZ == 3019 then MZ = if kd == UK[20] then 6. else 1 else MZ = 3020; continue end elseif MZ == 3020 then MY = MX == UK[476]; MZ = if MY then 16 else 3. else MZ = 3022; continue end elseif MZ < 3025 then if MZ < 3023 then
+if MZ < 3022 then if MZ == 3021. then return false else MZ = 3016; continue end elseif MZ == 3022 then MZ = if (M5 * UK[1099] + M6 * UK[172] + M5 * M6) % UK[1264] == UK[1546] then 24. else 14 else MZ = 5521; continue end elseif MZ < 3024. then MX = kc:GetAttribute(UK[1436]);
+M7 = if kd == UK[111.] then UK[1292] else UK[650]; M5 = UK[1116.] * M7 + UK[1951] * (UK[1292] - M7); MZ = 11 elseif MZ == 3024. then MY = not adSell_isUltimateSpell(kc); MZ = 3. else MZ = 3032; continue end elseif MZ < 3027. then if MZ < 3026 then if MZ == 3025 then
+MY = ad_isBodyArmorByName(kc[UK[821]]); MZ = 27. else MZ = 3018.; continue end else MZ = if kd == UK[188] then 23 else 21. end elseif MZ < 3028 then if MZ == 3027. then MY = adSell_isUltimateSpell(kc); MZ = 22 else MZ = 3034; continue end elseif MZ < 3029 then
+if MZ == 3028 then MY = ad_isHelmetByName(kc[UK[821]]); MZ = 5 else MZ = 3025; continue end elseif MZ == 3029 then M6 = UK[218] * M7 + UK[1611.] * (UK[1292] - M7); MZ = 18. else MZ = 3025; continue end elseif MZ < 3039. then if MZ < 3034 then if MZ < 3032 then
+if MZ < 3031 then MZ = 2 else MZ = if (M_ * UK[1179.] + M0 * UK[2000] + M_ * M0) % UK[1264] == UK[259] then 15. else 27. end elseif MZ < 3033. then if MZ == 3032 then MZ = 10 else MZ = 3017; continue end else M0 = UK[9.] * M1 + UK[339.] * (UK[1292] - M1); MZ = 9.
+end elseif MZ < 3036. then if MZ < 3035 then if MZ == 3034 then MY = MX == UK[188]; MZ = if MY then 12. else 5 else MZ = 3017; continue end elseif MZ == 3035 then return MY else MZ = 3034; continue end elseif MZ < 3037 then if MZ == 3036. then MZ = 8 else MZ = 16032.;
+continue end elseif MZ < 3038 then if MZ == 3037 then return MY else MZ = 3034; continue end else MZ = 19 end elseif MZ < 10451 then if MZ < 5521 then if MZ < 3040 then M4 = if kd == UK[476] then UK[1292] else UK[650]; M2 = UK[1446.] * M4 + UK[1729] * (UK[1292] - M4);
+M3 = UK[953] * M4 + UK[219.] * (UK[1292] - M4); MZ = if (M2 * UK[470] + M3 * UK[1223] + M2 * M3) % UK[1264] == UK[1314.] then 20 else 25 elseif MZ == 3040 then MY = MX == UK[476]; MZ = if MY then 13 else 22 else MZ = 3015.; continue end else break end else
+break end end end end, "Auto Equip Best Spells", 2571., 2119, "\u{1F4B0}  Gold Earned", "fromRGB", "DescendantAdded", 3986, "scftknypq", 1714, "NotificationSide", "Webhook", 1271, 1694, ")", "particle", "EXP Received", 5500462, 755, 3808, "PrimaryPart", "KeyPicker",
+"fields", 2748., 4009, "Y", "Under", "Auto Attack", "NoClip", "AbsoluteSize", "Rarity Filters", 1037885494, 6050879, 2.5, 11857127, "Auto Farm OFF", 63., 4569446, "", "Auto Ultimate", "ShowCustomCursor", "gipvrckr", "Position", 2934., "tbwybfwvopn", "Equipped Ultimate: ",
+2506, 1041., 245, "Webhook Active", "Unit", "Config verified & callbacks restored!", 3845, function() local R1, R2, R4, R5, R6, R7, R8, R9, Sa, Sb = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local R3 = nil; R3 = 0.; while true do R3 = 3114. - R3; do
+if R3 < 3110 then if R3 < 3104 then if R3 < 3101 then if R3 < 3100 then if R3 < 2123 then break elseif R3 < 3098 then break elseif R3 < 3099. then if R3 == 3098 then return else R3 = 3104; continue end elseif R3 == 3099. then R1[UK[1763]] = false; R3 = 4 else
+R3 = 3113; continue end elseif R3 == 3100 then R9 += UK[1292]; R3 = 5 else R3 = 3107; continue end elseif R3 < 3102. then R1 = isOn(UK[478]); R3 = 10 elseif R3 < 3103 then if R3 == 3102. then R3 = 7 else R3 = 3112; continue end else R1 = #CF; R9 = UK[1292];
+R7 = R1; R3 = 5 end elseif R3 < 3109 then if R3 < 3106 then if R3 < 3105. then R3 = if R1 then 11 else 12. elseif R3 == 3105. then R1 = (isOn(UK[2046.])); R6 = if R1 then UK[1292] else UK[650]; R4 = UK[1978] * R6 + UK[1522] * (UK[1292] - R6); R5 = UK[1076] * R6 + UK[746] * (UK[1292] - R6);
+R3 = if (R4 * UK[546.] + R5 * UK[1946] + R4 * R5) % UK[1264] == UK[48.] then 10 else 13 else R3 = 13000; continue end elseif R3 < 3107 then R3 = 12. elseif R3 < 3108. then break elseif R3 == 3108. then Sa = R9; R3 = 3. else R3 = 11586.; continue end elseif R3 == 3109 then
+R3 = if R9 <= R7 then 6. else 8 else R3 = 3110; continue end elseif R3 < 3113 then if R3 < 3112 then if R3 < 3111. then R3 = 14 else Sb = Sa; R1 = CF[Sb]; R2 = R1; R3 = if R2 then 1 else 2 end elseif R3 == 3112 then R3 = if R2 then 15. else 4 else R3 = 3113;
+continue end elseif R3 < 5973. then if R3 < 3114. then R2 = R1[UK[499]]; R3 = 2 elseif R3 < 4561 then if R3 == 3114. then R3 = if DJ[UK[1902.]] then 16 else 9. else R3 = 5973.; continue end else break end else break end end end end, function(gU, gV, gW) local Jn, Jo = nil, nil;
+local Jp = nil; Jp = 10; while true do Jp = 15417. - Jp; do if Jp < 15412 then if Jp < 15409 then if Jp < 15407 then if Jp < 5269 then break elseif Jp < 11564 then break elseif Jp < 15406 then break elseif Jp == 15406 then Jp = if Jo then 5 else 9. else Jp = 15414.;
+continue end elseif Jp < 15408. then Jn = tick(); Jp = 8 else local WX = UK[1957][UK[438.]]; UK[1433](UK[1505]); Jp = 4 end elseif Jp < 15411. then if Jp < 15410 then if Jp == 15409 then Jp = if true then 1 else 0. else Jp = 15411.; continue end elseif Jp == 15410 then
+Jp = 0. else Jp = 15412; continue end else Jo = gU:GetAttribute(UK[692]) == gV; Jp = 11 end elseif Jp < 15415 then if Jp < 15414. then if Jp < 15413 then if Jp == 15412 then return true else Jp = 15407; continue end elseif Jp == 15413 then Jp = 8 else Jp = 15416;
+continue end elseif Jp == 15414. then Jo = gU:GetAttribute(UK[46]) == true; Jp = if Jo then 6. else 11 else Jp = 15406; continue end elseif Jp < 15417. then if Jp < 15416 then break elseif Jp == 15416 then Jp = if tick() - Jn < gW then 3. else 7 else Jp = 15417.;
+continue end else return false end end end end }; Ct = nil; Cu = nil; Cv = nil; Cw = nil; Cy = nil; Cz = nil; CA = nil; CB = nil; CC = nil; CD = nil; CE = nil; CF = nil; CH = nil; CI = nil; CJ = nil; CK = nil; CL = nil; CM = nil; CN = nil; CO = nil; CP = nil;
+CQ = nil; CR = nil; CS = nil; CT = nil; CU = nil; CV = nil; CW = nil; CX = nil; CY = nil; CZ = nil; C_ = nil; C0 = nil; C2 = nil; C3 = nil; C4 = nil; C5 = nil; C6 = nil; C7 = nil; C8 = nil; C9 = nil; Da = nil; Db = nil; Dc = nil; Dd = nil; De = nil; Df = nil;
+local Cs, Cx, C1 = nil, nil, nil; Dg = nil; Dh = nil; Di = nil; Dj = nil; Dk = nil; Dl = nil; Dn = nil; Do = nil; Dp = nil; Dq = nil; Dt = nil; Du = nil; Dv = nil; Dw = nil; Dx = nil; Dy = nil; Dz = nil; DA = nil; DB = nil; DD = nil; DE = nil; DF = nil; DH = nil;
+DJ = nil; DK = nil; DL = nil; DM = nil; DN = nil; DP = nil; DQ = nil; DR = nil; DT = nil; DV = nil; DX = nil; DY = nil; D_ = nil; D3 = nil; local Dm, Dr, Ds, DC, DI, DO, DS, DU, DW, DZ, D0, D1, D2 = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+D4 = nil; D6 = nil; D8 = nil; D9 = nil; Ea = nil; Eb = nil; Ec = nil; Ed = nil; Ee = nil; Ef = nil; Eg = nil; Eh = nil; local D5, D7, Ez, EI, EJ, EK, EM; D5 = nil; D7 = nil; U2[20] = nil; U2[4] = nil; U2[14] = nil; U2[23] = nil; U2[7] = nil; U2[16] = nil; U2[26] = nil;
+U2[10] = nil; U2[18.] = nil; U2[1] = nil; U2[12.] = nil; U2[22] = nil; U2[5] = nil; U2[24.] = nil; U2[8] = nil; U2[17] = nil; Ez = nil; U2[11] = nil; U2[19] = nil; U2[13] = nil; U2[6.] = nil; U2[15.] = nil; U2[25] = nil; EI = nil; EJ = nil; EK = nil; EM = nil;
+local Ev = nil; Ev = 1026.; while true do Ev = 4030 - Ev; do if Ev < 3387. then if Ev < 3079 then if Ev < 2919. then if Ev < 2840 then if Ev < 2801 then if Ev < 2783 then if Ev < 2773 then if Ev < 2768 then if Ev < 2766. then if Ev < 2765 then if Ev < 2764 then
+if Ev < 1303 then break elseif Ev < 1320. then break elseif Ev < 2763. then break else Ev = 760 end else U2[20] = (U2[20] + UK[702.]) % UK[1984]; Ev = 594. end else U2[20] = (U2[20] + UK[702.]) % UK[1984]; Ev = 152 end elseif Ev < 2767 then if Ev == 2766. then
+U2[1] = nil; U2[1] = UK[2008] - UK[1292]; Ev = 251 else Ev = 3121; continue end elseif Ev == 2767 then Ev = 1050. else Ev = 3389; continue end elseif Ev < 2771 then if Ev < 2770 then if Ev < 2769. then if Ev == 2768 then Ev = 1031 else Ev = 3412; continue end
+else Ev = 1002. end else Ev = if true then 1110. else 427 end elseif Ev < 2772. then Ev = if (U2[20] * UK[2008] + UK[1165]) * UK[327.] % UK[1165] == ((U2[20] * UK[2008] + UK[1165]) * UK[327.] + (UK[1165] + UK[2008])) % UK[1165] then 556 else 129. else Ev = if U2[10] * UK[507.] + UK[1579] + UK[1165] <= U2[10] * UK[507.] + UK[1579] + UK[1165] + UK[2008] then 195. else 616
+end elseif Ev < 2778. then if Ev < 2776 then if Ev < 2775. then if Ev < 2774 then if Ev == 2773 then U2[14] = DD:WaitForChild(UK[750.]); Ev = 475 else Ev = 3943; continue end else U2[20] = (U2[20] + UK[597.]) % UK[1060]; Ev = 218 end else U2[10] = (U2[20] * UK[2008] + UK[1292]) % UK[633.] + UK[1292];
+Ev = 942. end elseif Ev < 2777 then Ev = if U2[18.] <= UK[597.] then 680 else 625 else local WY = UK; U2[18.] = { WY[1412], WY[180.], WY[748], WY[1451], WY[1366], WY[1803.], WY[685], WY[460] }; local WZ = U2[20]; U2[1] = U2[18.][WZ % WY[749] + WY[1292]]; Ev = if U2[1]:len() <= U2[1]:reverse():rep(WZ % WY[1165] + WY[2008]):len() then 853 else 274
+end elseif Ev < 2781. then if Ev < 2779 then if Ev == 2778. then Ev = 50 else Ev = 3948.; continue end elseif Ev < 2780 then if Ev == 2779 then U2[11] = false; local WY = UK; for l1, l2 in WY[1295](U2[18.]) do U2[19] = l1; U2[13] = l2; U2[2] = U2[19]; U2[21.] = U2[13];
+local Ez = nil; Ez = WY[1292]; while true do if Ez < 1 then U2[11] = true; Ez = WY[2008] elseif Ez < 2 then U2[1]:AddLabel(gradPlus(U2[4][WY[943]]) .. c(WY[1895] .. U2[21.], WY[1201]), true); Ez = WY[2008] else break end end; if U2[11] then break end end; U2[10], Cy, Cv, Ct, Ef, D9, D3, DX, U2[20], U2[26] = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+U2[26] = WY[749]; Ev = 468. else Ev = 3304; continue end else Ev = 1018 end elseif Ev < 2782 then U2[10] = (U2[10] + UK[1478]) % UK[591.]; Ev = 408. elseif Ev == 2782 then Ev = 543. else Ev = 2883.; continue end elseif Ev < 2792 then if Ev < 2788 then if Ev < 2786 then
+if Ev < 2785 then if Ev < 2784. then if Ev == 2783 then local WY = UK; DQ = U2[14]:WaitForChild(WY[134]); DK = U2[14]:WaitForChild(WY[967]); Ev = 390. else Ev = 3848; continue end else U2[14] = U2[20][UK[1682]]:AddLeftGroupbox(UK[1920.], UK[835]); Ev = 647
+end elseif Ev == 2785 then Ev = 824 else Ev = 2807; continue end elseif Ev < 2787. then if Ev == 2786 then Ev = if U2[20] <= UK[1292] then 41 else 1241 else Ev = 3962; continue end else U2[10] = { UK[69.], UK[163], UK[1047.], UK[2034.], UK[1161.], UK[85], UK[1796] };
+Ev = 801. end elseif Ev < 2790. then if Ev < 2789 then if Ev == 2788 then U2[10] = (U2[26] * UK[1292] + UK[1292]) % UK[2008] + UK[1292]; Ev = 1150 else Ev = 3433; continue end elseif Ev == 2789 then U2[20] = nil; local WY = UK; U2[20] = WY[2008] - WY[1292];
+U2[20] = WY[633.] - WY[327.]; U2[20] = WY[650] + WY[1292]; U2[20] = WY[2008] - WY[1292]; Ev = 227 else Ev = 2802.; continue end elseif Ev < 2791 then local WY = UK; U2[26]:AddToggle(WY[352], { [WY[592]] = WY[755], [WY[181]] = false }); U2[26]:AddDivider();
+U2[26]:AddButton({ [WY[592]] = WY[425], [WY[1441]] = WY[974] }); Ev = 42. else U2[10] = nil; local WY = UK; U2[10] = WY[1165] - WY[1292]; U2[10] = WY[650] + WY[2008]; Ev = 375. end elseif Ev < 2797 then if Ev < 2795 then if Ev < 2794 then if Ev < 2793. then
+Ev = if true then 539 else 598 elseif Ev == 2793. then U2[10] = U2[14][UK[111.]]:AddLeftGroupbox(UK[869], UK[1554.]); Ev = 156. else Ev = 3132.; continue end else U2[26] = nil; local WY = UK; U2[26] = WY[1165] - WY[1292]; U2[26] = WY[1292] + WY[1292]; Ev = 569
+end elseif Ev < 2796. then local WY = UK; U2[14] = DK:WaitForChild(WY[134]); DQ = DK:WaitForChild(WY[967]); Ev = 390. else Ev = 626 end elseif Ev < 2799. then if Ev < 2798 then U2[18.] = (U2[18.] + UK[1149.]) % UK[1060]; Ev = 795. elseif Ev == 2798 then Ev = 109
+else Ev = 3821; continue end elseif Ev < 2800 then Ev = 237. elseif Ev == 2800 then Ev = 294. else Ev = 2776; continue end elseif Ev < 2822 then if Ev < 2811. then if Ev < 2806 then if Ev < 2804 then if Ev < 2803 then if Ev < 2802. then if Ev == 2801 then U2[14] = U2[26][UK[832]]:AddLeftGroupbox(UK[1274], UK[641]);
+Ev = 96. else Ev = 3844; continue end else Ev = 94 end elseif Ev == 2803 then local WY = UK; Dc = WY[1695.]; WY[879.](WY[77]); CR = { [WY[277]] = os[WY[353]](), [WY[1521.]] = WY[650], [WY[459.]] = WY[650], [WY[400]] = WY[650], [WY[1251.]] = WY[650], [WY[944]] = WY[650],
+[WY[801.]] = WY[650], [WY[25]] = WY[650] }; Ev = 1041. else Ev = 3177.; continue end elseif Ev < 2805. then Ev = 1109 elseif Ev == 2805. then Ev = 394 else Ev = 3526; continue end elseif Ev < 2809 then if Ev < 2808. then if Ev < 2807 then Cw = false; Cu = false;
+Eh = false; CA = false; Ev = 1015 elseif Ev == 2807 then local WY = UK; Dl[WY[696.]]:OnChanged(WY[593]); Dl[WY[870.]]:OnChanged(WY[747.]); Dl[WY[545]]:OnChanged(WY[1577]); Dl[WY[1059.]]:OnChanged(WY[733]); CC = tick(); Ev = 839 else Ev = 3938; continue end
+else Ev = 1263. end elseif Ev < 2810 then Ev = 513. elseif Ev == 2810 then Ev = if (U2[10] * UK[1165] + UK[1756]) % UK[1060] == UK[1413.] then 393. else 770 else Ev = 2952.; continue end elseif Ev < 2818 then if Ev < 2814. then if Ev < 2813 then if Ev < 2812 then
+if Ev == 2811. then U2[20] = (U2[20] + UK[633.]) % UK[1984]; Ev = 981. else Ev = 4018; continue end else Ev = 1173. end elseif Ev == 2813 then Ev = 175 else Ev = 3827; continue end elseif Ev < 2817. then if Ev < 2815 then if Ev == 2814. then Ev = 1159 else
+Ev = 3885.; continue end elseif Ev < 2816 then Ev = 1081 elseif Ev == 2816 then Ev = 786. else Ev = 3476; continue end else Ev = if (not U2[26] and not U2[20] and (U2[26] and U2[26]) or (not U2[20] or U2[26]) and (U2[20] or not U2[26]) or (not U2[26] and not U2[20] and (U2[26] and not U2[26]) or (U2[26] or not U2[20]) and (U2[20] or U2[20])) or (not U2[26] or U2[20] or (U2[20] or U2[26])) and ((not U2[20] or not U2[20]) and (U2[20] or not U2[20])) and ((U2[26] or not U2[20] or U2[26] and not U2[26]) and (U2[26] or not U2[26] or U2[20] and not U2[26]))) and not (not U2[26] and not U2[20] and (U2[26] and U2[26]) or (not U2[20] or U2[26]) and (U2[20] or not U2[26]) or (not U2[26] and not U2[20] and (U2[26] and not U2[26]) or (U2[26] or not U2[20]) and (U2[20] or U2[20])) or (not U2[26] or U2[20] or (U2[20] or U2[26])) and ((not U2[20] or not U2[20]) and (U2[20] or not U2[20])) and ((U2[26] or not U2[20] or U2[26] and not U2[26]) and (U2[26] or not U2[26] or U2[20] and not U2[26]))) then 650 else 671
+end elseif Ev < 2820. then if Ev < 2819 then if Ev == 2818 then Ev = 20 else Ev = 3329; continue end elseif Ev == 2819 then Ev = 961 else Ev = 3976; continue end elseif Ev < 2821 then if Ev == 2820. then Ev = 614 else Ev = 4022; continue end elseif Ev == 2821 then
+Ev = 938 else Ev = 2923; continue end elseif Ev < 2831 then if Ev < 2827 then if Ev < 2825 then if Ev < 2824 then if Ev < 2823. then function sFLY(q_) local Rf; Rf = nil; local Rg, Rh, Ri, Rj, Rk, Rl, Rn, Ro, Rp = nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local Rm = nil; Rm = 14; while true do Rm = 4309 - Rm; do if Rm < 4302. then if Rm < 4291 then if Rm < 4290. then if Rm < 3864. then break elseif Rm < 4289 then break elseif Rm == 4289 then Rm = if true then 6. else 16 else Rm = 4297; continue end elseif Rm == 4290. then
+Rm = 20 else Rm = 8384; continue end elseif Rm < 4296. then if Rm < 4293. then if Rm < 4292 then if Rm == 4291 then return else Rm = 4290.; continue end else break end elseif Rm < 4294 then if Rm == 4293. then Rg = Rk:FindFirstChildOfClass(UK[985]); Rm = 3.
+else Rm = 4291; continue end elseif Rm < 4295 then if Rm == 4294 then DM:Disconnect(); Rm = 11 else Rm = 4304; continue end elseif Rm == 4295 then Rk = Cs[UK[337]]; Rl = Rk[UK[1988]]; Rm = if Rl then 8 else 5 else Rm = 269; continue end elseif Rm < 4299. then
+if Rm < 4297 then if Rm == 4296. then DE:Disconnect(); Rm = 10 else Rm = 14319.; continue end elseif Rm < 4298 then Rh = ad_getHRP(); Rp = if not Rh then UK[1292] else UK[650]; Rn = UK[825.] * Rp + UK[864.] * (UK[1292] - Rp); Ro = UK[1520] * Rp + UK[1368.] * (UK[1292] - Rp);
+Rm = if (Rn * UK[1675] + Ro * UK[428] + Rn * Ro) % UK[1264] == UK[1190] then 18. else 7 elseif Rm == 4298 then Rm = if DE then 13 else 10 else Rm = 4301; continue end elseif Rm < 4300 then Rm = 12. elseif Rm < 4301 then if Rm == 4300 then Rm = if DM then 15. else 11
+else Rm = 4294; continue end else Rk = Rl; Rg = Rk:FindFirstChildOfClass(UK[985]); Rm = if not Rg then 0. else 3. end elseif Rm < 4306 then if Rm < 4304 then if Rm < 4303 then Rf = { [UK[110]] = UK[650], [UK[131]] = UK[650], [UK[471.]] = UK[650], [UK[1243]] = UK[650],
+[UK[284]] = UK[650], [UK[30.]] = UK[650] }; Ri = UK[650]; Rj = { [UK[110]] = UK[650], [UK[131]] = UK[650], [UK[471.]] = UK[650], [UK[1243]] = UK[650], [UK[284]] = UK[650], [UK[30.]] = UK[650] }; function FLY() Ea = true; local W_ = UK; local rf = W_[1205][W_[1182.]](W_[500]);
+local rg = W_[1205][W_[1182.]](W_[170]); rf[W_[241]] = W_[1177]; rf[W_[499]] = Rh; rg[W_[499]] = Rh; rf[W_[340]] = W_[1618][W_[1182.]](W_[518], W_[518], W_[518]); rf[W_[1077.]] = Rh[W_[1077.]]; rg[W_[273.]] = W_[1618][W_[1182.]](W_[650], W_[650], W_[650]);
+rg[W_[1570]] = W_[1618][W_[1182.]](W_[518], W_[518], W_[518]); local W0 = W_[1957][W_[394]]; W_[1383.](function() local QY, QZ, Q_, Q0, Q2, Q3, Q4 = nil, nil, nil, nil, nil, nil, nil; local Q1 = nil; Q1 = 24.; while true do Q1 = 9791 - Q1; do if Q1 < 9765. then
+if Q1 < 9753. then if Q1 < 9745 then if Q1 < 9742 then if Q1 < 9740 then if Q1 < 9739 then break else Q_ = Rf[UK[110]] + Rf[UK[131]] ~= UK[650]; Q1 = 19 end elseif Q1 < 9741. then if Q1 == 9740 then QZ = getNumber(UK[220], UK[609.]); Q_ = Rf[UK[471.]] + Rf[UK[1243]] ~= UK[650];
+Q1 = if Q_ then 19 else 52 else Q1 = 925; continue end elseif Q1 == 9741. then Q1 = if true then 8 else 13 else Q1 = 4833.; continue end elseif Q1 < 9744. then if Q1 < 9743 then Q1 = if Q_ then 30. else 0. else local W1 = UK[359][UK[1182.]]; rg[UK[273.]] = (QY[UK[1077.]][UK[1407.]] * (Rf[UK[110]] + Rf[UK[131]]) + (QY[UK[1077.]] * UK[1207](Rf[UK[471.]] + Rf[UK[1243]], (Rf[UK[110]] + Rf[UK[131]] + Rf[UK[284]] + Rf[UK[30.]]) * UK[1317.], UK[650])[UK[1297]] - QY[UK[1077.]][UK[1297]])) * Ri;
+Rj = { [UK[110]] = Rf[UK[110]], [UK[131]] = Rf[UK[131]], [UK[471.]] = Rf[UK[471.]], [UK[1243]] = Rf[UK[1243]] }; Q1 = 16 end else Q1 = if QZ then 48. else 25 end elseif Q1 < 9749 then if Q1 < 9748 then if Q1 < 9746 then if Q1 == 9745 then QZ = Rf[UK[471.]] + Rf[UK[1243]] ~= UK[650];
+Q1 = if QZ then 15. else 4 else Q1 = 9782; continue end elseif Q1 < 9747. then break elseif Q1 == 9747. then Q1 = if QZ then 26 else 31 else Q1 = 7646; continue end elseif Q1 == 9748 then Q0 = Q_; Q1 = 34 else Q1 = 7920.; continue end elseif Q1 < 9751 then
+if Q1 < 9750. then if Q1 == 9749 then QZ = DJ[UK[1902.]]; Q1 = 33. else Q1 = 9768.; continue end elseif Q1 == 9750. then Q1 = 16 else Q1 = 9769; continue end elseif Q1 < 9752 then Rg[UK[1923.]] = false; Q1 = 22 else Q1 = if Q0 then 37 else 23 end elseif Q1 < 9759. then
+if Q1 < 9756. then if Q1 < 9755 then if Q1 < 9754 then if Q1 == 9753. then QZ = Rf[UK[110]] + Rf[UK[131]] ~= UK[650]; Q1 = 28 else Q1 = 9742; continue end elseif Q1 == 9754 then local W2 = UK[359][UK[1182.]]; rg[UK[273.]] = (QY[UK[1077.]][UK[1407.]] * (Rj[UK[110]] + Rj[UK[131]]) + (QY[UK[1077.]] * UK[1207](Rj[UK[471.]] + Rj[UK[1243]], (Rj[UK[110]] + Rj[UK[131]] + Rf[UK[284]] + Rf[UK[30.]]) * UK[1317.], UK[650])[UK[1297]] - QY[UK[1077.]][UK[1297]])) * Ri;
+Q1 = 41 else Q1 = 9781; continue end elseif Q1 == 9755 then Q1 = 50 else Q1 = 925; continue end elseif Q1 < 9758 then if Q1 < 9757 then if Q1 == 9756. then Q1 = 13 else Q1 = 7920.; continue end else Q1 = if Q0 then 21. else 2 end elseif Q1 == 9758 then Q1 = if QZ then 12. else 6.
+else Q1 = 9773; continue end elseif Q1 < 9762. then if Q1 < 9761 then if Q1 < 9760 then if Q1 == 9759. then QZ = not Ea; Q1 = if QZ then 33. else 42. else Q1 = 9766; continue end elseif Q1 == 9760 then Q_ = Ri ~= UK[650]; Q0 = QZ; Q4 = if Q0 then UK[1292] else UK[650];
+Q2 = UK[120.] * Q4 + UK[1733] * (UK[1292] - Q4); Q3 = UK[237.] * Q4 + UK[1647.] * (UK[1292] - Q4); Q1 = if (Q2 * UK[735.] + Q3 * UK[963.] + Q2 * Q3) % UK[1264] == UK[434] then 3. else 39. else Q1 = 9779; continue end else Ri = QZ; Q1 = 46 end elseif Q1 < 9764 then
+if Q1 < 9763 then if Q1 == 9762. then Q1 = 1 else Q1 = 9757; continue end elseif Q1 == 9763 then Q1 = if QZ then 11 else 20 else Q1 = 9754; continue end elseif Q1 == 9764 then Q_ = Rf[UK[284]] + Rf[UK[30.]] ~= UK[650]; Q1 = 49 else Q1 = 9780.; continue end
+elseif Q1 < 9780. then if Q1 < 9773 then if Q1 < 9769 then if Q1 < 9767 then if Q1 < 9766 then QZ = Rf[UK[284]] + Rf[UK[30.]] == UK[650]; Q1 = 31 else QZ = Rf[UK[471.]] + Rf[UK[1243]] == UK[650]; Q1 = if QZ then 14 else 44 end elseif Q1 < 9768. then if Q1 == 9767 then
+Q1 = 50 else Q1 = 9741.; continue end elseif Q1 == 9768. then rg[UK[273.]] = UK[1618][UK[1182.]](UK[650], UK[650], UK[650]); Q1 = 41 else Q1 = 9739; continue end elseif Q1 < 9772 then if Q1 < 9771. then if Q1 < 9770 then if Q1 == 9769 then Q1 = 45. else Q1 = 9783.;
+continue end else Ri = UK[650]; Q1 = 2 end else QZ = Rf[UK[284]] + Rf[UK[30.]] ~= UK[650]; Q1 = 11 end else Q1 = if Q_ then 49 else 27. end elseif Q1 < 9776 then if Q1 < 9775 then if Q1 < 9774. then Q1 = if QY then 35 else 36. elseif Q1 == 9774. then Rg[UK[1923.]] = true;
+Q1 = 51. else Q1 = 9763; continue end elseif Q1 == 9775 then rf[UK[1077.]] = QY[UK[1077.]]; QY = not Ea; Q1 = if QY then 18. else 7 else Q1 = 9755; continue end elseif Q1 < 9778 then if Q1 < 9777. then if Q1 == 9776 then Q1 = if QZ then 47 else 9. else Q1 = 9782;
+continue end else QZ = Rf[UK[110]] + Rf[UK[131]] == UK[650]; Q1 = 44 end elseif Q1 < 9779 then if Q1 == 9778 then Rf = { [UK[110]] = UK[650], [UK[131]] = UK[650], [UK[471.]] = UK[650], [UK[1243]] = UK[650], [UK[284]] = UK[650], [UK[30.]] = UK[650] }; Rj = { [UK[110]] = UK[650],
+[UK[131]] = UK[650], [UK[471.]] = UK[650], [UK[1243]] = UK[650], [UK[284]] = UK[650], [UK[30.]] = UK[650] }; Ri = UK[650]; rf:Destroy(); rg:Destroy(); Q1 = if Rg then 40 else 22 else Q1 = 9747.; continue end elseif Q1 == 9779 then Q1 = 13 else Q1 = 9766; continue
+end elseif Q1 < 9787 then if Q1 < 9784 then if Q1 < 9782 then if Q1 < 9781 then Q_ = Ri ~= UK[650]; Q0 = not QZ; Q1 = if Q0 then 43 else 34 else Q1 = if QZ then 17 else 51. end elseif Q1 < 9783. then if Q1 == 9782 then QZ = Rf[UK[284]] + Rf[UK[30.]] ~= UK[650];
+Q1 = 47 else Q1 = 9785; continue end elseif Q1 == 9783. then local W3 = UK[1957][UK[438.]]; UK[1433](); W3 = UK[1560.][UK[64]]; QY = UK[928]; Q1 = if not QY then 32 else 1 else Q1 = 9769; continue end elseif Q1 < 9786. then if Q1 < 9785 then QY = DJ[UK[1902.]];
+Q1 = 18. elseif Q1 == 9785 then Q1 = 50 else Q1 = 9773; continue end else QZ = Rg; Q1 = 10 end elseif Q1 < 9790 then if Q1 < 9789. then if Q1 < 9788 then if Q1 == 9787 then QZ = Rf[UK[110]] + Rf[UK[131]] ~= UK[650]; Q1 = 15. else Q1 = 2370.; continue end elseif Q1 == 9788 then
+Q0 = Q_; Q1 = 39. else Q1 = 9787; continue end else Q1 = 46 end elseif Q1 < 9818 then if Q1 < 9791 then if Q1 == 9790 then QZ = not q_; Q1 = if QZ then 5 else 10 else Q1 = 9783.; continue end elseif Q1 == 9791 then QZ = Rf[UK[471.]] + Rf[UK[1243]] ~= UK[650];
+Q1 = if QZ then 28 else 38 else Q1 = 9769; continue end else break end end end end) end; DM = DW[UK[439]]:Connect(function(rq, rr) local Q5, Q6, Q8, Q9, Ra = nil, nil, nil, nil, nil; local Q7 = nil; Q7 = 28; while true do Q7 = 8361. - Q7; do if Q7 < 8347 then
+if Q7 < 8338 then if Q7 < 8333 then break elseif Q7 < 8335 then if Q7 < 8334. then if Q7 == 8333 then Q7 = if rr then 23 else 12. else Q7 = 8334.; continue end else Q5 = Q6; Q7 = if rq[UK[658]] == UK[1209.][UK[658]][UK[1423]] then 5 else 1 end elseif Q7 < 8336 then
+Q7 = 15. elseif Q7 < 8337. then Rf[UK[284]] = Q5 * UK[2008]; Q7 = 15. elseif Q7 == 8337. then Q6 = rq[UK[658]] == UK[1209.][UK[658]][UK[284]]; Q7 = if Q6 then 9. else 16 else Q7 = 8351; continue end elseif Q7 < 8342 then if Q7 < 8340. then if Q7 < 8339 then
+return else Rf[UK[471.]] = -Q5; Q7 = 19 end elseif Q7 < 8341 then if Q7 == 8340. then Rf[UK[1243]] = Q5; Q7 = 8 else Q7 = 8334.; continue end else Q7 = 7 end elseif Q7 < 8344 then if Q7 < 8343. then Q7 = 18. elseif Q7 == 8343. then Q7 = 20 else Q7 = 8346.;
+continue end elseif Q7 < 8345 then if Q7 == 8344 then Q7 = if rq[UK[658]] == UK[1209.][UK[658]][UK[1604]] then 21. else 13 else Q7 = 8359; continue end elseif Q7 < 8346. then Q7 = if Q6 then 11 else 26 else Q7 = 8 end elseif Q7 < 8356 then if Q7 < 8351 then
+if Q7 < 8349. then if Q7 < 8348 then Q5 = DS; Q7 = 2 else Q6 = rq[UK[658]] == UK[1209.][UK[658]][UK[30.]]; Q7 = if Q6 then 4 else 6. end elseif Q7 < 8350 then Q5 = q_; Q7 = if Q5 then 14 else 2 else Rf[UK[30.]] = -Q5 * UK[2008]; Q7 = 26 end elseif Q7 < 8353 then
+if Q7 < 8352. then local W4 = UK; Ra = if rq[W4[658]] == W4[1209.][W4[658]][W4[23]] then W4[1292] else W4[650]; Q8 = W4[1443.] * Ra + W4[380] * (W4[1292] - Ra); Q9 = W4[931] * Ra + W4[1550] * (W4[1292] - Ra); Q7 = if (Q8 * W4[863] + Q9 * W4[823] + Q8 * Q9) % W4[1264] == W4[1995.] then 22 else 17
+elseif Q7 == 8352. then Q6 = D5; Q7 = 16 else Q7 = 8358.; continue end elseif Q7 < 8354 then Q7 = 19 elseif Q7 < 8355. then break else Q7 = if Q6 then 25 else 24. end elseif Q7 < 8360 then if Q7 < 8358. then if Q7 < 8357 then Rf[UK[110]] = Q5; Q7 = 20 elseif Q7 == 8357 then
+Q6 = D5; Q7 = 6. else Q7 = 8350; continue end elseif Q7 < 8359 then if Q7 == 8358. then Rf[UK[131]] = -Q5; Q7 = 18. else Q7 = 15837.; continue end else Q6 = Q5; Q7 = if Q6 then 27. else 0. end elseif Q7 < 10471 then if Q7 < 8361. then Q7 = if rq[UK[658]] == UK[1209.][UK[658]][UK[1493]] then 3. else 10
+elseif Q7 == 8361. then Q6 = DZ; Q7 = 27. else Q7 = 8338; continue end else break end end end end); DE = DW[UK[498.]]:Connect(function(rB, rC) local Rc, Rd, Re = nil, nil, nil; local Rb = nil; Rb = 11; while true do Rb = 3692 - Rb; do if Rb < 3682 then if Rb < 3674 then
+if Rb < 3670 then break elseif Rb < 3672. then if Rb < 3671 then if Rb == 3670 then Rb = 7 else Rb = 3679; continue end else Rb = 10 end elseif Rb < 3673 then if Rb == 3672. then Rb = if rB[UK[658]] == UK[1209.][UK[658]][UK[284]] then 5 else 12. else Rb = 3688;
+continue end elseif Rb == 3673 then Rf[UK[1243]] = UK[650]; Rb = 7 else Rb = 3689; continue end elseif Rb < 3678. then if Rb < 3676 then if Rb < 3675. then break else local W5 = UK; Re = if rB[W5[658]] == W5[1209.][W5[658]][W5[1493]] then W5[1292] else W5[650];
+Rc = W5[927.] * Re + W5[1080.] * (W5[1292] - Re); Rb = 3. end elseif Rb < 3677 then if Rb == 3676 then return else Rb = 3690.; continue end else Rb = if rB[UK[658]] == UK[1209.][UK[658]][UK[1423]] then 2 else 17 end elseif Rb < 3680 then if Rb < 3679 then if Rb == 3678. then
+Rb = if (Rc * UK[1410.] + Rd * UK[1764.] + Rc * Rd) % UK[1264] == UK[1445] then 8 else 6. else Rb = 3687.; continue end else Rb = if rB[UK[658]] == UK[1209.][UK[658]][UK[30.]] then 9. else 20 end elseif Rb < 3681. then if Rb == 3680 then Rb = 22 else Rb = 3671;
+continue end else Rb = if rC then 16 else 15. end elseif Rb < 3690. then if Rb < 3686 then if Rb < 3684. then if Rb < 3683 then Rb = 18. elseif Rb == 3683 then Rf[UK[284]] = UK[650]; Rb = 22 else Rb = 3688; continue end elseif Rb < 3685 then Rf[UK[131]] = UK[650];
+Rb = 21. else Rb = 4 end elseif Rb < 3688 then if Rb < 3687. then Rb = if rB[UK[658]] == UK[1209.][UK[658]][UK[23]] then 0. else 1 elseif Rb == 3687. then Rf[UK[30.]] = UK[650]; Rb = 12. else Rb = 3686; continue end elseif Rb < 3689 then Rb = 21. elseif Rb == 3689 then
+Rd = UK[1849] * Re + UK[637] * (UK[1292] - Re); Rb = 14 else Rb = 1539.; continue end elseif Rb < 5267 then if Rb < 3692 then if Rb < 3691 then Rf[UK[110]] = UK[650]; Rb = 10 else Rb = if rB[UK[658]] == UK[1209.][UK[658]][UK[1604]] then 19 else 13 end elseif Rb < 4233. then
+if Rb == 3692 then Rf[UK[471.]] = UK[650]; Rb = 4 else Rb = 8999; continue end else break end else break end end end end); FLY(); Rm = 17 else local W6 = UK[1957][UK[438.]]; UK[1433](); Rm = if Rk:FindFirstChildOfClass(UK[985]) then 4 else 19 end elseif Rm < 4305. then
+Rl = Rk[UK[1567]]:Wait(); Rm = 8 elseif Rm == 4305. then Rm = 16 else Rm = 8029; continue end elseif Rm < 6452 then if Rm < 4309 then if Rm < 4307 then Rk = DM; Rm = if Rk then 1 else 2 elseif Rm < 4308. then if Rm == 4307 then Rk = DE; Rm = 1 else Rm = 4291;
+continue end else Rm = if Rk then 9. else 12. end elseif Rm < 4367 then if Rm == 4309 then Rm = 20 else break end else break end else break end end end end; Ev = 1187 elseif Ev == 2823. then Ev = 1162 else Ev = 2897; continue end elseif Ev == 2824 then Cz = tick();
+local WY = UK; WY[879.](WY[395]); antiAfkTap = WY[1199]; DW[WY[439]]:Connect(WY[215]); DW[WY[529]]:Connect(WY[1635.]); local W7 = WY[1957][WY[394]]; WY[1383.](WY[561.]); W7 = WY[1957][WY[394]]; WY[1383.](WY[531.]); W7 = WY[1957][WY[394]]; WY[1383.](WY[1653.]);
+W7 = WY[1957][WY[394]]; WY[1383.](function() local SZ, S_, S1, S2, S3, S4 = nil, nil, nil, nil, nil, nil; local S0 = nil; S0 = 1; while true do S0 = 10347. - S0; do if S0 < 10347. then if S0 < 5493. then break elseif S0 < 9790 then break elseif S0 < 10346 then
+break else S2 = false; while true do local SX = nil; local S1 = nil; S1 = UK[650]; while true do if S1 < 6. then if S1 < 3. then if S1 < 1 then S1 = if not DJ[UK[1902.]] then UK[1165] else UK[597.] elseif S1 < 2 then S1 = UK[327.] else local W8 = UK[1957][UK[438.]];
+UK[1433](UK[2008]); S1 = UK[1478] end elseif S1 < 4 then S1 = if isOn(UK[557]) then UK[749] else UK[1579] elseif S1 < 5 then break else S2 = true; S1 = UK[327.] end elseif S1 < 9. then if S1 < 7 then Eb = false; local W9 = UK[1957][UK[438.]]; UK[1433](UK[419]);
+S1 = UK[1756] elseif S1 < 8 then S1 = UK[633.] else SX = ad_getNearestChest(); S1 = if not SX then UK[2008] else UK[1620.] end elseif S1 < 10 then Eb = true; CS = nil; CW = nil; UK[879.](function() SX[UK[378.]][UK[722]] = UK[185]; SX[UK[378.]][UK[373]] = false;
+SX[UK[378.]][UK[688]] = UK[650]; SX[UK[378.]][UK[141.]] = true end); UK[879.](function() local SJ, SK, SM, SN, SO = nil, nil, nil, nil, nil; local SL = nil; SL = 0.; while true do SL = 817 - SL; do if SL < 2703. then if SL < 816. then if SL < 815 then if SL == 814 then
+local Xa = UK[1618][UK[1182.]]; SK[UK[1077.]] = UK[359][UK[1182.]](SJ + UK[1417](UK[650], UK[1165], UK[650]), SJ); SL = 2 else break end else SL = 1 end elseif SL < 817 then break elseif SL == 817 then local Xb = UK; SJ = SX[Xb[1825]]:GetPivot()[Xb[2060]];
+SK = ad_getHRP(); SO = if SK then Xb[1292] else Xb[650]; SM = Xb[892] * SO + Xb[931] * (Xb[1292] - SO); SN = Xb[1310] * SO + Xb[997] * (Xb[1292] - SO); SL = if (SM * Xb[1800.] + SN * Xb[1701.] + SM * SN) % Xb[1264] == Xb[1525] then 3. else 2 else SL = 2703.;
+continue end else break end end end end); local Xc = UK[1957][UK[438.]]; UK[1433](UK[1317.]); SZ = tick(); S4 = false; while true do local SY = nil; local S3 = nil; S3 = UK[1165]; while true do if S3 < 5 then if S3 < 2 then if S3 < 1 then SY = false; UK[879.](function()
+local SP, SR, SS, SU = nil, nil, nil, nil; local SQ = nil; SQ = 0.; while true do SQ = 13882 - SQ; do if SQ < 13776. then break elseif SQ < 13879 then if SQ < 13876 then if SQ < 13874 then break elseif SQ < 13875. then if SQ == 13874 then SQ = if (SR * UK[772] + SS * UK[1138] + SR * SS) % UK[1264] == UK[1668.] then 1 else 6.
+else SQ = 11700.; continue end elseif SQ == 13875. then local Xd = UK; SU = if SP then Xd[1292] else Xd[650]; SR = Xd[651.] * SU + Xd[161] * (Xd[1292] - SU); SQ = 3. else SQ = 13130; continue end elseif SQ < 13877 then SY = true; SQ = 4 elseif SQ < 13878. then
+SP = SX[UK[378.]][UK[499]]; SQ = 7 elseif SQ == 13878. then SQ = 2 else SQ = 13053.; continue end elseif SQ < 13882 then if SQ < 13880 then SS = UK[883] * SU + UK[1673] * (UK[1292] - SU); SQ = 8 elseif SQ < 13881. then break else fireproximityprompt(SX[UK[378.]], UK[650]);
+SQ = 4 end elseif SQ < 14381 then if SQ == 13882 then SP = SX[UK[378.]]; SQ = if SP then 5 else 7 else SQ = 13878.; continue end else break end end end end); UK[879.](function() local SV = nil; local SW = nil; SW = 2; while true do SW = 404 - SW; do if SW < 7469 then
+if SW < 403 then if SW < 401 then if SW < 400 then if SW == 399. then SW = if SV then 0. else 3. else break end else SV = not SX[UK[1825]][UK[499]]; SW = 5 end elseif SW < 402. then SW = 1 elseif SW == 402. then SV = not SX[UK[1825]]; SW = if SV then 5 else 4
+else SW = 13045; continue end elseif SW < 3702. then if SW < 404 then break elseif SW == 404 then SY = true; SW = 3. else SW = 400; continue end else break end else break end end end end); S3 = if SY then UK[597.] else UK[1579] else S3 = UK[327.] end elseif S3 < 3. then
+S4 = true; S3 = UK[327.] elseif S3 < 4 then S_ = (isOn(UK[557])); S3 = if S_ then UK[1620.] else UK[749] else break end elseif S3 < 7 then if S3 < 6. then S3 = UK[2008] else local Xe = UK[1957][UK[438.]]; UK[1433](); S3 = UK[1292] end elseif S3 < 8 then S3 = UK[2008]
+elseif S3 < 9. then S3 = if S_ then UK[650] else UK[633.] else S_ = tick() - SZ < UK[1756]; S3 = UK[749] end end; if S4 then break end end; Xc = UK[1957][UK[438.]]; UK[1433](UK[419]); Eb = false; S1 = UK[1478] elseif S1 < 11 then S1 = UK[1292] else local Xf = UK[1957][UK[438.]];
+UK[1433](UK[1292]); S1 = UK[1756] end end; if S2 then break end end; S0 = 0. end else break end end end end); W7 = WY[1957][WY[394]]; WY[1383.](WY[1749.]); W7 = WY[1957][WY[394]]; WY[1383.](function() local Tn, To, Tp, Tr, Ts = nil, nil, nil, nil, nil; local Tq = nil;
+Tq = 0.; while true do Tq = 15715 - Tq; do if Tq < 15715 then break else Ts = false; while true do local Tm, Tl = nil, nil; local Tr = nil; Tr = UK[1165]; while true do if Tr < 9. then if Tr < 4 then if Tr < 2 then if Tr < 1 then Tr = if Tl then UK[1478] else UK[2008]
+else Tr = UK[1143.] end elseif Tr < 3. then local Xg = UK[1957][UK[438.]]; UK[1433](UK[1102]); Tr = UK[1628] else Tr = if not DJ[UK[1902.]] then UK[608] else UK[327.] end elseif Tr < 6. then if Tr < 5 then Tr = UK[1620.] else Tr = if Tp then UK[1288] else UK[1413.]
+end elseif Tr < 7 then To = CW; Tr = UK[597.] elseif Tr < 8 then Tn = To; Tr = UK[1060] else Tp = To; Tr = UK[633.] end elseif Tr < 14 then if Tr < 11 then if Tr < 10 then Ts = true; Tr = UK[1143.] else UK[879.](function() DQ:FireServer(UK[1662.], Tm[UK[821]])
+end); CR[UK[25]] = CR[UK[25]] + UK[1292]; Tr = UK[650] end elseif Tr < 12. then UK[879.](function() DQ:FireServer(UK[1262], Tl[UK[821]]) end); CR[UK[25]] = CR[UK[25]] + UK[1292]; Tr = UK[2008] elseif Tr < 13 then local Xh = UK[1957][UK[438.]]; UK[1433](UK[1258]);
+Tr = UK[1628] else To = (isOn(UK[478])); Tr = if To then UK[597.] else UK[1579] end elseif Tr < 16 then if Tr < 15. then break else Tm = ad_getEquippedSpellBySlot(UK[1662.]); Tl = ad_getEquippedSpellBySlot(UK[1262]); Tr = if Tm then UK[1756] else UK[650] end
+elseif Tr < 17 then To = not Eb; Tp = Tn; Tr = if Tp then UK[749] else UK[633.] elseif Tr < 18. then Tr = UK[1292] else Tn = (isOn(UK[294.])); Tr = if Tn then UK[1149.] else UK[1060] end end; if Ts then break end end; Tq = 1 end end end end); W7 = WY[1957][WY[394]];
+WY[1383.](function() local Tu, Tv, Tw, Ty, Tz = nil, nil, nil, nil, nil; local Tx = nil; Tx = 0.; while true do Tx = 9788 - Tx; do if Tx < 9788 then break elseif Tx < 10568 then if Tx == 9788 then Tz = false; while true do local Tt = nil; local Ty = nil; local Xi = UK;
+Ty = Xi[597.]; while true do if Ty < 8 then if Ty < 4 then if Ty < 2 then if Ty < 1 then Ty = Xi[1165] else Tv = CW; Ty = Xi[1149.] end elseif Ty < 3. then Tv = (isOn(Xi[478])); Ty = if Tv then Xi[1149.] else Xi[1292] else Tz = true; Ty = Xi[1288] end elseif Ty < 6. then
+if Ty < 5 then Ty = Xi[1288] else Tu = (isOn(Xi[274])); Ty = if Tu then Xi[2008] else Xi[1143.] end elseif Ty < 7 then Ty = if Tw then Xi[1478] else Xi[749] else Ty = if not DJ[Xi[1902.]] then Xi[633.] else Xi[650] end elseif Ty < 12. then if Ty < 10 then if Ty < 9. then
+local Xj = Xi[1957][Xi[438.]]; Xi[1433](Xi[1258]); Ty = Xi[1413.] else local Xk = Xi[1957][Xi[438.]]; Xi[1433](Xi[1102]); Ty = Xi[1413.] end elseif Ty < 11 then Tw = Tv; Ty = Xi[1579] else Tt = ad_getEquippedUltimate(); Ty = if Tt then Xi[1060] else Xi[1620.]
+end elseif Ty < 14 then if Ty < 13 then Ty = Xi[327.] else Tu = Tv; Ty = Xi[1143.] end elseif Ty < 15. then Tv = not Eb; Tw = Tu; Ty = if Tw then Xi[1756] else Xi[1579] elseif Ty < 16 then break else Xi[879.](function() DQ:FireServer(UK[1933], Tt[UK[821]])
+end); CR[Xi[25]] = CR[Xi[25]] + Xi[1292]; Ty = Xi[1620.] end end; if Tz then break end end; Tx = 1 else break end else break end end end end); W7 = WY[1957][WY[394]]; WY[1383.](WY[139]); W7 = WY[1957][WY[394]]; WY[1383.](WY[416]); W7 = WY[1957][WY[394]]; WY[1383.](WY[533]);
+W7 = WY[1957][WY[394]]; WY[1383.](WY[203]); W7 = WY[1957][WY[394]]; WY[1383.](WY[1342]); W7 = WY[1957][WY[394]]; WY[1383.](WY[1153]); W7 = WY[1957][WY[394]]; WY[1383.](WY[1584.]); W7 = WY[1957][WY[394]]; WY[1383.](WY[1098.]); W7 = WY[1957][WY[394]]; WY[1383.](WY[1916]);
+W7 = WY[1957][WY[394]]; WY[1383.](WY[138.]); W7 = WY[1957][WY[394]]; WY[1383.](WY[34]); W7 = WY[1957][WY[394]]; WY[1383.](WY[991]); W7 = WY[1957][WY[394]]; WY[1383.](WY[777.]); DJ:OnUnload(WY[147.]); U2[7]:SetLibrary(DJ); U2[23]:SetLibrary(DJ); U2[23]:IgnoreThemeSettings();
+U2[23]:SetIgnoreIndexes({ WY[67] }); U2[7]:SetFolder(WY[1466]); U2[23]:SetFolder(WY[1744]); U2[23]:BuildConfigSection(U2[14][WY[832]]); U2[7]:ApplyToTab(U2[14][WY[832]]); U2[7]:SaveDefault(WY[1440.]); U2[7]:LoadDefault(); Eg = true; Ev = 224 else Ev = 3214;
+continue end elseif Ev < 2826. then if Ev == 2825 then Ev = if U2[10] <= UK[1292] then 1039 else 533 else Ev = 3852.; continue end elseif Ev == 2826. then local WY = UK; U2[26] = { WY[1519], WY[1768], WY[168.], WY[1689.], WY[846.], WY[1003], WY[793], WY[374],
+WY[323], WY[207.], WY[898] }; local Xl = U2[20]; U2[10] = U2[26][Xl % WY[1478] + WY[1292]]; Ev = if U2[10]:len() <= U2[10]:gsub(WY[1246], WY[298], Xl % WY[1165] % WY[2008] + WY[1292]):len() then 955 else 1126 else Ev = 2942; continue end elseif Ev < 2829. then
+if Ev < 2828 then Ev = 972. elseif Ev == 2828 then Ev = if U2[16] <= UK[553] then 447. else 172 else Ev = 3725; continue end elseif Ev < 2830 then if Ev == 2829. then U2[20] = (U2[10] * UK[2008] + UK[650]) % UK[1165] + UK[1292]; Ev = 168. else Ev = 3547; continue
+end elseif Ev == 2830 then D1 = {}; Ev = 737 else Ev = 3490; continue end elseif Ev < 2836 then if Ev < 2834 then if Ev < 2833 then if Ev < 2832. then if Ev == 2831 then Ev = 822. else Ev = 3905; continue end else U2[10] = (U2[20] * UK[1292] + UK[650]) % UK[2008] + UK[1292];
+Ev = 1048 end elseif Ev == 2833 then DC = { [UK[1710.]] = UK[1579], [UK[695]] = UK[1165], [UK[37]] = UK[327.], [UK[1403]] = UK[633.], [UK[1742]] = UK[2008], [UK[1612]] = UK[1292] }; Ev = 86 else Ev = 3881; continue end elseif Ev < 2835. then Ev = 253 else U2[26] = U2[14][UK[923]]:AddLeftGroupbox(UK[1467.], UK[338]);
+Ev = 896 end elseif Ev < 2838. then if Ev < 2837 then if Ev == 2836 then Ev = 847 else Ev = 2854; continue end elseif Ev == 2837 then U2[20] = (U2[20] + UK[597.]) % UK[1060]; Ev = 1066 else Ev = 2890; continue end elseif Ev < 2839 then Ev = 1214 else CW = nil;
+Ev = 903. end elseif Ev < 2880. then if Ev < 2860 then if Ev < 2850. then if Ev < 2845 then if Ev < 2843 then if Ev < 2842 then if Ev < 2841. then if Ev == 2840 then Ev = 416 else Ev = 3911; continue end elseif Ev == 2841. then DJ = U2[16]:CreateWindow({ [UK[1108]] = UK[725],
+[UK[710]] = { [UK[1379]] = true, [UK[990.]] = true, [UK[1555]] = true, [UK[2039]] = true, [UK[1419.]] = false, [UK[1344.]] = false }, [UK[1994]] = UK[2008], [UK[559]] = UK[1868], [UK[1808]] = UK[893], [UK[2058.]] = false, [UK[1938.]] = UK[235], [UK[1127]] = UK[235] });
+Ev = 260 else Ev = 3350; continue end else U2[18.] = (U2[18.] + UK[1165]) % UK[1060]; Ev = 576. end elseif Ev < 2844. then if Ev == 2843 then U2[10] = (U2[10] + UK[466]) % UK[206]; Ev = 1001 else Ev = 3594.; continue end else U2[10] = nil; local WY = UK; U2[10] = WY[633.] - WY[327.];
+U2[10] = WY[650] + WY[1292]; Ev = 202 end elseif Ev < 2848 then if Ev < 2847. then if Ev < 2846 then if Ev == 2845 then local WY = UK; C2 = Eg:WaitForChild(WY[125]); U2[14] = {}; CV = {}; CZ = { [WY[1403]] = WY[2008], [WY[37]] = WY[1165], [WY[1742]] = WY[633.],
+[WY[695]] = WY[327.], [WY[1612]] = WY[1579], [WY[1710.]] = WY[1292] }; WY[879.](WY[429.]); WY[879.](WY[933.]); C8 = false; Ev = 861. else Ev = 2971; continue end else Ev = 498. end elseif Ev == 2847. then local WY = UK; U2[18.]:AddToggle(WY[1285], { [WY[592]] = WY[3.],
+[WY[181]] = false }); U2[18.]:AddDivider(); U2[18.]:AddButton({ [WY[592]] = WY[741.], [WY[1441]] = WY[784] }); Ev = 4 else Ev = 4006; continue end elseif Ev < 2849 then if Ev == 2848 then Ev = 1149. else Ev = 3844; continue end else Ev = 1117 end elseif Ev < 2855 then
+if Ev < 2853. then if Ev < 2852 then if Ev < 2851 then U2[18.] = (U2[20] * UK[1292] + UK[2008]) % UK[1165] + UK[1292]; Ev = 601 else Ev = if true then 1133 else 935 end else local Xm = UK[1957][UK[394]]; local WY = UK; WY[1383.](function() local O; local N = UK[1241];
+local M = UK[826]; O = UK[144.]; UK[879.](function() local Xn = UK[1185.][UK[1039]]; O = UK[1185.]:GetService(UK[582.]):GetProductInfo(UK[1616])[UK[821]] end); local U = { [UK[1510]] = { { [UK[816.]] = UK[1842.], [UK[73]] = UK[88], [UK[2040.]] = { { [UK[1590.]] = UK[989],
+[UK[536]] = Dk[UK[821]], [UK[1511]] = true }, { [UK[1590.]] = UK[242], [UK[536]] = Dc, [UK[1511]] = true }, { [UK[1590.]] = UK[1968.], [UK[536]] = O, [UK[1511]] = true }, { [UK[1590.]] = UK[1725.], [UK[536]] = tostring(#Cs:GetPlayers()), [UK[1511]] = true } },
+[UK[689]] = { [UK[221]] = UK[1057] .. os[UK[1782.]](UK[1450]) } } } }; UK[879.](function() request({ [UK[938]] = M, [UK[585.]] = UK[1101.], [UK[1378]] = { [UK[880]] = UK[343] }, [UK[150.]] = DC:JSONEncode({ [UK[177.]] = N, [UK[745]] = U }) }) end) end); CV = WY[792.];
+Ev = 190 end elseif Ev < 2854 then if Ev == 2853. then Ev = 312. else Ev = 3645.; continue end else local WY = UK; D8 = WY[1185.]:GetService(WY[1173.]); D2 = WY[1185.]:GetService(WY[35]); Ev = 1266. end elseif Ev < 2858 then if Ev < 2856. then if Ev == 2855 then
+Ev = if U2[16] <= UK[1620.] then 928 else 22 else Ev = 3215; continue end elseif Ev < 2857 then if Ev == 2856. then U2[26], U2[20], U2[18.] = nil, nil, nil; U2[18.] = UK[1620.]; Ev = 1024 else Ev = 3972.; continue end elseif Ev == 2857 then Ev = 316 else Ev = 2877.;
+continue end elseif Ev < 2859. then if Ev == 2858 then Ev = if (U2[26] * UK[2008] + UK[1579]) * UK[327.] % UK[1165] == ((U2[26] * UK[2008] + UK[1579]) * UK[327.] + UK[650]) % UK[1165] then 380 else 219. else Ev = 3060.; continue end elseif Ev == 2859. then
+Ev = if (U2[20] * UK[2008] + UK[2008]) * UK[327.] % UK[1165] == ((U2[20] * UK[2008] + UK[2008]) * UK[327.] + UK[1165]) % UK[1165] then 884 else 297. else Ev = 3628; continue end elseif Ev < 2870 then if Ev < 2865. then if Ev < 2863 then if Ev < 2862. then if Ev < 2861 then
+U2[20] = (U2[20] + UK[633.]) % UK[1060]; Ev = 267. elseif Ev == 2861 then Ev = if U2[16] <= UK[1478] then 735. else 1155. else Ev = 3221; continue end elseif Ev == 2862. then U2[26] = nil; local WY = UK; U2[26] = WY[327.] - WY[1165]; U2[26] = WY[650] + WY[1292];
+Ev = 1171 else Ev = 3878; continue end elseif Ev < 2864 then if Ev == 2863 then Ev = 1214 else Ev = 3848; continue end elseif Ev == 2864 then Ev = 122 else Ev = 3722; continue end elseif Ev < 2868. then if Ev < 2867 then if Ev < 2866 then Ev = 1144 elseif Ev == 2866 then
+Ev = 142 else Ev = 3075.; continue end elseif Ev == 2867 then C1 = false; C5 = false; Ev = 506 else Ev = 3509; continue end elseif Ev < 2869 then if Ev == 2868. then Ev = 1194. else Ev = 3906.; continue end elseif Ev == 2869 then Ev = 901 else Ev = 4011.; continue
+end elseif Ev < 2876 then if Ev < 2873 then if Ev < 2871. then if Ev == 2870 then Ev = 887 else Ev = 3566; continue end elseif Ev < 2872 then Ev = 1008. else local WY = UK; U2[26]:AddToggle(WY[446], { [WY[592]] = WY[1352], [WY[181]] = false }); U2[26]:AddDivider();
+U2[26]:AddButton({ [WY[592]] = WY[505], [WY[1441]] = WY[1748] }); Ev = 186. end elseif Ev < 2874. then Ev = 980 elseif Ev < 2875 then if Ev == 2874. then U2[26], U2[20] = nil, nil; U2[20] = UK[633.]; Ev = 659 else Ev = 3527; continue end else U2[26] = nil;
+U2[26] = UK[1165] - UK[2008]; Ev = 395 end elseif Ev < 2878 then if Ev < 2877. then local WY = UK; CN = WY[650]; CH = WY[650]; CQ = WY[650]; CL = WY[650]; CJ = WY[650]; Ev = 187 elseif Ev == 2877. then local WY = UK; U2[14][WY[750.]] = U2[14][WY[1386.]]:AddSubTab(WY[750.], WY[712]);
+U2[14][WY[923]] = U2[14][WY[1386.]]:AddSubTab(WY[923], WY[338]); U2[14][WY[680]] = U2[14][WY[1386.]]:AddSubTab(WY[680], WY[190]); U2[14][WY[1532]] = U2[14][WY[1386.]]:AddSubTab(WY[1532], WY[296]); U2[14][WY[806]] = U2[14][WY[1386.]]:AddSubTab(WY[806], WY[642.]);
+U2[14][WY[111.]] = U2[14][WY[1298]]:AddSubTab(WY[134], WY[1554.]); U2[14][WY[1655]] = U2[14][WY[1298]]:AddSubTab(WY[1655], WY[91]); U2[14][WY[1933]] = U2[14][WY[1298]]:AddSubTab(WY[1933], WY[293]); U2[14][WY[1066]] = U2[14][WY[1030]]:AddSubTab(WY[111.], WY[1554.]);
+U2[14][WY[705.]] = U2[14][WY[1030]]:AddSubTab(WY[188], WY[1573]); U2[14][WY[1682]] = U2[14][WY[1030]]:AddSubTab(WY[20], WY[835]); U2[14][WY[671]] = U2[14][WY[1030]]:AddSubTab(WY[1655], WY[91]); U2[14][WY[1953.]] = U2[14][WY[1030]]:AddSubTab(WY[1933], WY[293]);
+U2[14][WY[525.]] = U2[14][WY[1030]]:AddSubTab(WY[420.], WY[166]); U2[14][WY[1990]] = U2[14][WY[484]]:AddSubTab(WY[852.], WY[353]); U2[14][WY[1123]] = U2[14][WY[484]]:AddSubTab(WY[968], WY[1798]); U2[14][WY[982]] = U2[14][WY[484]]:AddSubTab(WY[1752.], WY[623]);
+U2[14][WY[1871]] = U2[14][WY[484]]:AddSubTab(WY[443], WY[293]); U2[14][WY[1841]] = U2[14][WY[2029]]:AddSubTab(WY[765.], WY[44]); U2[14][WY[1666]] = U2[14][WY[2029]]:AddSubTab(WY[1564], WY[886]); U2[14][WY[1658]] = U2[14][WY[2029]]:AddSubTab(WY[1735], WY[1801]);
+Ev = 1028 else Ev = 2932; continue end elseif Ev < 2879 then if Ev == 2878 then U2[10] = nil; local WY = UK; U2[10] = WY[327.] - WY[1165]; U2[10] = WY[633.] - WY[327.]; Ev = 682 else Ev = 3269; continue end elseif Ev == 2879 then function applyFPSBoost(rR)
+UK[879.](function() local U1 = table.clear; local RG, RH, RI, RK, RL, RM, RO, RQ, RR, RS, RT, RU, RV, RX = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local RJ = nil; RJ = 12.; while true do RJ = 3335 - RJ; do if RJ < 3329 then if RJ < 3324. then
+if RJ < 3322 then if RJ < 3320 then if RJ < 3129. then break elseif RJ < 3319 then break elseif RJ == 3319 then RJ = if not D1 then 7 else 14 else RJ = 15272; continue end elseif RJ < 3321. then if RJ == 3320 then D1 = true; U1(D7); local Xo = UK; settings()[Xo[1698.]][Xo[160]] = Xo[1209.][Xo[160]][Xo[286]];
+Xo[1560.][Xo[1964]] = Xo[1209.][Xo[1964]][Xo[124]]; D7[Xo[952]] = RG[Xo[952]]; RG[Xo[952]] = false; RG[Xo[86]] = false; RG[Xo[1304]] = Xo[28][Xo[2023]](Xo[123.], Xo[123.], Xo[123.]); RJ = if RH then 11 else 9. else RJ = 3322; continue end else D1 = false; local Xo = UK;
+settings()[Xo[1698.]][Xo[160]] = Xo[1209.][Xo[160]][Xo[464]]; Xo[1560.][Xo[1964]] = Xo[1209.][Xo[1964]][Xo[444.]]; RS = if D7[Xo[952]] ~= nil then Xo[1292] else Xo[650]; RQ = Xo[999.] * RS + Xo[1558] * (Xo[1292] - RS); RR = Xo[475] * RS + Xo[1572.] * (Xo[1292] - RS);
+RJ = if (RQ * Xo[1856] + RR * Xo[1307] + RQ * RR) % Xo[1264] == Xo[491] then 3. else 4 end elseif RJ < 3323 then RU = false; for r_, r0 in UK[1189](D7) do RV = r_; RX = r0; local RW = RV; local RY = RX; local RT = nil; local Xo = UK; RT = Xo[650]; while true do
+if RT < 1 then Xo[879.](function() local Rs, Ru, Rv, Rw = nil, nil, nil, nil; local Rt = nil; Rt = 1; while true do Rt = 5162 - Rt; do if Rt < 5145. then if Rt < 5133. then if Rt < 5127. then if Rt < 3203 then break elseif Rt < 3289 then break elseif Rt < 5126 then
+break else Rs = (RW:IsA(UK[261.])); Rw = if Rs then UK[1292] else UK[650]; Ru = UK[1245.] * Rw + UK[480.] * (UK[1292] - Rw); Rv = UK[1705] * Rw + UK[1081] * (UK[1292] - Rw); Rt = if (Ru * UK[979] + Rv * UK[752] + Ru * Rv) % UK[1264] == UK[456.] then 7 else 6.
+end elseif Rt < 5130. then if Rt < 5128 then Rw = if Rs then UK[1292] else UK[650]; Ru = UK[1328] * Rw + UK[1160] * (UK[1292] - Rw); Rv = UK[1391] * Rw + UK[960.] * (UK[1292] - Rw); Rt = if (Ru * UK[874] + Rv * UK[1740.] + Ru * Rv) % UK[1264] == UK[1031] then 21. else 28
+elseif Rt < 5129 then break else Rs = RW:IsA(UK[224]); Rt = 35 end elseif Rt < 5131 then Rt = if Rs then 35 else 33. elseif Rt < 5132 then Rt = if RW:IsA(UK[878]) then 16 else 2 else Rt = if Rs then 18. else 4 end elseif Rt < 5139. then if Rt < 5136. then if Rt < 5134 then
+Rt = if Rs then 19 else 8 elseif Rt < 5135 then if Rt == 5134 then Rs = RW:IsA(UK[1610]); Rt = 21. else Rt = 5133.; continue end elseif Rt == 5135 then Rw = if Rs then UK[1292] else UK[650]; Ru = UK[405.] * Rw + UK[760] * (UK[1292] - Rw); Rv = UK[1508] * Rw + UK[184] * (UK[1292] - Rw);
+Rt = if (Ru * UK[1707.] + Rv * UK[1010] + Ru * Rv) % UK[1264] == UK[461] then 10 else 20 else Rt = 5156; continue end elseif Rt < 5137 then if Rt == 5136. then Rt = if Rs then 32 else 15. else Rt = 5150; continue end elseif Rt < 5138 then Rs = RW:IsA(UK[1602.]);
+Rt = 14 else Rt = 8 end elseif Rt < 5142. then if Rt < 5140 then Rt = 24. elseif Rt < 5141 then RW[UK[488]] = RY; Rt = 23 elseif Rt == 5141 then Rt = if Rs then 9. else 36. else Rt = 5142.; continue end elseif Rt < 5143 then Rs = RW:IsA(UK[263]); Rt = 10 elseif Rt < 5144 then
+Rs = (RW:IsA(UK[726.])); Rt = if Rs then 30. else 17 elseif Rt == 5144 then Rt = if Rs then 14 else 25 else Rt = 5150; continue end elseif Rt < 5156 then if Rt < 5150 then if Rt < 5147 then if Rt < 5146 then if Rt == 5145. then Rs = RW:IsA(UK[586]); Rt = 30.
+else Rt = 5157.; continue end elseif Rt == 5146 then RW[UK[1192]] = RY[UK[1005.]]; RW[UK[116]] = RY[UK[483.]]; Rt = 2 else Rt = 5156; continue end elseif Rt < 5148. then if Rt == 5147 then Rs = RW:IsA(UK[367]); Rt = 32 else Rt = 5148.; continue end elseif Rt < 5149 then
+if Rt == 5148. then Rw = if Rs then UK[1292] else UK[650]; Ru = UK[1887.] * Rw + UK[668] * (UK[1292] - Rw); Rv = UK[1901] * Rw + UK[1458.] * (UK[1292] - Rw); Rt = if (Ru * UK[1033] + Rv * UK[1646] + Ru * Rv) % UK[1264] == UK[1121] then 27. else 5 else Rt = 5139.;
+continue end else Rs = RW:IsA(UK[797]); Rt = 26 end elseif Rt < 5153 then if Rt < 5151. then RW[UK[773]] = RY; Rt = 11 elseif Rt < 5152 then if Rt == 5151. then Rt = 23 else Rt = 5141; continue end else Rt = if Rs then 26 else 13 end elseif Rt < 5154. then
+RW[UK[141.]] = true; Rt = 24. elseif Rt < 5155 then Rt = 34 else Rw = if Rs then UK[1292] else UK[650]; Ru = UK[1972] * Rw + UK[1333] * (UK[1292] - Rw); Rv = UK[5] * Rw + UK[1166] * (UK[1292] - Rw); Rt = if (Ru * UK[1399] + Rv * UK[881] + Ru * Rv) % UK[1264] == UK[1074.] then 22 else 0.
+end elseif Rt < 5162 then if Rt < 5159 then if Rt < 5157. then if Rt == 5156 then Rs = RW:IsA(UK[488]); Rt = 7 else Rt = 5137; continue end elseif Rt < 5158 then if Rt == 5157. then Rs = RW:IsA(UK[562]); Rt = 27. else Rt = 5147; continue end else Rs = RW:IsA(UK[388]);
+Rt = 18. end elseif Rt < 5160. then if Rt == 5159 then Rs = RW[UK[499]]; Rt = 29 else Rt = 5152; continue end elseif Rt < 5161 then Rt = 11 elseif Rt == 5161 then Rs = typeof(RW) == UK[673]; Rt = if Rs then 3. else 29 else Rt = 5146; continue end elseif Rt < 13306 then
+if Rt < 5882 then if Rt == 5162 then Rw = if RW:IsA(UK[402.]) then UK[1292] else UK[650]; Ru = UK[216.] * Rw + UK[1687] * (UK[1292] - Rw); Rv = UK[1524.] * Rw + UK[504.] * (UK[1292] - Rw); Rt = if (Ru * UK[1347.] + Rv * UK[2064.] + Ru * Rv) % UK[1264] == UK[605] then 12. else 31
+else Rt = 13306; continue end else break end else break end end end end); RT = Xo[2008] elseif RT < 2 then RU = true; RT = Xo[2008] else break end end; if RU then break end end; U1(D7); RJ = 8 elseif RJ == 3323 then local Xo = UK; RG = Xo[1185.]:GetService(Xo[882.]);
+RH = Xo[1560.]:FindFirstChildOfClass(Xo[1078]); RJ = if rR then 10 else 16 else RJ = 3329; continue end elseif RJ < 3328 then if RJ < 3327. then if RJ < 3325 then local Xo = UK; D7[Xo[1078]] = { [Xo[1208]] = RH[Xo[1208]], [Xo[1693]] = RH[Xo[1693]], [Xo[58]] = RH[Xo[58]],
+[Xo[782]] = RH[Xo[782]], [Xo[1343]] = RH[Xo[1343]] }; RH[Xo[1208]] = false; RH[Xo[1693]] = Xo[650]; RH[Xo[58]] = Xo[650]; RH[Xo[782]] = Xo[650]; RH[Xo[1343]] = Xo[650]; RJ = 9. elseif RJ < 3326 then if RJ == 3325 then RJ = if D1 then 2 else 15. else RJ = 15109;
+continue end elseif RJ == 3326 then RL = false; local Xo = UK; for r9, sc in Xo[1295](Xo[1560.]:GetDescendants()) do RM = r9; RO = sc; local RN = RM; local RP = RO; local RK = nil; RK = Xo[1827.]; while true do if RK < 23 then if RK < 11 then if RK < 5 then
+if RK < 2 then if RK < 1 then RL = true; RK = Xo[1035.] else RI = RP:IsA(Xo[224]); RK = Xo[1765] end elseif RK < 3. then RK = if RI then Xo[350] else Xo[1405] elseif RK < 4 then RI = RP:IsA(Xo[367]); RK = Xo[1465] else D7[RP] = { [Xo[1005.]] = false, [Xo[483.]] = RP[Xo[116]] };
+RK = Xo[1143.] end elseif RK < 8 then if RK < 6. then RK = Xo[1035.] elseif RK < 7 then RK = if RI then Xo[2008] else Xo[597.] else RI = RP:IsA(Xo[1602.]); RK = Xo[2008] end elseif RK < 9. then D7[RP] = true; RP[Xo[141.]] = false; RK = Xo[1620.] elseif RK < 10 then
+RK = Xo[633.] else RK = if RI then Xo[1465] else Xo[1165] end elseif RK < 17 then if RK < 14 then if RK < 12. then RK = Xo[1664] elseif RK < 13 then RK = Xo[1329.] else RK = Xo[1478] end elseif RK < 15. then RP[Xo[116]] = Xo[1209.][Xo[116]][Xo[720.]]; RK = Xo[1001]
+elseif RK < 16 then RI = RP:IsA(Xo[586]); RK = Xo[14] else RK = if RP[Xo[488]] ~= Xo[2056] then Xo[1456] else Xo[1149.] end elseif RK < 20 then if RK < 18. then RI = RP:IsA(Xo[263]); RK = Xo[1355] elseif RK < 19 then RK = if RP[Xo[141.]] then Xo[553] else Xo[1930]
+else RK = if RP:IsA(Xo[878]) then Xo[1221.] else Xo[1001] end elseif RK < 21. then RI = RP:IsA(Xo[488]); RK = Xo[1222] elseif RK < 22 then RI = RP:IsA(Xo[797]); RK = Xo[1756] else RK = if RI then Xo[608] else Xo[850] end elseif RK < 34 then if RK < 28 then
+if RK < 25 then if RK < 24. then RK = if RP:IsA(Xo[402.]) then Xo[624.] else Xo[836] else RI = RP:IsA(Xo[388]); RK = Xo[1579] end elseif RK < 26 then RK = if RI then Xo[1765] else Xo[1292] elseif RK < 27. then RI = (RP:IsA(Xo[562])); RK = if RI then Xo[1355] else Xo[1628]
+else RK = Xo[1329.] end elseif RK < 31 then if RK < 29 then RK = if RI then Xo[1756] else Xo[976] elseif RK < 30. then RK = if RI then Xo[1609] else Xo[1629.] else RK = if RP[Xo[773]] ~= Xo[2056] then Xo[978.] else Xo[1413.] end elseif RK < 32 then D7[RP] = true;
+RP[Xo[141.]] = false; RK = Xo[1930] elseif RK < 33. then D7[RP] = { [Xo[1005.]] = true, [Xo[483.]] = RP[Xo[116]] }; RP[Xo[1192]] = false; RK = Xo[1143.] else RK = if RI then Xo[1060] else Xo[1337] end elseif RK < 40 then if RK < 37 then if RK < 35 then RK = Xo[633.]
+elseif RK < 36. then RK = if RP[Xo[141.]] then Xo[749] else Xo[1620.] else RK = if RP[Xo[1192]] then Xo[591.] else Xo[327.] end elseif RK < 38 then break elseif RK < 39. then RK = Xo[1664] else RK = Xo[1478] end elseif RK < 43 then if RK < 41 then D7[RP] = RP[Xo[488]];
+RP[Xo[488]] = Xo[2056]; RK = Xo[1149.] elseif RK < 42. then RK = if RI then Xo[1579] else Xo[206] else RI = (RP:IsA(Xo[726.])); RK = if RI then Xo[14] else Xo[1288] end elseif RK < 44 then RI = RP:IsA(Xo[1610]); RK = Xo[1609] elseif RK < 45. then RI = (RP:IsA(Xo[261.]));
+RK = if RI then Xo[1222] else Xo[466] else D7[RP] = RP[Xo[773]]; RP[Xo[773]] = Xo[2056]; RK = Xo[1413.] end end; if RL then break end end; local Xp = Xo[1957][Xo[394]]; Xo[1383.](function() local Rx, Ry, RA, RB, RC, RE = nil, nil, nil, nil, nil, nil; local Rz = nil;
+Rz = 8; while true do Rz = 15859 - Rz; do if Rz < 15856 then if Rz < 15854 then if Rz < 15853 then if Rz < 8340. then break elseif Rz < 15767 then break elseif Rz < 15851 then if Rz < 15850 then break elseif Rz == 15850 then Rx = not DJ[UK[1902.]]; Rz = 2 else
+Rz = 15859; continue end elseif Rz < 15852. then Rz = 4 elseif Rz == 15852. then Rz = 0. else Rz = 5722; continue end else break end elseif Rz < 15855. then if Rz == 15854 then RB = false; for sl, sm in UK[1295](UK[1560.]:GetChildren()) do RC = sl; RE = sm;
+local RD = RC; local RF = RE; local RA = nil; RA = UK[1756]; while true do if RA < 5 then if RA < 2 then if RA < 1 then Ry = RF[UK[821]]:lower():find(UK[2033]); RA = UK[633.] else Ry = (RF[UK[821]]:lower():find(UK[683])); RA = if Ry then UK[633.] else UK[650]
+end elseif RA < 3. then RF:ClearAllChildren(); RA = UK[1579] elseif RA < 4 then break else Rx = Ry; RA = UK[1620.] end elseif RA < 8 then if RA < 6. then RA = if Ry then UK[327.] else UK[597.] elseif RA < 7 then RA = UK[1165] else Ry = RF[UK[821]]:lower():find(UK[490]);
+RA = UK[327.] end elseif RA < 9. then RB = true; RA = UK[1165] elseif RA < 10 then RA = if Rx then UK[2008] else UK[1579] else Rx = (RF:IsA(UK[62])); RA = if Rx then UK[1292] else UK[1620.] end end; if RB then break end end; local Xq = UK[1957][UK[438.]]; UK[1433](UK[1576]);
+Rz = 3. else Rz = 7126; continue end elseif Rz == 15855. then Rz = if true then 1 else 0. else Rz = 8340.; continue end elseif Rz < 15858. then if Rz < 15857 then if Rz == 15856 then Rz = 4 else Rz = 5722; continue end elseif Rz == 15857 then Rz = if Rx then 5 else 7
+else Rz = 15767; continue end elseif Rz < 15859 then if Rz == 15858. then Rx = D1; Rz = if Rx then 9. else 2 else Rz = 15855.; continue end elseif Rz == 15859 then Rz = 6. else Rz = 15854; continue end end end end); RJ = 8 else RJ = 9749; continue end else
+RJ = 5 end else return end elseif RJ < 3333. then if RJ < 3331 then if RJ < 3330. then RG = D7[UK[1078]]; RJ = 1 else break end elseif RJ < 3332 then if RJ == 3331 then RG = RH; RJ = if RG then 6. else 1 else RJ = 3327.; continue end elseif RJ == 3332 then
+RG[UK[952]] = D7[UK[952]]; RJ = 4 else RJ = 10190; continue end elseif RJ < 4714 then if RJ < 3335 then if RJ < 3334 then if RJ == 3333. then return else RJ = 3320; continue end elseif RJ == 3334 then RJ = if RG then 0. else 13 else RJ = 3335; continue end
+elseif RJ == 3335 then local Xo = UK; RG = D7[Xo[1078]]; RH[Xo[1208]] = RG[Xo[1208]]; RH[Xo[1693]] = RG[Xo[1693]]; RH[Xo[58]] = RG[Xo[58]]; RH[Xo[782]] = RG[Xo[782]]; RH[Xo[1343]] = RG[Xo[1343]]; RJ = 13 else break end else break end end end end) end; local WY = UK;
+U2[4]:AddToggle(WY[1846], { [WY[592]] = WY[1831], [WY[181]] = false, [WY[1977.]] = applyFPSBoost }); U2[4]:AddToggle(WY[1784], { [WY[592]] = WY[487], [WY[181]] = false, [WY[1977.]] = WY[729.] }); U2[4]:AddToggle(WY[1220], { [WY[592]] = WY[539], [WY[181]] = true });
+U2[14] = U2[26][WY[832]]:AddRightGroupbox(WY[706], WY[44]); Ev = 332 else Ev = 3297.; continue end elseif Ev < 2899 then if Ev < 2890 then if Ev < 2885 then if Ev < 2883. then if Ev < 2882 then if Ev < 2881 then Ev = if U2[10] <= UK[1292] then 34 else 397 else
+Ev = 367 end else Ev = 1079 end elseif Ev < 2884 then local Xr = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[10], UK[1465]), string.byte(tostring(CC))), UK[1609]); Ev = if bit32.bxor(bit32.bxor(bit32.bxor(bit32.bxor(bit32.band(Xr, UK[941]), UK[1012]), (bit32.bxor(bit32.band(Xr, UK[1137.]), UK[1118]))), UK[1012]), UK[1118]) == Xr then 342. else 191
+elseif Ev == 2884 then local WY = UK; U2[18.]:AddToggle(WY[1671.], { [WY[592]] = WY[2019.], [WY[181]] = false }); U2[18.]:AddDivider(); U2[18.]:AddButton({ [WY[592]] = WY[1452.], [WY[1441]] = WY[329] }); Ev = 213. else Ev = 3870.; continue end elseif Ev < 2888 then
+if Ev < 2887 then if Ev < 2886. then if Ev == 2885 then Ev = 280 else Ev = 3884; continue end elseif Ev == 2886. then Ev = 837. else Ev = 3939.; continue end elseif Ev == 2887 then U2[10] = U2[14][UK[525.]]:AddLeftGroupbox(UK[1454], UK[166]); Ev = 1233. else
+Ev = 3903.; continue end elseif Ev < 2889. then U2[26] = nil; local WY = UK; U2[26] = WY[2008] - WY[1292]; U2[26] = WY[1165] - WY[2008]; Ev = 990. else Ev = 281 end elseif Ev < 2895. then if Ev < 2893 then if Ev < 2892. then if Ev < 2891 then local WY = UK;
+U2[26] = { WY[1248.], WY[724], WY[351.], WY[1276], WY[900.], WY[2062], WY[1462], WY[716], WY[432.], WY[1627], WY[1536.], WY[493] }; Ev = if U2[26][(U2[20] * WY[1329.] + WY[1096]) % WY[1413.] + WY[1292]] <= U2[26][(U2[20] * WY[1329.] + WY[1096]) % WY[1413.] + WY[1292]] then 975. else 621.
+elseif Ev == 2891 then U2[20] = nil; local WY = UK; U2[20] = WY[1165] - WY[2008]; U2[20] = WY[2008] - WY[1292]; U2[20] = WY[1165] - WY[2008]; Ev = 1258 else Ev = 3581; continue end else Ev = 225. end elseif Ev < 2894 then if Ev == 2893 then U2[26] = U2[14][UK[1933]]:AddLeftGroupbox(UK[669.], UK[293]);
+Ev = 291. else Ev = 2961.; continue end else Ev = 1172 end elseif Ev < 2897 then if Ev < 2896 then Ev = if ((not U2[26] or not U2[20]) and (U2[26] and U2[20]) or (not U2[26] or not U2[20]) and (not U2[18.] or U2[20])) and not ((not U2[26] or not U2[20]) and (U2[26] and U2[20]) or (not U2[26] or not U2[20]) and (not U2[18.] or U2[20])) then 781 else 964
+elseif Ev == 2896 then local Xs = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[20], UK[1628]), string.byte(tostring(C4))), UK[327.]); Ev = if bit32.bxor(bit32.lrotate(bit32.bxor(Xs, UK[770]), UK[327.]), UK[1937]) ~= bit32.lrotate(Xs, UK[327.]) then 565 else 196
+else Ev = 3528.; continue end elseif Ev < 2898. then local Xt = (U2[18.] * UK[1292] + UK[650]) % UK[1292] + UK[1292]; Ev = 433 elseif Ev == 2898. then local WY = UK; U2[4]:AddLabel(b(createMultiGradientText(WY[1284.], U2[20][WY[943]])), true); U2[4]:AddDivider();
+U2[4]:AddToggle(WY[696.], { [WY[592]] = WY[696.], [WY[181]] = false }); U2[4]:AddSlider(WY[220], { [WY[592]] = WY[1442], [WY[181]] = WY[609.], [WY[1873]] = WY[1839.], [WY[1977.]] = WY[1299.], [WY[834.]] = WY[1756], [WY[1734.]] = WY[650] }); U2[4]:AddDivider();
+U2[4]:AddToggle(WY[129.], { [WY[181]] = false, [WY[592]] = WY[1891], [WY[1977.]] = WY[1040] }); U2[4]:AddDivider(); U2[4]:AddLabel(b(createMultiGradientText(WY[804.], U2[20][WY[647]])), true); U2[4]:AddDivider(); U2[4]:AddToggle(WY[870.], { [WY[592]] = WY[427],
+[WY[181]] = false }); U2[4]:AddSlider(WY[857], { [WY[1873]] = WY[1244], [WY[834.]] = WY[1060], [WY[1734.]] = WY[650], [WY[592]] = WY[949], [WY[1977.]] = WY[301], [WY[181]] = WY[1060] }); U2[4]:AddDivider(); U2[4]:AddToggle(WY[545], { [WY[592]] = WY[1131.],
+[WY[181]] = false }); U2[4]:AddSlider(WY[315.], { [WY[834.]] = WY[1096], [WY[1873]] = WY[1455.], [WY[1977.]] = WY[1147], [WY[181]] = WY[1096], [WY[592]] = WY[1917.], [WY[1734.]] = WY[650] }); U2[4]:AddDivider(); U2[4]:AddToggle(WY[1322], { [WY[592]] = WY[945.],
+[WY[181]] = false }); U2[4]:AddToggle(WY[2046.], { [WY[592]] = WY[2046.], [WY[181]] = false }); Ev = 424 else Ev = 3253; continue end elseif Ev < 2909 then if Ev < 2904. then if Ev < 2902 then if Ev < 2901. then if Ev < 2900 then if Ev == 2899 then Ev = 141.
+else Ev = 3858.; continue end else local WY = UK; U2[26]:AddToggle(WY[1992.], { [WY[592]] = WY[889], [WY[181]] = false }); U2[26]:AddDivider(); U2[26]:AddButton({ [WY[592]] = WY[1750], [WY[1441]] = WY[1061] }); Ev = 949 end else local WY = UK; U2[18.] = (vector.create((U2[10] * WY[327.] + WY[597.]) % WY[1478] + WY[1292], (U2[10] * WY[1478] + WY[327.]) % WY[1149.] + WY[1292], (U2[10] * WY[1292] + WY[1149.]) % WY[1628] + WY[1292]));
+U2[1] = (vector.create((U2[10] * WY[1579] + WY[633.]) % WY[1478] + WY[1292], (U2[10] * WY[327.] + WY[597.]) % WY[1149.] + WY[1292], (U2[10] * WY[749] + WY[1149.]) % WY[1628] + WY[1292])); U2[12.] = (vector.create((U2[10] * WY[633.] + WY[327.]) % WY[1478] + WY[1292], (U2[10] * WY[749] + WY[749]) % WY[1149.] + WY[1292], (U2[10] * WY[2008] + WY[1288]) % WY[1628] + WY[1292]));
+U2[22] = (vector.create((U2[10] * WY[327.] + WY[2008]) % WY[633.] + WY[1292], (U2[10] * WY[2008] + WY[327.]) % WY[597.] + WY[1292], (U2[10] * WY[1292] + WY[1292]) % WY[1620.] + WY[1292])); Ev = if vector.dot(vector.cross(U2[18.], (vector.cross(U2[1], U2[12.]))), U2[22]) == vector.dot(U2[1] * vector.dot(U2[18.], U2[12.]) - U2[12.] * vector.dot(U2[18.], U2[1]), U2[22]) + WY[633.] then 200 else 284
+end elseif Ev < 2903 then if Ev == 2902 then U2[14] = U2[26][UK[1532]]:AddLeftGroupbox(UK[1667], UK[296]); Ev = 1089. else Ev = 3222.; continue end else Ev = 1260. end elseif Ev < 2907. then if Ev < 2906 then if Ev < 2905 then function adQuest_claimHourly()
+local Lg, Lh, Lj, Lk, Ll = nil, nil, nil, nil, nil; local Li = nil; Li = 1; while true do Li = 4912 - Li; do if Li < 4912 then if Li < 3756. then break elseif Li < 4081 then break elseif Li < 4911. then break elseif Li == 4911. then Lg = UK[650]; Lk = false;
+for iB = UK[1292], D0 do Ll = iB; local Lm = Ll; local Lj = nil; Lj = UK[1292]; while true do if Lj < 3. then if Lj < 1 then Lj = if Lh then UK[2008] else UK[1165] elseif Lj < 2 then Lh = DJ[UK[1902.]]; Lj = if Lh then UK[650] else UK[633.] else Lj = UK[327.]
+end elseif Lj < 5 then if Lj < 4 then UK[879.](function() Dm:FireServer(UK[381.] .. Lm) end); Lg = Lg + UK[1292]; local Xu = UK[1957][UK[438.]]; UK[1433](UK[1292]); Lj = UK[1579] else Lk = true; Lj = UK[1579] end elseif Lj < 6. then Lh = not isOn(UK[352]);
+Lj = UK[650] else break end end; if Lk then break end end; return Lg else Li = 16309; continue end else break end end end end; function adQuest_claimDaily() local Ln, Lo, Lq, Lr, Ls = nil, nil, nil, nil, nil; local Lp = nil; Lp = 0.; while true do Lp = 838 - Lp;
+do if Lp < 1841 then if Lp < 838 then break elseif Lp == 838 then Ln = UK[650]; Lr = false; for iJ = UK[1292], DU do Ls = iJ; local Lt = Ls; local Lq = nil; Lq = UK[650]; while true do if Lq < 3. then if Lq < 1 then Lo = DJ[UK[1902.]]; Lq = if Lo then UK[327.] else UK[1165]
+elseif Lq < 2 then UK[879.](function() Dm:FireServer(UK[1566.] .. Lt) end); Ln = Ln + UK[1292]; local Xv = UK[1957][UK[438.]]; UK[1433](UK[1292]); Lq = UK[2008] else break end elseif Lq < 5 then if Lq < 4 then Lo = not isOn(UK[1285]); Lq = UK[327.] else Lq = if Lo then UK[633.] else UK[1292]
+end elseif Lq < 6. then Lq = UK[1579] else Lr = true; Lq = UK[2008] end end; if Lr then break end end; return Ln else Lp = 837.; continue end else break end end end end; function adQuest_claimWeekly() local Lu, Lv, Lx, Ly, Lz = nil, nil, nil, nil, nil; local Lw = nil;
+Lw = 0.; while true do Lw = 2909 - Lw; do if Lw < 3632 then if Lw < 2909 then break elseif Lw == 2909 then Lu = UK[650]; Ly = false; for iR = UK[1292], DO do Lz = iR; local LA = Lz; local Lx = nil; Lx = UK[327.]; while true do if Lx < 3. then if Lx < 1 then
+Lx = if Lv then UK[1579] else UK[1292] elseif Lx < 2 then UK[879.](function() Dm:FireServer(UK[364] .. LA) end); Lu = Lu + UK[1292]; local Xw = UK[1957][UK[438.]]; UK[1433](UK[1292]); Lx = UK[633.] else Ly = true; Lx = UK[633.] end elseif Lx < 5 then if Lx < 4 then
+Lv = not isOn(UK[1992.]); Lx = UK[650] else Lv = DJ[UK[1902.]]; Lx = if Lv then UK[650] else UK[1165] end elseif Lx < 6. then break else Lx = UK[2008] end end; if Ly then break end end; return Lu else Lw = 3632; continue end else break end end end end; local WY = UK;
+adVirus_getButtons = WY[496]; adVirus_isVisible = WY[929]; function adVirus_clickBtn(jl) local LX, LY, LZ = nil, nil, nil; local LW = nil; LW = 2; while true do LW = 12630. - LW; do if LW < 12625 then break elseif LW < 12629 then if LW < 12627. then if LW < 12626 then
+if LW == 12625 then return false else LW = 405.; continue end else LW = if firesignal then 3. else 0. end elseif LW < 12628 then if LW == 12627. then UK[879.](function() firesignal(jl[UK[570.]]) end); local Xx = UK[1957][UK[438.]]; UK[1433](UK[1505]); UK[879.](function()
+firesignal(jl[UK[1215.]]) end); Xx = UK[1957][UK[438.]]; UK[1433](UK[1505]); LW = 0. else LW = 405.; continue end else LZ = if not jl then UK[1292] else UK[650]; LX = UK[542] * LZ + UK[43] * (UK[1292] - LZ); LY = UK[1229] * LZ + UK[1141] * (UK[1292] - LZ);
+LW = if (LX * UK[1219] + LY * UK[253] + LX * LY) % UK[1264] == UK[136] then 5 else 4 end elseif LW < 12844 then if LW < 12630. then break elseif LW == 12630. then UK[879.](function() local US = math.floor; local Xy = UK; local jp = jl[Xy[614]]; local jq = jl[Xy[2047]];
+local jr = jp[Xy[785]] + US(jq[Xy[785]] / Xy[2008]); local js = jp[Xy[2043.]] + US(jq[Xy[2043.]] / Xy[2008]); DI:SendMouseButtonEvent(jr, js, Xy[650], true, Xy[1185.], Xy[650]); local Xz = Xy[1957][Xy[438.]]; Xy[1433](Xy[1505]); DI:SendMouseButtonEvent(jr, js, Xy[650], false, Xy[1185.], Xy[650])
+end); return true else break end else break end end end end; function ad_getChests() local jv; jv = {}; UK[879.](function() local L_, L0, L2, L3, L4, L6, L8, L9, Ma = nil, nil, nil, nil, nil, nil, nil, nil, nil; local L1 = nil; L1 = 4; while true do L1 = 13066 - L1;
+do if L1 < 13064 then if L1 < 10623. then break elseif L1 < 13062. then if L1 < 13061 then break elseif L1 == 13061 then return else L1 = 15130; continue end elseif L1 < 13063 then L_ = UK[1560.]:FindFirstChild(UK[1968.]); L1 = if not L_ then 5 else 0. else
+break end elseif L1 < 13065. then L3 = false; for jy, jz in UK[1189](L0:GetChildren()) do L4 = jy; L6 = jz; local L5 = L4; local L7 = L6; local L2 = nil; local XA = UK; L2 = XA[650]; while true do if L2 < 4 then if L2 < 2 then if L2 < 1 then Ma = if L7[XA[821]]:find(XA[22]) then XA[1292] else XA[650];
+L8 = XA[1642] * Ma + XA[530] * (XA[1292] - Ma); L9 = XA[970] * Ma + XA[115] * (XA[1292] - Ma); L2 = if (L8 * XA[548] + L9 * XA[223] + L8 * L9) % XA[1264] == XA[1133] then XA[1165] else XA[749] else L2 = XA[749] end elseif L2 < 3. then break else L_ = L7:FindFirstChild(XA[1864], true);
+L0 = L_; L2 = if L0 then XA[597.] else XA[633.] end elseif L2 < 6. then if L2 < 5 then table.insert(jv, { [XA[1825]] = L7, [XA[378.]] = L_ }); L2 = XA[1292] else L2 = if L0 then XA[327.] else XA[1292] end elseif L2 < 7 then L3 = true; L2 = XA[2008] elseif L2 < 8 then
+L0 = L_:IsA(XA[1864]); L2 = XA[633.] else L2 = XA[2008] end end; if L3 then break end end; L1 = 3. elseif L1 < 15130 then if L1 < 13066 then if L1 == 13065. then return else L1 = 15313; continue end elseif L1 == 13066 then L0 = L_:FindFirstChild(UK[670]); L1 = if not L0 then 1 else 2
+else break end else break end end end end); return jv end; function ad_getNearestChest() local Mb, Mc, Md, Me, Mf, Mg, Mi, Mj, Mk, Mm = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local Mh = nil; Mh = 0.; while true do Mh = 3915. - Mh; do if Mh < 3915. then
+if Mh < 3913 then break elseif Mh < 3914 then return nil elseif Mh == 3914 then Mc = ad_getChests(); Me, Md = nil, math.huge; Mj = false; for jH, jI in UK[1295](Mc) do Mk = jH; Mm = jI; local Ml = Mk; local Mn = Mm; local Mi = nil; local XB = UK; Mi = XB[650];
+while true do if Mi < 3. then if Mi < 1 then Mc, Mf = XB[879.](function() return (Mn[UK[1825]]:GetPivot()[UK[2060]] - Mb[UK[2060]])[UK[1142]] end); Mg = Mc; Mi = if Mg then XB[1579] else XB[633.] elseif Mi < 2 then Mj = true; Mi = XB[2008] else break end elseif Mi < 5 then
+if Mi < 4 then Md = Mf; Me = Mn; Mi = XB[327.] else Mi = XB[2008] end elseif Mi < 6. then Mi = if Mg then XB[1165] else XB[327.] else Mg = Mf < Md; Mi = XB[633.] end end; if Mj then break end end; return Me else Mh = 13786; continue end elseif Mh < 7851. then
+if Mh < 4661 then if Mh < 4612 then if Mh == 3915. then Mb = ad_getHRP(); Mh = if not Mb then 2 else 1 else Mh = 13786; continue end else break end else break end else break end end end end; ad_getEquippedSpellBySlot = WY[82]; ad_getEquippedUltimate = WY[267.];
+adSell_normalizeMulti = WY[1637]; adSell_getRarityTable = WY[1084]; adSell_hasRarityFilter = WY[924.]; adSell_rarityAllowed = WY[1949]; adSell_isUltimateSpell = WY[502]; adSell_matchesCategory = WY[2018]; adSell_canSellItem = WY[1883]; adSell_collect = WY[1900];
+function adSell_fireBatch(kF) local Nq, Nr, Ns, Nu, Nv, Nw, Nx, Ny, Nz, NA, NB = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local Nt = nil; Nt = 1; while true do Nt = 12262 - Nt; do if Nt < 12255. then if Nt < 12250 then if Nt < 12249. then if Nt < 12245 then
+if Nt < 6949 then break elseif Nt < 11177 then break elseif Nt < 12000. then break elseif Nt < 12244 then break elseif Nt == 12244 then Nt = if #Nq == UK[650] then 17 else 10 else Nt = 12253; continue end elseif Nt < 12247 then if Nt < 12246. then if Nt == 12245 then
+return UK[650] else Nt = 12249.; continue end elseif Nt == 12246. then Ns = #Nq; Nt = 9. else Nt = 12247; continue end elseif Nt < 12248 then if Nt == 12247 then Nt = if (Nz * UK[2042] + NA * UK[1413.] + Nz * NA) % UK[1264] == UK[1563.] then 7 else 2 else Nt = 12251;
+continue end else Ny = Nx; Nr = kF[Ny]; Ns = Nr; Nt = if Ns then 13 else 6. end elseif Nt == 12249. then Ns = Nr[UK[499]]; Nt = 6. else Nt = 12250; continue end elseif Nt < 12252. then if Nt < 12251 then Nt = if Nw <= Nu then 8 else 18. else break end elseif Nt < 12253 then
+Nr = UK[879.](function() Ds:FireServer(UK[626], Nq) end); Ns = Nr; Nt = if Ns then 16 else 9. elseif Nt < 12254 then Nr = Ns; NB = if Nr then UK[1292] else UK[650]; Nz = UK[1216] * NB + UK[1626.] * (UK[1292] - NB); Nt = 5 elseif Nt == 12254 then Nx = Nw; Nt = 14
+else Nt = 12249.; continue end elseif Nt < 12260 then if Nt < 12259 then if Nt < 12257 then if Nt < 12256 then if Nt == 12255. then return Nr else Nt = 12247; continue end else Nt = if Ns then 0. else 3. end elseif Nt < 12258. then if Nt == 12257 then NA = UK[532] * NB + UK[711.] * (UK[1292] - NB);
+Nt = 15. else Nt = 12247; continue end elseif Nt == 12258. then Nw += UK[1292]; Nt = 12. else Nt = 12246.; continue end elseif Nt == 12259 then Nt = 4 else Nt = 12261.; continue end elseif Nt < 12427 then if Nt < 12262 then if Nt < 12261. then if Nt == 12260 then
+Nr = UK[650]; Nt = 7 else Nt = 12257; continue end elseif Nt == 12261. then Nq = {}; Nr = math.min(UK[2008], #kF); Nw = UK[1292]; Nu = Nr; Nt = 12. else Nt = 12256; continue end elseif Nt == 12262 then table.insert(Nq, Nr); Nt = 3. else Nt = 12250; continue
+end else break end end end end; adSell_sellOneBatch = WY[265]; adSell_anyEnabled = WY[992]; c = WY[1409]; b = WY[290]; i = WY[1414]; sz = WY[1053.]; hexToRgb = WY[973]; rgbToHex = WY[1851.]; lerp = WY[385]; createGradientText = WY[1973]; createMultiGradientText = WY[1088];
+C6 = { [WY[647]] = { WY[53], WY[661], WY[503] }, [WY[1457]] = { WY[226], WY[1494.], WY[1541] }, [WY[943]] = { WY[661], WY[738.], WY[345.] }, [WY[1736]] = { WY[1927], WY[1289], WY[1582] }, [WY[1406]] = { WY[865], WY[49], WY[1607] }, [WY[547]] = { WY[1318], WY[602],
+WY[345.] } }; formatNumber = WY[1105]; formatDuration = WY[1941.]; gradPlus = WY[1311.]; U2[4] = WY[15.]; De = WY[1028]; Ev = 885. elseif Ev == 2905 then Ev = 401 else Ev = 4009; continue end elseif Ev == 2906 then Ev = 810. else Ev = 3202; continue end elseif Ev < 2908 then
+if Ev == 2907. then Ev = if (U2[26] * UK[1288] + UK[1756]) % UK[1060] == UK[1756] then 937 else 989 else Ev = 2840; continue end else local WY = UK; D2 = WY[1185.]:GetService(WY[1173.]); D8 = WY[1185.]:GetService(WY[35]); Ev = 1266. end elseif Ev < 2915 then
+if Ev < 2912 then if Ev < 2910. then U2[26] = nil; local WY = UK; U2[26] = WY[327.] - WY[1165]; U2[26] = WY[650] + WY[1292]; Ev = 1116. elseif Ev < 2911 then Ev = 452 elseif Ev == 2911 then Ev = if (U2[10] * UK[1337] + UK[327.]) % UK[206] == UK[466] then 231. else 1221.
+else Ev = 3694; continue end elseif Ev < 2914 then if Ev < 2913. then if Ev == 2912 then Ev = 504. else Ev = 3811; continue end elseif Ev == 2913. then Ev = 921. else Ev = 3734; continue end elseif Ev == 2914 then Ev = if (U2[20] * UK[1165] + UK[1292]) * UK[1628] % UK[327.] == ((U2[20] * UK[1165] + UK[1292]) * UK[1628] + (UK[1413.] + UK[2008])) % UK[327.] then 1036 else 352
+else Ev = 3645.; continue end elseif Ev < 2917 then if Ev < 2916. then Ev = 385 elseif Ev == 2916. then U2[20] = (U2[20] + UK[1288]) % UK[4]; Ev = 487 else Ev = 3862; continue end elseif Ev < 2918 then Ev = 1060 else Ev = 106 end elseif Ev < 2999 then if Ev < 2961. then
+if Ev < 2939 then if Ev < 2930 then if Ev < 2924 then if Ev < 2922. then if Ev < 2921 then if Ev < 2920 then if Ev == 2919. then Ev = if U2[18.] <= UK[2008] then 1006 else 623 else Ev = 2766.; continue end else U2[20] = (U2[18.] * UK[1292] + UK[1292]) % UK[2008] + UK[1292];
+Ev = 1103 end else Ev = if true then 289 else 361 end elseif Ev < 2923 then if Ev == 2922. then DU = UK[1579]; Ev = 265 else Ev = 3763; continue end else Ev = 1164. end elseif Ev < 2928. then if Ev < 2927 then if Ev < 2926 then if Ev < 2925. then if Ev == 2924 then
+U2[26], U2[20] = nil, nil; U2[20] = UK[1292]; Ev = 93. else Ev = 3948.; continue end else local WY = UK; C8 = U2[14]:WaitForChild(WY[125]); C2 = {}; CZ = {}; CV = { [WY[1710.]] = WY[1292], [WY[1403]] = WY[2008], [WY[37]] = WY[1165], [WY[695]] = WY[327.], [WY[1742]] = WY[633.],
+[WY[1612]] = WY[1579] }; WY[879.](WY[429.]); WY[879.](WY[933.]); Eg = false; Ev = 861. end elseif Ev == 2926 then Ev = 1164. else Ev = 3226; continue end elseif Ev == 2927 then Ev = if U2[20] <= UK[1292] then 552. else 954. else Ev = 3859; continue end elseif Ev < 2929 then
+local WY = UK; ad_isDungeonComplete = WY[799]; ad_isDungeonNotStarted = WY[1155.]; ad_cancelTween = WY[473]; function ad_resetPhysics() local Ho; Ho = nil; local Hp = nil; local Hq = nil; Hq = 1; while true do Hq = 13570 - Hq; do if Hq < 12999. then break elseif Hq < 13568 then
+if Hq < 13566. then if Hq < 13565 then break elseif Hq == 13565 then Hp:ChangeState(UK[1209.][UK[1870]][UK[309.]]); Hq = 3. else Hq = 2764; continue end elseif Hq < 13567 then return elseif Hq == 13567 then Hq = 2 else Hq = 2764; continue end elseif Hq < 13570 then
+if Hq < 13569. then break else Ho = ad_getHRP(); Hq = if not Ho then 4 else 0. end elseif Hq < 14532. then if Hq == 13570 then local XC = UK; Ho[XC[273.]] = XC[1618][XC[958]]; Ho[XC[1533.]] = XC[1618][XC[958]]; XC[879.](function() Ho[UK[829]] = UK[1618][UK[958]]
+end); XC[879.](function() Ho[UK[899]] = UK[1618][UK[958]] end); Hp = getHumanoid(); Hq = if Hp then 5 else 3. else break end else break end end end end; ad_directTeleport = WY[919]; function ad_tweenTo(en, eo) local HA, HB, HC, HD, HE, HF = nil, nil, nil, nil, nil, nil;
+local HH = nil; HH = 4; while true do HH = 14122 - HH; do if HH < 14114 then if HH < 11647 then break elseif HH < 14112. then if HH < 14111 then break else HF = HE; HH = 9. end elseif HH < 14113 then if HH == 14112. then HF = HE; HE = math.clamp(HD / HF, UK[1505], UK[1165]);
+HA = UK[812][UK[1182.]](HE, UK[1209.][UK[108.]][UK[1290.]], UK[1209.][UK[1540]][UK[391]]); HD, HB = UK[879.](function() return D2:Create(HC, HA, { [UK[1077.]] = en }) end); HE = not HB; HF = not HD; HH = if HF then 9. else 11 else HH = 7977.; continue end elseif HH == 14113 then
+HH = if HF then 0. else 1 else HH = 14121.; continue end elseif HH < 14118. then if HH < 14116 then if HH < 14115. then if HH == 14114 then return else HH = 14117; continue end else HD = (en[UK[2060]] - HC[UK[2060]])[UK[1142]]; HH = if HD < UK[1292] then 8 else 6.
+end elseif HH < 14117 then ad_cancelTween(); HE = eo; HH = if HE then 10 else 3. else return end elseif HH < 14120 then if HH < 14119 then if HH == 14118. then HC = ad_getHRP(); HH = if not HC then 5 else 7 else HH = 14117; continue end elseif HH == 14119 then
+HE = Dz; HH = 10 else HH = 14120; continue end elseif HH < 14121. then break elseif HH < 14122 then CK = HB; HB[UK[907]]:Connect(function(eE) local Hu, Hv, Hw, Hx, Hy, Hz = nil, nil, nil, nil, nil, nil; local Ht = nil; Ht = 7; while true do Ht = 7506. - Ht;
+do if Ht < 7503. then if Ht < 7499 then break elseif Ht < 7501 then if Ht < 7500. then local XD = UK; Hw = if eE == XD[1209.][XD[1661]][XD[907]] then XD[1292] else XD[650]; Hu = XD[1024] * Hw + XD[409] * (XD[1292] - Hw); Ht = 6. elseif Ht == 7500. then Hv = UK[971] * Hw + UK[1534] * (UK[1292] - Hw);
+Ht = 2 else Ht = 9897.; continue end elseif Ht < 7502 then if Ht == 7501 then ad_resetPhysics(); Ht = 3. else Ht = 4305.; continue end elseif Ht == 7502 then CK = nil; Ht = 0. else Ht = 288.; continue end elseif Ht < 8336 then if Ht < 7505 then if Ht < 7504 then
+if Ht == 7503. then local XD = UK; Hz = if CK == HB then XD[1292] else XD[650]; Hx = XD[1588] * Hz + XD[2031.] * (XD[1292] - Hz); Hy = XD[1702] * Hz + XD[1675] * (XD[1292] - Hz); Ht = if (Hx * XD[1308.] + Hy * XD[333.] + Hx * Hy) % XD[1264] == XD[1107.] then 4 else 0.
+else Ht = 1861; continue end elseif Ht == 7504 then Ht = if (Hu * UK[250] + Hv * UK[399.] + Hu * Hv) % UK[1264] == UK[543.] then 5 else 3. else Ht = 7502; continue end elseif Ht < 7506. then break elseif Ht == 7506. then Ht = 1 else break end else break end
+end end end); HB:Play(); return HB elseif HH == 14122 then return else HH = 14112.; continue end end end end; ad_moveTo = WY[1275.]; function ad_pathfindTweenTo(eJ, eK) local HJ; local HK; HJ = nil; HK = nil; local HM, HN, HO, HP, HQ, HS, HT, HU, HV = nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local HR = nil; HR = 11; while true do HR = 10967 - HR; do if HR < 10966 then if HR < 10956. then if HR < 10955 then if HR < 8425 then break elseif HR < 9536 then break elseif HR < 10954 then break elseif HR == 10954 then HR = if HM then 9. else 6. else HR = 10955;
+continue end else HN = #HM; HT = false; for eV = UK[2008], HN do local HL = nil; HU = eV; local HS = nil; local XE = UK; HS = XE[1579]; while true do if HS < 8 then if HS < 4 then if HS < 2 then if HS < 1 then HO = tick() - HN < HQ + XE[1317.]; HS = XE[1165]
+else HV = HU; XE[879.](function() HL:Cancel() end); CK = nil; HS = XE[2008] end elseif HS < 3. then HS = XE[1149.] else HS = if HO then XE[1060] else XE[1478] end elseif HS < 6. then if HS < 5 then HT = true; HS = XE[1149.] else HO = HL[XE[1661]] == XE[1209.][XE[1661]][XE[210.]];
+HS = if HO then XE[650] else XE[1165] end elseif HS < 7 then HS = if DJ[XE[1902.]] then XE[1756] else XE[1288] else HS = XE[1413.] end elseif HS < 12. then if HS < 10 then if HS < 9. then HP = (HN[XE[2060]] - HO)[XE[1142]]; HS = if HP > XE[419] then XE[1143.] else XE[2008]
+else return false end elseif HS < 11 then return false else HS = XE[1292] end elseif HS < 14 then if HS < 13 then HS = if true then XE[633.] else XE[1292] else break end elseif HS < 15. then HQ = HP / eK; HP = XE[812][XE[1182.]](HQ, XE[1209.][XE[108.]][XE[1384]], XE[1209.][XE[1540]][XE[391]]);
+local XF = XE[359][XE[1182.]]; HL = D2:Create(HN, HP, { [XE[1077.]] = XE[1207](HO) }); CK = HL; HL:Play(); HN = tick(); HS = XE[1413.] elseif HS < 16 then HV = HU; HN = HM[HV]; local XG = XE[1618][XE[1182.]]; HO = HN[XE[2060]] + XE[1417](XE[650], XE[1165], XE[650]);
+HN = ad_getHRP(); HS = if not HN then XE[1620.] else XE[749] else local XH = XE[1957][XE[438.]]; XE[1433](); HS = XE[597.] end end; if HT then break end end; HN = ad_getHRP(); HR = if HN then 2 else 0. end elseif HR < 10961 then if HR < 10958 then if HR < 10957 then
+HJ = ad_getHRP(); HR = if not HJ then 8 else 1 elseif HR == 10957 then HM = HK[UK[485]] ~= UK[1209.][UK[1325]][UK[638]]; HR = 13 else HR = 10958; continue end elseif HR < 10959. then if HR == 10958 then return false else HR = 10956.; continue end elseif HR < 10960 then
+return false elseif HR == 10960 then HM = UK[978.]; HR = 4 else HR = 10959.; continue end elseif HR < 10963 then if HR < 10962. then HM = HK:GetWaypoints(); HR = if #HM < UK[2008] then 3. else 12. else break end elseif HR < 10964 then if HR == 10963 then eK = HM;
+local XE = UK; HK = Dr:CreatePath({ [XE[666.]] = XE[1165], [XE[389]] = XE[633.], [XE[1058]] = true, [XE[437]] = XE[749], [XE[435.]] = XE[978.], [XE[682]] = XE[327.] }); HN, HM = XE[879.](function() HK:ComputeAsync(HJ[UK[2060]], eJ) end); HM = not HN; HR = if HM then 13 else 10
+else HR = 1929.; continue end elseif HR < 10965. then if HR == 10964 then return false else HR = 10965.; continue end elseif HR == 10965. then local XI = UK[1618][UK[1182.]]; HN[UK[1077.]] = UK[359][UK[1182.]](eJ + UK[1417](UK[650], UK[1165], UK[650])); HR = 0.
+else HR = 10957; continue end elseif HR < 11804 then if HR < 10967 then if HR == 10966 then HM = eK; HR = if HM then 4 else 7 else HR = 8425; continue end elseif HR == 10967 then return true else HR = 10956.; continue end else break end end end end; adf_isEnemyAlive = WY[149];
+adf_getEnemyPart = WY[412]; adf_getEnemies = WY[92]; adf_isValidTarget = WY[368]; adf_pickTarget = WY[629]; adTP_getNearestTeleportPad = WY[127]; function adf_checkAndHandleTeleportPad() local IR, IS, IT, IU, IV, IW, IY, IZ, I_, I0, I1, I2 = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local IX = nil; IX = 11; while true do IX = 16296. - IX; do if IX < 16283 then if IX < 12828. then break elseif IX < 16279 then if IX < 15142 then break elseif IX < 16278. then break else IS = ad_getHRP(); I_ = if not IS then UK[1292] else UK[650]; IY = UK[342.] * I_ + UK[1934] * (UK[1292] - I_);
+IZ = UK[1946] * I_ + UK[198.] * (UK[1292] - I_); IX = if (IY * UK[871] + IZ * UK[1663] + IY * IZ) % UK[1264] == UK[1227.] then 5 else 14 end elseif IX < 16281. then if IX < 16280 then return true else CK = IV; IV[UK[907]]:Connect(function() CK = nil; ad_resetPhysics();
+local XJ = UK[1957][UK[438.]]; UK[1433](UK[1576]); CS = nil; CW = nil; CI = false end); IV:Play(); return true end elseif IX < 16282 then if IX == 16281. then IW = IV <= UK[1439]; IX = 3. else IX = 10444; continue end else IU, IV = adTP_getNearestTeleportPad();
+IW = IU; IX = if IW then 15. else 3. end elseif IX < 16290. then if IX < 16286 then if IX < 16284. then if IX == 16283 then IX = if (I0 * UK[161] + I1 * UK[269] + I0 * I1) % UK[1264] == UK[951.] then 2 else 4 else IX = 16294; continue end elseif IX < 16285 then
+if IX == 16284. then return false else IX = 15142; continue end elseif IX == 16285 then IX = if CI then 17 else 6. else IX = 10444; continue end elseif IX < 16288 then if IX < 16287. then I1 = UK[554] * I2 + UK[1811] * (UK[1292] - I2); IX = 13 elseif IX == 16287. then
+IX = if IW then 16 else 1 else IX = 16285; continue end elseif IX < 16289 then break elseif IX == 16289 then IX = 4 else IX = 16279; continue end elseif IX < 16293. then if IX < 16291 then IX = if #adf_getEnemies() > UK[650] then 12. else 18. elseif IX < 16292 then
+return false else return false end elseif IX < 16295 then if IX < 16294 then I2 = if IW then UK[1292] else UK[650]; I0 = UK[2070.] * I2 + UK[831.] * (UK[1292] - I2); IX = 10 elseif IX == 16294 then CI = true; ad_cancelTween(); local XK = UK[1618][UK[1182.]];
+IR = UK[359][UK[1182.]](IU[UK[2060]] + UK[1417](UK[650], IU[UK[2013.]][UK[2043.]] / UK[2008] + UK[1165], UK[650])); IU = math.clamp(IV / UK[978.], UK[192.], UK[2051]); IT = UK[812][UK[1182.]](IU, UK[1209.][UK[108.]][UK[1384]]); IU, IV = UK[879.](function()
+return D2:Create(IS, IT, { [UK[1077.]] = IR }) end); IW = IU; IX = if IW then 0. else 9. else IX = 16282; continue end elseif IX < 16296. then if IX == 16295 then CI = false; IX = 7 else IX = 7112; continue end else IW = IV; IX = 9. end end end end; adf_stopMovement = WY[61];
+function adf_startMovement() local Je = nil; Je = 3.; while true do Je = 4098. - Je; do if Je < 6848 then if Je < 4097 then if Je < 4095. then break elseif Je < 4096 then if Je == 4095. then Je = if CO then 1 else 0. else Je = 74; continue end else break end
+elseif Je < 4098. then if Je == 4097 then return else Je = 4096; continue end elseif Je < 4557. then if Je == 4098. then local XL = UK; CM = XL[650]; CI = false; CO = D8[XL[1236.]]:Connect(function(gj, gk) local Jb, Jc = nil, nil; local Jd = nil; Jd = 7; while true do
+Jd = 11420 - Jd; do if Jd < 11412. then if Jd < 11404 then if Jd < 11400. then break elseif Jd < 11402 then if Jd < 11401 then if Jd == 11400. then Jd = if Jb then 13 else 14 else Jd = 14323; continue end elseif Jd == 11401 then return else Jd = 10883; continue
+end elseif Jd < 11403. then function calculateTargetCFrame(gs) local I4, I5, I6, I8, I9, Ja = nil, nil, nil, nil, nil, nil; local I7 = nil; I7 = 9.; while true do I7 = 12335 - I7; do if I7 < 12326 then if I7 < 12319 then if I7 < 10688 then break elseif I7 < 11540 then
+break elseif I7 < 12318. then break else local XM = UK; I6 = gs[XM[1077.]][XM[1407.]] * -XM[1579]; I5 = XM[359][XM[1182.]](I4 + I6, I4); I7 = 12. end elseif I7 < 12322 then if I7 < 12320 then I7 = if D4 == UK[1183] then 17 else 2 elseif I7 < 12321. then if I7 == 12320 then
+I7 = 8 else I7 = 12321.; continue end else break end elseif I7 < 12324. then if I7 < 12323 then if I7 == 12322 then local XN = UK[1618][UK[1182.]]; local XM = UK; I6 = I4 - XM[1417](XM[650], DR, XM[650]); I5 = XM[359][XM[1182.]](I6, I4); I7 = 15. else I7 = 11540;
+continue end elseif I7 == 12323 then I7 = 4 else I7 = 12321.; continue end elseif I7 < 12325 then return nil elseif I7 == 12325 then local XM = UK; CM = (CM + DL * gk) % (math.pi * XM[2008]); local XO = XM[1618][XM[1182.]]; I6 = I4 + XM[1417](math.cos(CM) * DF, DR, math.sin(CM) * DF);
+I5 = XM[359][XM[1182.]](I6, I4); I7 = 4 else I7 = 12332; continue end elseif I7 < 12333. then if I7 < 12329 then if I7 < 12327. then local XM = UK; Ja = if not gs then XM[1292] else XM[650]; I8 = XM[1435] * Ja + XM[4] * (XM[1292] - Ja); I9 = XM[1911.] * Ja + XM[1692.] * (XM[1292] - Ja);
+I7 = if (I8 * XM[454] + I9 * XM[119] + I8 * I9) % XM[1264] == XM[1067] then 11 else 6. elseif I7 < 12328 then I7 = 12. elseif I7 == 12328 then local XP = UK[1618][UK[1182.]]; I5 = UK[359][UK[1182.]](I4 + UK[1417](UK[650], UK[650], UK[327.]), I4); I7 = 8 else
+I7 = 12322; continue end elseif I7 < 12331 then if I7 < 12330. then if I7 == 12329 then local XM = UK; I4 = gs[XM[2060]]; I5 = nil; I7 = if D4 == XM[699.] then 1 else 5 else I7 = 11540; continue end elseif I7 == 12330. then I7 = if D4 == UK[1048] then 10 else 16
+else I7 = 12320; continue end elseif I7 < 12332 then if I7 == 12331 then I7 = 0. else I7 = 12334; continue end else local XM = UK; Ja = if D4 == XM[2044] then XM[1292] else XM[650]; I8 = XM[1640] * Ja + XM[467] * (XM[1292] - Ja); I9 = XM[1912] * Ja + XM[146] * (XM[1292] - Ja);
+I7 = if (I8 * XM[868] + I9 * XM[1503.] + I8 * I9) % XM[1264] == XM[228.] then 13 else 15. end elseif I7 < 12813. then if I7 < 12334 then I7 = if D4 == UK[285.] then 7 else 3. elseif I7 < 12335 then if I7 == 12334 then local XQ = UK[1618][UK[1182.]]; local XM = UK;
+I6 = I4 + XM[1417](XM[650], DR, XM[650]); I5 = XM[359][XM[1182.]](I6, I4); I7 = 0. else I7 = 11540; continue end elseif I7 == 12335 then return I5 else I7 = 15780.; continue end else break end end end end; Jb = adf_getEnemies(); Jd = if #Jb > UK[650] then 1 else 11
+else Jb = ad_getHRP(); Jd = if not Jb then 0. else 18. end elseif Jd < 11408 then if Jd < 11406. then if Jd < 11405 then ad_moveTo(Jc); Jd = 15. else Jd = 6. end elseif Jd < 11407 then if Jd == 11406. then Jd = if Eb then 19 else 8 else Jd = 11420; continue
+end elseif Jd == 11407 then adf_stopMovement(); return else Jd = 15540.; continue end elseif Jd < 11410 then if Jd < 11409. then if Jd == 11408 then return else Jd = 11413; continue end elseif Jd == 11409. then CW = nil; Jd = if adf_checkAndHandleTeleportPad() then 4 else 2
+else Jd = 11400.; continue end elseif Jd < 11411 then if Jd == 11410 then CW = Jb[UK[1825]]; Jc = calculateTargetCFrame(Jb[UK[1394]]); Jd = if Jc then 16 else 15. else Jd = 11413; continue end else break end elseif Jd < 11420 then if Jd < 11416 then if Jd < 11414 then
+if Jd < 11413 then if Jd == 11412. then Jd = if CI then 12. else 17 else Jd = 15540.; continue end else Jb = DJ[UK[1902.]]; Jd = if Jb then 20 else 5 end elseif Jd < 11415. then Jd = 9. elseif Jd == 11415. then Jb = not isOn(UK[478]); Jd = 20 else Jd = 11401;
+continue end elseif Jd < 11418. then if Jd < 11417 then return elseif Jd == 11417 then return else Jd = 11404; continue end elseif Jd < 11419 then Jd = 6. else Jb = adf_pickTarget(); Jd = if not Jb then 3. else 10 end elseif Jd < 13543 then if Jd < 11861 then
+if Jd < 11704 then if Jd == 11420 then return else Jd = 11417; continue end else break end else break end else break end end end end); Je = 2 else break end else break end else break end end end end; function adeq_fire(gE, gF, gG) UK[879.](function() Ds:FireServer(gE, gF, gG)
+end) end; adeq_oldHP = WY[1543]; adeq_oldSTR = WY[312.]; adeq_oldMAG = WY[1622]; adeq_total = WY[1354]; adeq_isLoaded = WY[653]; adeq_waitForLoaded = WY[1312]; adeq_waitForSlot = WY[2072]; adeq_waitForUnequip = WY[1335.]; adeq_getInv = WY[618.]; adeq_getEquippedInSlot = WY[1109];
+adeq_collect = WY[1326.]; adeq_score = WY[912.]; function adeq_sort(hj, hk) table.sort(hj, function(hl, hm) local JQ, JR, JS, JU, JV, JW = nil, nil, nil, nil, nil, nil; local JT = nil; JT = 1; while true do JT = 8789 - JT; do if JT < 8781. then if JT < 8774 then
+if JT < 7766 then break elseif JT < 8772. then break elseif JT < 8773 then JT = if (JU * UK[2030] + JV * UK[54.] + JU * JV) % UK[1264] == UK[615.] then 0. else 11 else JQ = UK[650]; JT = 9. end elseif JT < 8777 then if JT < 8775. then if JT == 8774 then JR, JQ = adeq_total(hl), adeq_total(hm);
+JT = if JR ~= JQ then 4 else 7 else JT = 8784.; continue end elseif JT < 8776 then if JT == 8775. then JS = UK[2056]; JT = 8 else JT = 11406.; continue end elseif JT == 8776 then JR = tostring(JQ); JS = (hm:GetAttribute(UK[472])); JT = if JS then 8 else 14
+else JT = 8781.; continue end elseif JT < 8779 then if JT < 8778. then return JR > JQ elseif JT == 8778. then JQ = UK[650]; JT = 0. else JT = 11406.; continue end elseif JT < 8780 then break elseif JT == 8780 then JR = JQ; local XR = UK; JQ = (hm:GetAttribute(XR[1340]));
+JW = if JQ then XR[1292] else XR[650]; JU = XR[305] * JW + XR[800] * (XR[1292] - JW); JT = 3. else JT = 8777; continue end elseif JT < 8788 then if JT < 8784. then if JT < 8782 then if JT == 8781. then return JR < tostring(JS) else JT = 11406.; continue end
+elseif JT < 8783 then if JT == 8782 then JQ = (hl:GetAttribute(UK[1340])); JT = if JQ then 9. else 16 else JT = 8774; continue end else JQ = (hl:GetAttribute(UK[472])); JT = if JQ then 13 else 2 end elseif JT < 8786 then if JT < 8785 then return JR > JS else
+return JR > JQ end elseif JT < 8787. then JV = UK[1537] * JW + UK[1956.] * (UK[1292] - JW); JT = 17 else JQ = UK[2056]; JT = 13 end elseif JT < 10721 then if JT < 8789 then if JT == 8788 then JR, JQ = adeq_score(hl, hk), adeq_score(hm, hk); JT = if JR ~= JQ then 12. else 15.
+else JT = 11406.; continue end elseif JT < 9796 then if JT == 8789 then JS = JQ; JT = if JR ~= JS then 5 else 6. else break end else break end else break end end end end) end; adeq_fastPrime = WY[231.]; adeq_doEquipWeapon = WY[961]; adeq_doEquipArmor = WY[1685];
+adeq_doEquipHelmet = WY[214]; adeq_doEquipHeroes = WY[1899.]; adeq_collectSpells = WY[774.]; adeq_doEquipSpells = WY[244]; adeq_doEquipUltimate = WY[264.]; Dk[WY[1567]]:Connect(WY[1890.]); D0 = WY[633.]; Ev = 654. elseif Ev == 2929 then Ev = 1177 else Ev = 3273.;
+continue end elseif Ev < 2935 then if Ev < 2933 then if Ev < 2932 then if Ev < 2931. then if Ev == 2930 then U2[1] = (U2[20] * UK[1292] + UK[650]) % UK[2008] + UK[1292]; Ev = 48. else Ev = 3525.; continue end else Ev = 688 end else U2[20] = nil; local WY = UK;
+U2[20] = WY[327.] - WY[1165]; U2[20] = WY[1165] - WY[2008]; Ev = 501. end elseif Ev < 2934. then U2[14] = U2[26][UK[1477]]:AddLeftGroupbox(UK[2048], UK[886]); Ev = 305 elseif Ev == 2934. then Ev = if (U2[10] * UK[1288] + UK[1413.]) % UK[1060] == UK[1165] then 618. else 319
+else Ev = 3911; continue end elseif Ev < 2937. then if Ev < 2936 then if Ev == 2935 then local XS = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[26], UK[597.]), string.byte(tostring(U2[20]))), UK[466]); Ev = if bit32.bxor(bit32.lrotate(bit32.bxor(XS, UK[607]), UK[1060]), UK[510.]) ~= bit32.lrotate(XS, UK[1060]) then 939. else 1067
+else Ev = 3551; continue end elseif Ev == 2936 then Ev = 833 else Ev = 3892; continue end elseif Ev < 2938 then Ev = if (U2[20] * UK[633.] + UK[2008]) % UK[749] == UK[327.] then 146 else 322 elseif Ev == 2938 then Ev = 590 else Ev = 3889; continue end elseif Ev < 2950 then
+if Ev < 2945 then if Ev < 2943. then if Ev < 2942 then if Ev < 2941 then if Ev < 2940. then Ec, DV, Dj, CC, Cz, U2[10] = nil, nil, nil, nil, nil, nil; U2[10] = UK[206]; Ev = 634 else U2[26]:AddToggle(UK[294.], { [UK[592]] = UK[1363], [UK[181]] = false }); Ev = 1170.
+end elseif Ev == 2941 then U2[20] = (U2[20] + UK[1165]) % UK[749]; Ev = 849. else Ev = 3688; continue end else Ev = 972. end elseif Ev < 2944 then if Ev == 2943. then Ev = 270. else Ev = 3999.; continue end else Ev = 669. end elseif Ev < 2947 then if Ev < 2946. then
+Ev = if true then 45. else 756. else Ev = 1131. end elseif Ev < 2948 then if Ev == 2947 then Ev = 1101. else Ev = 3801.; continue end elseif Ev < 2949. then if Ev == 2948 then local WY = UK; U2[20] = (vector.create((U2[18.] * WY[327.] + WY[2008]) % WY[1478] + WY[1292], (U2[18.] * WY[1620.] + WY[1413.]) % WY[1149.] + WY[1292], (U2[18.] * WY[1165] + WY[2008]) % WY[1628] + WY[1292]));
+U2[26] = (vector.create((U2[18.] * WY[2008] + WY[1579]) % WY[1478] + WY[1292], (U2[18.] * WY[1756] + WY[749]) % WY[1149.] + WY[1292], (U2[18.] * WY[1149.] + WY[1060]) % WY[1628] + WY[1292])); U2[12.] = (vector.create((U2[18.] * WY[1165] + WY[749]) % WY[1478] + WY[1292], (U2[18.] * WY[749] + WY[633.]) % WY[1149.] + WY[1292], (U2[18.] * WY[1292] + WY[1478]) % WY[1628] + WY[1292]));
+U2[22] = (vector.create((U2[18.] * WY[1579] + WY[1620.]) % WY[1478] + WY[1292], (U2[18.] * WY[2008] + WY[1149.]) % WY[1149.] + WY[1292], (U2[18.] * WY[1288] + WY[1620.]) % WY[1628] + WY[1292])); Ev = if vector.dot(vector.cross(U2[20], U2[26]), (vector.cross(U2[12.], U2[22]))) == vector.dot(U2[20], U2[12.]) * vector.dot(U2[26], U2[22]) - vector.dot(U2[20], U2[22]) * vector.dot(U2[26], U2[12.]) + WY[1165] then 1017. else 1143.
+else Ev = 3894.; continue end elseif Ev == 2949. then U2[20], U2[26] = nil, nil; U2[26] = UK[2008]; Ev = 736 else Ev = 2852; continue end elseif Ev < 2957 then if Ev < 2954 then if Ev < 2953 then if Ev < 2952. then if Ev < 2951 then if Ev == 2950 then U2[18.], U2[10] = nil, nil;
+U2[10] = UK[1478]; Ev = 755 else Ev = 3474.; continue end else Ev = 1182. end elseif Ev == 2952. then Ev = 740 else Ev = 3840.; continue end elseif Ev == 2953 then U2[26] = nil; local WY = UK; U2[26] = WY[2008] - WY[1292]; U2[26] = WY[327.] - WY[1165]; U2[26] = WY[633.] - WY[327.];
+Ev = 973 else Ev = 3621.; continue end elseif Ev < 2955. then if Ev == 2954 then Ed = false; D6 = {}; D_ = {}; Ev = 308 else Ev = 3769; continue end elseif Ev < 2956 then Ev = 5 else Ev = 161 end elseif Ev < 2959 then if Ev < 2958. then if Ev == 2957 then Ev = 611
+else Ev = 3325; continue end else Ev = if U2[20] * UK[1277] + UK[1165] + UK[327.] >= U2[20] * UK[1277] + UK[1165] + UK[327.] + UK[1292] then 1122. else 1176. end elseif Ev < 2960 then if Ev == 2959 then U2[16] = (U2[20] * UK[597.] + UK[633.]) % UK[1664] + UK[1292];
+Ev = 958 else Ev = 2843; continue end else Ev = 364 end elseif Ev < 2981 then if Ev < 2971 then if Ev < 2966 then if Ev < 2964. then if Ev < 2963 then if Ev < 2962 then local WY = UK; U2[20] = (vector.create((U2[10] * WY[597.] + WY[327.]) % WY[1478] + WY[1292], (U2[10] * WY[633.] + WY[597.]) % WY[1149.] + WY[1292], (U2[10] * WY[327.] + WY[1579]) % WY[1628] + WY[1292]));
+U2[4] = (vector.create((U2[10] * WY[1165] + WY[1620.]) % WY[1478] + WY[1292], (U2[10] * WY[1756] + WY[1165]) % WY[1149.] + WY[1292], (U2[10] * WY[327.] + WY[1620.]) % WY[1628] + WY[1292])); U2[26] = (vector.create((U2[10] * WY[597.] + WY[1579]) % WY[1478] + WY[1292], (U2[10] * WY[1579] + WY[1413.]) % WY[1149.] + WY[1292], (U2[10] * WY[1288] + WY[749]) % WY[1628] + WY[1292]));
+U2[18.] = (vector.create((U2[10] * WY[327.] + WY[1292]) % WY[633.] + WY[1292], (U2[10] * WY[327.] + WY[2008]) % WY[597.] + WY[1292], (U2[10] * WY[633.] + WY[2008]) % WY[1620.] + WY[1292])); Ev = if vector.dot(vector.cross(U2[20], (vector.cross(U2[4], U2[26]))), U2[18.]) == vector.dot(U2[4] * vector.dot(U2[20], U2[26]) - U2[26] * vector.dot(U2[20], U2[4]), U2[18.]) then 63. else 996.
+else Ev = 420. end elseif Ev == 2963 then local WY = UK; U2[20]:AddToggle(WY[1751], { [WY[592]] = WY[877], [WY[181]] = false }); U2[20]:AddToggle(WY[1674.], { [WY[592]] = WY[1218.], [WY[181]] = false }); U2[20]:AddDivider(); U2[20]:AddButton({ [WY[592]] = WY[40],
+[WY[1441]] = WY[1070] }); U2[20]:AddButton({ [WY[592]] = WY[891.], [WY[1441]] = WY[1345] }); Ev = 677 else Ev = 2921; continue end elseif Ev < 2965 then Ev = 633. else Ev = 1149. end elseif Ev < 2969 then if Ev < 2968 then if Ev < 2967. then U2[26] = nil; local WY = UK;
+U2[26] = WY[1149.] - WY[1579]; U2[26] = WY[749] - WY[327.]; Ev = 234. else Ev = if (U2[20] * UK[2008] + UK[1165]) * UK[1060] % UK[1165] == ((U2[20] * UK[2008] + UK[1165]) * UK[1060] + (UK[650] + UK[2008])) % UK[1165] then 230 else 662 end else U2[26] = nil;
+local WY = UK; U2[26] = WY[1165] - WY[2008]; U2[26] = WY[650] + WY[1292]; U2[26] = WY[2008] - WY[1292]; U2[26] = WY[650] + WY[1292]; Ev = 449 end elseif Ev < 2970. then Ev = 356 elseif Ev == 2970. then local WY = UK; U2[10] = { WY[390.], WY[1293.], WY[1461.],
+WY[660.], WY[1634], WY[1321], WY[1816], WY[690.], WY[1859], WY[1367], WY[606.], WY[1350.] }; Ev = if U2[10][(U2[18.] * WY[303.] + WY[1060]) % WY[1413.] + WY[1292]] <= U2[10][(U2[18.] * WY[303.] + WY[1060]) % WY[1413.] + WY[1292]] then 252. else 1132 else Ev = 3102.;
+continue end elseif Ev < 2976. then if Ev < 2974 then if Ev < 2973. then if Ev < 2972 then Ev = 158 else U2[26]:AddButton({ [UK[592]] = UK[151], [UK[1441]] = UK[387.] }); Ev = 1040 end else Ev = 67 end elseif Ev < 2975 then if Ev == 2974 then Ev = if U2[1] <= UK[1165] then 550 else 430
+else Ev = 3565; continue end elseif Ev == 2975 then local XT = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[26], UK[597.]), string.byte(tostring(U2[20]))), UK[633.]); Ev = if bit32.bxor(bit32.lrotate(bit32.bxor(XT, UK[751]), UK[1609]), UK[239]) == bit32.lrotate(XT, UK[1609]) then 642. else 444.
+else Ev = 2928.; continue end elseif Ev < 2978 then if Ev < 2977 then if Ev == 2976. then Ev = if U2[10] * UK[1875.] + UK[1149.] + UK[327.] <= U2[10] * UK[1875.] + UK[1149.] + UK[327.] + UK[2008] then 399. else 423. else Ev = 3534.; continue end else U2[26] = U2[14][UK[1532]]:AddLeftGroupbox(UK[1667], UK[296]);
+Ev = 1089. end elseif Ev < 2979. then Ev = 935 elseif Ev < 2980 then if Ev == 2979. then U2[26], U2[20] = nil, nil; U2[20] = UK[650]; Ev = 782 else Ev = 3834.; continue end else Ev = 683 end elseif Ev < 2990 then if Ev < 2986 then if Ev < 2984 then if Ev < 2983 then
+if Ev < 2982. then U2[10] = (U2[10] + UK[1288]) % UK[1060]; Ev = 947 elseif Ev == 2982. then Ev = if U2[10] <= UK[1292] then 636. else 834. else Ev = 3664; continue end elseif Ev == 2983 then local WY = UK; U2[10]:AddToggle(WY[1019], { [WY[592]] = WY[1115],
+[WY[181]] = false, [WY[302]] = WY[292] }); U2[10]:AddToggle(WY[152], { [WY[592]] = WY[1715], [WY[181]] = false, [WY[302]] = WY[81.] }); U2[10]:AddDivider(); U2[10]:AddButton({ [WY[592]] = WY[1774], [WY[1441]] = WY[859] }); U2[10]:AddButton({ [WY[592]] = WY[1339],
+[WY[1441]] = WY[66.] }); U2[26] = U2[14][WY[750.]]:AddRightGroupbox(WY[955], WY[246.]); Ev = 830 else Ev = 2839; continue end elseif Ev < 2985. then if Ev == 2984 then Ev = 614 else Ev = 3852.; continue end else Ev = if (U2[20] * UK[1165] + UK[1292]) * UK[633.] % UK[327.] == ((U2[20] * UK[1165] + UK[1292]) * UK[633.] + UK[749]) % UK[327.] then 60. else 1021
+end elseif Ev < 2988. then if Ev < 2987 then Ev = if (U2[10] * UK[1165] + UK[1165]) % UK[1060] == UK[1165] then 292 else 992 elseif Ev == 2987 then Ev = 1073 else Ev = 3932; continue end elseif Ev < 2989 then if Ev == 2988. then Ev = 538 else Ev = 2932; continue
+end else U2[20] = (U2[20] + UK[633.]) % UK[1984]; Ev = 1196 end elseif Ev < 2995 then if Ev < 2993 then if Ev < 2992 then if Ev < 2991. then if Ev == 2990 then U2[20] = (U2[20] + UK[1149.]) % UK[206]; Ev = 888. else Ev = 2929; continue end else Ev = 85 end
+else Ev = 1084 end elseif Ev < 2994. then if Ev == 2993 then CB = {}; CE = {}; Ev = 37 else Ev = 3633.; continue end else local WY = UK; C3 = WY[512]; C9 = WY[535]; Ev = 665 end elseif Ev < 2997. then if Ev < 2996 then Ev = 744. else Ev = 836 end elseif Ev < 2998 then
+Ev = 701 else Ev = 520 end elseif Ev < 3040 then if Ev < 3019 then if Ev < 3010 then if Ev < 3004 then if Ev < 3002 then if Ev < 3001 then if Ev < 3000. then Ev = 1248. elseif Ev == 3000. then U2[1] = { UK[964], UK[1097], UK[164], UK[479], UK[1082], UK[410],
+UK[2015], UK[1580], UK[1411], UK[1969], UK[2057] }; Ev = 112 else Ev = 2814.; continue end elseif Ev == 3001 then Dr = UK[1185.]:GetService(UK[1015]); Ev = 814 else Ev = 3103; continue end elseif Ev < 3003. then if Ev == 3002 then U2[20] = (U2[20] + UK[1288]) % UK[4];
+Ev = 986 else Ev = 3003.; continue end else U2[26] = (U2[26] + UK[1165]) % UK[1060]; Ev = 694 end elseif Ev < 3008 then if Ev < 3007 then if Ev < 3006. then if Ev < 3005 then local WY = UK; WY[1368.], WY[1384], WY[892], WY[426.], WY[1037], WY[965], WY[648.], WY[888.], WY[1520], WY[1752.], WY[1211], WY[1902.], WY[438.], WY[1431.], WY[1918], WY[1858], WY[1289], WY[1588], WY[1349], WY[1477] = WY[1384], WY[1368.], WY[1902.], WY[1477], WY[1211], WY[1588], WY[1289], WY[888.], WY[1037], WY[426.], WY[1520], WY[1858], WY[1752.], WY[648.], WY[1918], WY[965], WY[1431.], WY[892], WY[1349], WY[438.];
+WY[1837], WY[331], WY[635], WY[1332.], WY[1086.], WY[312.], WY[67], WY[598], WY[60.], WY[670], WY[599], WY[1231], WY[162.], WY[1806.], WY[1331], WY[63.], WY[462.], WY[419], WY[1040] = WY[635], WY[1231], WY[598], WY[599], WY[312.], WY[1331], WY[1040], WY[419], WY[1837], WY[462.], WY[67], WY[60.], WY[63.], WY[162.], WY[1806.], WY[1332.], WY[1086.], WY[331], WY[670];
+WY[765.], WY[1596.], WY[122], WY[432.] = WY[432.], WY[122], WY[1596.], WY[765.]; WY[1743.], WY[1254.], WY[1262], WY[1714], WY[1773.], WY[1802], WY[1745], WY[455], WY[1143.], WY[543.], WY[471.], WY[1846], WY[1955], WY[941] = WY[471.], WY[1846], WY[1254.], WY[1714], WY[455], WY[1745], WY[543.], WY[1955], WY[941], WY[1262], WY[1802], WY[1743.], WY[1773.], WY[1143.];
+WY[1690], WY[969.], WY[438.], WY[318.], WY[1274], WY[1798], WY[917], WY[1875.], WY[95], WY[763], WY[733], WY[471.], WY[1095.], WY[617], WY[1711], WY[286], WY[1787], WY[1307], WY[887] = WY[438.], WY[917], WY[286], WY[1787], WY[887], WY[763], WY[318.], WY[1711], WY[1095.], WY[1690], WY[1307], WY[95], WY[617], WY[1274], WY[733], WY[1875.], WY[471.], WY[1798], WY[969.];
+WY[1596.], WY[1313], WY[218], WY[169], WY[924.], WY[1776.], WY[400], WY[258.], WY[442], WY[1765], WY[80], WY[86], WY[1912], WY[349] = WY[442], WY[80], WY[924.], WY[1765], WY[1776.], WY[349], WY[218], WY[169], WY[1313], WY[400], WY[86], WY[1912], WY[258.], WY[1596.];
+Cs, Ee, D8, D2, DW, DP, DI, DC, Dx, Dr, Dk, Dc, CR, U2[4], DJ, U2[7], U2[23], Dl, Dd, U2[14], DQ, DK, DD, Dy, Ds, Dm, Df, C8, C2, CZ, CV, Eg, Eb, D4, DY, DR, DL, DF, Dz, Dt, Dp, Dg, C9, C3, C_, CW, CS, CO, CM, CK, CI, CF, CD, CA, Cw, Cu, Eh, Ed, D6, D_, DT, DN, DH, DA, Dv, Dq, Di, Db, C5, C1, CY, CU, CQ, CN, CL, CJ, CH, CE, CB, Cx, U2[20] = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+U2[20] = WY[470]; Ev = 500 else Ev = 253 end else Ev = if true then 759. else 723. end elseif Ev == 3007 then U2[26] = (U2[26] + UK[633.]) % UK[1060]; Ev = 278 else Ev = 3032; continue end elseif Ev < 3009. then if Ev == 3008 then Ev = if U2[20] <= UK[1292] then 702. else 121
+else Ev = 3358; continue end else U2[26] = CP:AddLabel(b(UK[310]) .. c(UK[204.], UK[1289]), true); Ev = 16 end elseif Ev < 3015. then if Ev < 3013 then if Ev < 3012. then if Ev < 3011 then local WY = UK; U2[1]:AddDropdown(WY[526], { [WY[1977.]] = WY[1134.],
+[WY[181]] = WY[512], [WY[1697]] = U2[20], [WY[592]] = WY[326] }); U2[1]:AddToggle(WY[932], { [WY[592]] = WY[319], [WY[181]] = false }); U2[1]:AddDivider(); U2[1]:AddButton({ [WY[592]] = WY[1910], [WY[1441]] = WY[679] }); Ev = 878 else U2[26] = nil; local WY = UK;
+U2[26] = WY[2008] - WY[1292]; U2[26] = WY[2008] - WY[1292]; U2[26] = WY[633.] - WY[327.]; Ev = 455 end else Ev = if true then 892 else 681. end elseif Ev < 3014 then if Ev == 3013 then U2[14] = U2[10][UK[525.]]:AddLeftGroupbox(UK[1454], UK[166]); Ev = 1233.
+else Ev = 3577; continue end else Ev = 748 end elseif Ev < 3017 then if Ev < 3016 then if Ev == 3015. then U2[20] = (U2[20] + UK[633.]) % UK[1984]; Ev = 403 else Ev = 3754; continue end elseif Ev == 3016 then Ev = if U2[20] <= UK[1292] then 767 else 486. else
+Ev = 3655; continue end elseif Ev < 3018. then Ev = 502 else Ev = if U2[16] <= UK[1292] then 1124 else 174. end elseif Ev < 3030. then if Ev < 3025 then if Ev < 3022 then if Ev < 3021. then if Ev < 3020 then if Ev == 3019 then local WY = UK; U2[10] = { WY[628],
+WY[1358], WY[620], WY[1762], WY[625], WY[1844], WY[922], WY[1231], WY[1421], WY[779], WY[981.], WY[295] }; Ev = if U2[10][(U2[20] * WY[609.] + WY[1765]) % WY[1413.] + WY[1292]] <= U2[10][(U2[20] * WY[609.] + WY[1765]) % WY[1413.] + WY[1292]] then 1195 else 313
+else Ev = 3396.; continue end elseif Ev == 3020 then Ev = if U2[26] <= UK[1165] then 1092. else 1186 else Ev = 3630.; continue end else U2[14] = U2[26][UK[1990]]:AddLeftGroupbox(UK[1544], UK[353]); Ev = 962 end elseif Ev < 3024. then if Ev < 3023 then U2[10], U2[26], Du, Do, Dh, Da, C4, C0, CX, CT, CP, U2[20] = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+U2[20] = UK[1609]; Ev = 744. elseif Ev == 3023 then local XU = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[20], UK[466]), string.byte(tostring(CU))), UK[1405]); Ev = if bit32.bxor(bit32.bxor(bit32.bxor(bit32.bxor(bit32.band(XU, UK[1837]), UK[1691]), (bit32.bxor(bit32.band(XU, UK[1679]), UK[581]))), UK[1691]), UK[581]) ~= XU then 977 else 532
+else Ev = 3883; continue end else Ev = 910 end elseif Ev < 3027. then if Ev < 3026 then Ev = 720. elseif Ev == 3026 then U2[20] = (U2[10] * UK[1292] + UK[650]) % UK[2008] + UK[1292]; Ev = 607 else Ev = 2872; continue end elseif Ev < 3029 then if Ev < 3028 then
+if Ev == 3027. then U2[10], U2[18.] = nil, nil; U2[18.] = UK[1143.]; Ev = 1260. else Ev = 3880; continue end else Ev = if U2[20] <= UK[2008] then 1115 else 176 end else Ev = 1000 end elseif Ev < 3036. then if Ev < 3034 then if Ev < 3032 then if Ev < 3031 then
+Ev = 64 else Ev = if U2[16] <= UK[327.] then 256 else 554 end elseif Ev < 3033. then Ev = 773 elseif Ev == 3033. then Ev = 709 else Ev = 3838; continue end elseif Ev < 3035 then D8 = Ec[UK[1236.]]:Connect(UK[2071]); Ev = 325 else De = UK[1579]; Ev = 265 end
+elseif Ev < 3038 then if Ev < 3037 then if Ev == 3036. then local WY = UK; U2[20] = { WY[939.], WY[1483], WY[946], WY[600.], WY[1828], WY[674], WY[1018], WY[902], WY[988], WY[520], WY[1027] }; local XV = U2[10]; U2[26] = U2[20][XV % WY[1478] + WY[1292]]; Ev = if U2[26]:len() >= U2[26]:gsub(WY[1246], WY[298], XV % WY[1165] % WY[2008] + WY[1292]):len() then 936. else 463
+else Ev = 3760; continue end else Ev = 787 end elseif Ev < 3039. then Ev = 413 elseif Ev == 3039. then U2[10] = (U2[10] + UK[1756]) % UK[206]; Ev = 603. else Ev = 3230; continue end elseif Ev < 3061 then if Ev < 3051. then if Ev < 3045. then if Ev < 3043 then
+if Ev < 3042. then if Ev < 3041 then if Ev == 3040 then local WY = UK; U2[26] = { WY[734], WY[1348], WY[121], WY[1528], WY[1880], WY[798.], WY[26], WY[1139], WY[1301], WY[41] }; local XW = U2[20]; U2[10] = U2[26][XW % WY[1756] + WY[1292]]; Ev = if U2[10]:len() <= U2[10]:reverse():rep(XW % WY[1165] + WY[2008]):len() then 437 else 1154
+else Ev = 3599; continue end elseif Ev == 3041 then Ev = 736 else Ev = 4000; continue end elseif Ev == 3042. then Ev = 974 else Ev = 3277; continue end elseif Ev < 3044 then if Ev == 3043 then U2[26] = (U2[26] + UK[597.]) % UK[1456]; Ev = 273. else Ev = 3010;
+continue end else Ev = 906. end elseif Ev < 3049 then if Ev < 3047 then if Ev < 3046 then Ev = 1079 else U2[10] = nil; local WY = UK; U2[10] = WY[633.] - WY[327.]; U2[10] = WY[650] + WY[1292]; U2[10] = WY[2008] - WY[1292]; Ev = 699. end elseif Ev < 3048. then
+if Ev == 3047 then Ev = 466 else Ev = 3127; continue end elseif Ev == 3048. then U2[10] = nil; local WY = UK; U2[10] = WY[633.] - WY[327.]; U2[10] = WY[650] + WY[1292]; U2[10] = WY[327.] - WY[1165]; U2[10] = WY[650] + WY[1292]; U2[10] = WY[2008] - WY[1292];
+Ev = 1055 else Ev = 3159.; continue end elseif Ev < 3050 then Ev = 629 elseif Ev == 3050 then Ev = 1194. else Ev = 3287; continue end elseif Ev < 3057. then if Ev < 3054. then if Ev < 3053 then if Ev < 3052 then local XX = UK[1957][UK[394]]; local WY = UK;
+WY[1383.](function() local O; local N = UK[1241]; local M = UK[826]; O = UK[144.]; UK[879.](function() local XY = UK[1185.][UK[1039]]; O = UK[1185.]:GetService(UK[582.]):GetProductInfo(UK[1616])[UK[821]] end); local U = { [UK[1510]] = { { [UK[816.]] = UK[1842.],
+[UK[73]] = UK[88], [UK[2040.]] = { { [UK[1590.]] = UK[989], [UK[536]] = Dk[UK[821]], [UK[1511]] = true }, { [UK[1590.]] = UK[242], [UK[536]] = Dc, [UK[1511]] = true }, { [UK[1590.]] = UK[1968.], [UK[536]] = O, [UK[1511]] = true }, { [UK[1590.]] = UK[1725.],
+[UK[536]] = tostring(#Cs:GetPlayers()), [UK[1511]] = true } }, [UK[689]] = { [UK[221]] = UK[1057] .. os[UK[1782.]](UK[1450]) } } } }; UK[879.](function() request({ [UK[938]] = M, [UK[585.]] = UK[1101.], [UK[1378]] = { [UK[880]] = UK[343] }, [UK[150.]] = DC:JSONEncode({ [UK[177.]] = N,
+[UK[745]] = U }) }) end) end); U2[4] = WY[792.]; Ev = 190 else Ev = if U2[16] <= UK[597.] then 733 else 3. end elseif Ev == 3053 then local WY = UK; Dz = WY[1862]; DL = WY[1143.]; DF = WY[795.]; Ev = 105. else Ev = 3404; continue end elseif Ev < 3056 then if Ev < 3055 then
+Ev = 1080. else DT = {}; Ev = 9. end elseif Ev == 3056 then Ev = 842 else Ev = 2888; continue end elseif Ev < 3059 then if Ev < 3058 then Ev = if ((Dx or CE) and (not Dx and CE) or (not Dx or not Dx) and (Dx and Dx)) and ((Dx and not CE or CE and not CE) and (not Dx and not Dx and (not Dx and CE))) or (Dx or Dx or not Dx and Dx) and (not Dx and Dx or Dx and not CE) and ((not Dx and not CE or (CE or not CE)) and (not Dx and Dx or not CE and not CE)) or not (((Dx or CE) and (not Dx and CE) or (not Dx or not Dx) and (Dx and Dx)) and ((Dx and not CE or CE and not CE) and (not Dx and not Dx and (not Dx and CE))) or (Dx or Dx or not Dx and Dx) and (not Dx and Dx or Dx and not CE) and ((not Dx and not CE or (CE or not CE)) and (not Dx and Dx or not CE and not CE))) then 336. else 608
+else Ev = 1148 end elseif Ev < 3060. then if Ev == 3059 then Ev = 906. else Ev = 2904.; continue end elseif Ev == 3060. then Ev = 1044. else Ev = 2927; continue end elseif Ev < 3070 then if Ev < 3066. then if Ev < 3064 then if Ev < 3063. then if Ev < 3062 then
+if Ev == 3061 then local WY = UK; U2[26] = { WY[703], WY[1255], WY[1091], WY[1538], WY[1369], WY[866], WY[83], WY[1834], WY[718] }; local XZ = U2[20]; U2[10] = U2[26][XZ % WY[1620.] + WY[1292]]; Ev = if U2[10]:len() <= U2[10]:gsub(WY[1246], WY[298], XZ % WY[1165] % WY[2008] + WY[1292]):len() then 635 else 1197.
+else Ev = 2959; continue end elseif Ev == 3062 then Ev = 927. else Ev = 3371; continue end else Ev = 776 end elseif Ev < 3065 then Ev = if not D8 and not U2[20] or (CJ or not U2[20]) or DW and CJ and (not DK and not CJ) or not (not D8 and not U2[20] or (CJ or not U2[20]) or DW and CJ and (not DK and not CJ)) then 411. else 1
+else local WY = UK; U2[20] = (vector.create((U2[10] * WY[327.] + WY[327.]) % WY[1478] + WY[1292], (U2[10] * WY[1620.] + WY[327.]) % WY[1149.] + WY[1292], (U2[10] * WY[1149.] + WY[1478]) % WY[1628] + WY[1292])); U2[26] = (vector.create((U2[10] * WY[2008] + WY[633.]) % WY[1478] + WY[1292], (U2[10] * WY[749] + WY[327.]) % WY[1149.] + WY[1292], (U2[10] * WY[1292] + WY[2008]) % WY[1628] + WY[1292]));
+local X_ = vector.dot(U2[20], U2[26]); Ev = if X_ * X_ >= vector.dot(U2[20], U2[20]) * vector.dot(U2[26], U2[26]) + WY[1292] then 373 else 1146. end elseif Ev < 3068 then if Ev < 3067 then if Ev == 3066. then local WY = UK; U2[18.]:AddToggle(WY[1822], { [WY[592]] = WY[717.],
+[WY[181]] = false }); U2[18.]:AddToggle(WY[656], { [WY[592]] = WY[575], [WY[181]] = false }); U2[18.]:AddToggle(WY[17], { [WY[592]] = WY[1574], [WY[181]] = false }); U2[18.]:AddToggle(WY[662], { [WY[592]] = WY[1390], [WY[181]] = false }); U2[18.]:AddToggle(WY[972.], { [WY[592]] = WY[1556],
+[WY[181]] = false }); Ev = 453. else Ev = 2928.; continue end else Ev = 454 end elseif Ev < 3069. then U2[20] = (U2[20] + UK[1292]) % UK[749]; Ev = 26 elseif Ev == 3069. then Ev = 764 else Ev = 3644; continue end elseif Ev < 3075. then if Ev < 3073 then if Ev < 3072. then
+if Ev < 3071 then if Ev == 3070 then Ev = if (U2[20] * UK[1478] + UK[650]) % UK[1060] == UK[633.] then 708. else 68 else Ev = 2807; continue end elseif Ev == 3071 then Ev = if U2[16] <= UK[1222] then 464 else 199 else Ev = 3347; continue end elseif Ev == 3072. then
+Ev = if U2[16] <= UK[1628] then 859 else 1064 else Ev = 3484; continue end elseif Ev < 3074 then local X0 = UK[1957][UK[394]]; UK[1383.](UK[1723]); Ev = 585. else U2[26] = { UK[1161.], UK[2034.], UK[85], UK[69.], UK[1796], UK[1047.], UK[163] }; Ev = 801. end
+elseif Ev < 3077 then if Ev < 3076 then function adQuest_claimHourly() local Lg, Lh, Lj, Lk, Ll = nil, nil, nil, nil, nil; local Li = nil; Li = 1; while true do Li = 4912 - Li; do if Li < 4912 then if Li < 3756. then break elseif Li < 4081 then break elseif Li < 4911. then
+break elseif Li == 4911. then Lg = UK[650]; Lk = false; for iB = UK[1292], D0 do Ll = iB; local Lm = Ll; local Lj = nil; Lj = UK[1292]; while true do if Lj < 3. then if Lj < 1 then Lj = if Lh then UK[2008] else UK[1165] elseif Lj < 2 then Lh = DJ[UK[1902.]];
+Lj = if Lh then UK[650] else UK[633.] else Lj = UK[327.] end elseif Lj < 5 then if Lj < 4 then UK[879.](function() Dm:FireServer(UK[381.] .. Lm) end); Lg = Lg + UK[1292]; local X1 = UK[1957][UK[438.]]; UK[1433](UK[1292]); Lj = UK[1579] else Lk = true; Lj = UK[1579]
+end elseif Lj < 6. then Lh = not isOn(UK[352]); Lj = UK[650] else break end end; if Lk then break end end; return Lg else Li = 16309; continue end else break end end end end; function adQuest_claimDaily() local Ln, Lo, Lq, Lr, Ls = nil, nil, nil, nil, nil;
+local Lp = nil; Lp = 0.; while true do Lp = 838 - Lp; do if Lp < 1841 then if Lp < 838 then break elseif Lp == 838 then Ln = UK[650]; Lr = false; for iJ = UK[1292], DU do Ls = iJ; local Lt = Ls; local Lq = nil; Lq = UK[650]; while true do if Lq < 3. then if Lq < 1 then
+Lo = DJ[UK[1902.]]; Lq = if Lo then UK[327.] else UK[1165] elseif Lq < 2 then UK[879.](function() Dm:FireServer(UK[1566.] .. Lt) end); Ln = Ln + UK[1292]; local X2 = UK[1957][UK[438.]]; UK[1433](UK[1292]); Lq = UK[2008] else break end elseif Lq < 5 then if Lq < 4 then
+Lo = not isOn(UK[1285]); Lq = UK[327.] else Lq = if Lo then UK[633.] else UK[1292] end elseif Lq < 6. then Lq = UK[1579] else Lr = true; Lq = UK[2008] end end; if Lr then break end end; return Ln else Lp = 837.; continue end else break end end end end; function adQuest_claimWeekly()
+local Lu, Lv, Lx, Ly, Lz = nil, nil, nil, nil, nil; local Lw = nil; Lw = 0.; while true do Lw = 2909 - Lw; do if Lw < 3632 then if Lw < 2909 then break elseif Lw == 2909 then Lu = UK[650]; Ly = false; for iR = UK[1292], DO do Lz = iR; local LA = Lz; local Lx = nil;
+Lx = UK[327.]; while true do if Lx < 3. then if Lx < 1 then Lx = if Lv then UK[1579] else UK[1292] elseif Lx < 2 then UK[879.](function() Dm:FireServer(UK[364] .. LA) end); Lu = Lu + UK[1292]; local X3 = UK[1957][UK[438.]]; UK[1433](UK[1292]); Lx = UK[633.]
+else Ly = true; Lx = UK[633.] end elseif Lx < 5 then if Lx < 4 then Lv = not isOn(UK[1992.]); Lx = UK[650] else Lv = DJ[UK[1902.]]; Lx = if Lv then UK[650] else UK[1165] end elseif Lx < 6. then break else Lx = UK[2008] end end; if Ly then break end end; return Lu
+else Lw = 3632; continue end else break end end end end; local WY = UK; adVirus_getButtons = WY[496]; adVirus_isVisible = WY[929]; function adVirus_clickBtn(jl) local LX, LY, LZ = nil, nil, nil; local LW = nil; LW = 2; while true do LW = 12630. - LW; do if LW < 12625 then
+break elseif LW < 12629 then if LW < 12627. then if LW < 12626 then if LW == 12625 then return false else LW = 405.; continue end else LW = if firesignal then 3. else 0. end elseif LW < 12628 then if LW == 12627. then UK[879.](function() firesignal(jl[UK[570.]])
+end); local X4 = UK[1957][UK[438.]]; UK[1433](UK[1505]); UK[879.](function() firesignal(jl[UK[1215.]]) end); X4 = UK[1957][UK[438.]]; UK[1433](UK[1505]); LW = 0. else LW = 405.; continue end else LZ = if not jl then UK[1292] else UK[650]; LX = UK[542] * LZ + UK[43] * (UK[1292] - LZ);
+LY = UK[1229] * LZ + UK[1141] * (UK[1292] - LZ); LW = if (LX * UK[1219] + LY * UK[253] + LX * LY) % UK[1264] == UK[136] then 5 else 4 end elseif LW < 12844 then if LW < 12630. then break elseif LW == 12630. then UK[879.](function() local US = math.floor; local X5 = UK;
+local jp = jl[X5[614]]; local jq = jl[X5[2047]]; local jr = jp[X5[785]] + US(jq[X5[785]] / X5[2008]); local js = jp[X5[2043.]] + US(jq[X5[2043.]] / X5[2008]); DI:SendMouseButtonEvent(jr, js, X5[650], true, X5[1185.], X5[650]); local X6 = X5[1957][X5[438.]];
+X5[1433](X5[1505]); DI:SendMouseButtonEvent(jr, js, X5[650], false, X5[1185.], X5[650]) end); return true else break end else break end end end end; function ad_getChests() local jv; jv = {}; UK[879.](function() local L_, L0, L2, L3, L4, L6, L8, L9, Ma = nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local L1 = nil; L1 = 4; while true do L1 = 13066 - L1; do if L1 < 13064 then if L1 < 10623. then break elseif L1 < 13062. then if L1 < 13061 then break elseif L1 == 13061 then return else L1 = 15130; continue end elseif L1 < 13063 then L_ = UK[1560.]:FindFirstChild(UK[1968.]);
+L1 = if not L_ then 5 else 0. else break end elseif L1 < 13065. then L3 = false; for jy, jz in UK[1189](L0:GetChildren()) do L4 = jy; L6 = jz; local L5 = L4; local L7 = L6; local L2 = nil; local X7 = UK; L2 = X7[650]; while true do if L2 < 4 then if L2 < 2 then
+if L2 < 1 then Ma = if L7[X7[821]]:find(X7[22]) then X7[1292] else X7[650]; L8 = X7[1642] * Ma + X7[530] * (X7[1292] - Ma); L9 = X7[970] * Ma + X7[115] * (X7[1292] - Ma); L2 = if (L8 * X7[548] + L9 * X7[223] + L8 * L9) % X7[1264] == X7[1133] then X7[1165] else X7[749]
+else L2 = X7[749] end elseif L2 < 3. then break else L_ = L7:FindFirstChild(X7[1864], true); L0 = L_; L2 = if L0 then X7[597.] else X7[633.] end elseif L2 < 6. then if L2 < 5 then table.insert(jv, { [X7[1825]] = L7, [X7[378.]] = L_ }); L2 = X7[1292] else L2 = if L0 then X7[327.] else X7[1292]
+end elseif L2 < 7 then L3 = true; L2 = X7[2008] elseif L2 < 8 then L0 = L_:IsA(X7[1864]); L2 = X7[633.] else L2 = X7[2008] end end; if L3 then break end end; L1 = 3. elseif L1 < 15130 then if L1 < 13066 then if L1 == 13065. then return else L1 = 15313; continue
+end elseif L1 == 13066 then L0 = L_:FindFirstChild(UK[670]); L1 = if not L0 then 1 else 2 else break end else break end end end end); return jv end; function ad_getNearestChest() local Mb, Mc, Md, Me, Mf, Mg, Mi, Mj, Mk, Mm = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local Mh = nil; Mh = 0.; while true do Mh = 3915. - Mh; do if Mh < 3915. then if Mh < 3913 then break elseif Mh < 3914 then return nil elseif Mh == 3914 then Mc = ad_getChests(); Me, Md = nil, math.huge; Mj = false; for jH, jI in UK[1295](Mc) do Mk = jH; Mm = jI;
+local Ml = Mk; local Mn = Mm; local Mi = nil; local X8 = UK; Mi = X8[650]; while true do if Mi < 3. then if Mi < 1 then Mc, Mf = X8[879.](function() return (Mn[UK[1825]]:GetPivot()[UK[2060]] - Mb[UK[2060]])[UK[1142]] end); Mg = Mc; Mi = if Mg then X8[1579] else X8[633.]
+elseif Mi < 2 then Mj = true; Mi = X8[2008] else break end elseif Mi < 5 then if Mi < 4 then Md = Mf; Me = Mn; Mi = X8[327.] else Mi = X8[2008] end elseif Mi < 6. then Mi = if Mg then X8[1165] else X8[327.] else Mg = Mf < Md; Mi = X8[633.] end end; if Mj then
+break end end; return Me else Mh = 13786; continue end elseif Mh < 7851. then if Mh < 4661 then if Mh < 4612 then if Mh == 3915. then Mb = ad_getHRP(); Mh = if not Mb then 2 else 1 else Mh = 13786; continue end else break end else break end else break end end
+end end; ad_getEquippedSpellBySlot = WY[82]; ad_getEquippedUltimate = WY[267.]; adSell_normalizeMulti = WY[1637]; adSell_getRarityTable = WY[1084]; adSell_hasRarityFilter = WY[924.]; adSell_rarityAllowed = WY[1949]; adSell_isUltimateSpell = WY[502]; adSell_matchesCategory = WY[2018];
+adSell_canSellItem = WY[1883]; adSell_collect = WY[1900]; function adSell_fireBatch(kF) local Nq, Nr, Ns, Nu, Nv, Nw, Nx, Ny, Nz, NA, NB = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local Nt = nil; Nt = 1; while true do Nt = 12262 - Nt; do if Nt < 12255. then
+if Nt < 12250 then if Nt < 12249. then if Nt < 12245 then if Nt < 6949 then break elseif Nt < 11177 then break elseif Nt < 12000. then break elseif Nt < 12244 then break elseif Nt == 12244 then Nt = if #Nq == UK[650] then 17 else 10 else Nt = 12253; continue
+end elseif Nt < 12247 then if Nt < 12246. then if Nt == 12245 then return UK[650] else Nt = 12249.; continue end elseif Nt == 12246. then Ns = #Nq; Nt = 9. else Nt = 12247; continue end elseif Nt < 12248 then if Nt == 12247 then Nt = if (Nz * UK[2042] + NA * UK[1413.] + Nz * NA) % UK[1264] == UK[1563.] then 7 else 2
+else Nt = 12251; continue end else Ny = Nx; Nr = kF[Ny]; Ns = Nr; Nt = if Ns then 13 else 6. end elseif Nt == 12249. then Ns = Nr[UK[499]]; Nt = 6. else Nt = 12250; continue end elseif Nt < 12252. then if Nt < 12251 then Nt = if Nw <= Nu then 8 else 18. else
+break end elseif Nt < 12253 then Nr = UK[879.](function() Ds:FireServer(UK[626], Nq) end); Ns = Nr; Nt = if Ns then 16 else 9. elseif Nt < 12254 then Nr = Ns; NB = if Nr then UK[1292] else UK[650]; Nz = UK[1216] * NB + UK[1626.] * (UK[1292] - NB); Nt = 5 elseif Nt == 12254 then
+Nx = Nw; Nt = 14 else Nt = 12249.; continue end elseif Nt < 12260 then if Nt < 12259 then if Nt < 12257 then if Nt < 12256 then if Nt == 12255. then return Nr else Nt = 12247; continue end else Nt = if Ns then 0. else 3. end elseif Nt < 12258. then if Nt == 12257 then
+NA = UK[532] * NB + UK[711.] * (UK[1292] - NB); Nt = 15. else Nt = 12247; continue end elseif Nt == 12258. then Nw += UK[1292]; Nt = 12. else Nt = 12246.; continue end elseif Nt == 12259 then Nt = 4 else Nt = 12261.; continue end elseif Nt < 12427 then if Nt < 12262 then
+if Nt < 12261. then if Nt == 12260 then Nr = UK[650]; Nt = 7 else Nt = 12257; continue end elseif Nt == 12261. then Nq = {}; Nr = math.min(UK[2008], #kF); Nw = UK[1292]; Nu = Nr; Nt = 12. else Nt = 12256; continue end elseif Nt == 12262 then table.insert(Nq, Nr);
+Nt = 3. else Nt = 12250; continue end else break end end end end; adSell_sellOneBatch = WY[265]; adSell_anyEnabled = WY[992]; c = WY[1409]; b = WY[290]; i = WY[1414]; sz = WY[1053.]; hexToRgb = WY[973]; rgbToHex = WY[1851.]; lerp = WY[385]; createGradientText = WY[1973];
+createMultiGradientText = WY[1088]; U2[4] = { [WY[943]] = { WY[661], WY[345.], WY[738.] }, [WY[547]] = { WY[602], WY[1318], WY[345.] }, [WY[1736]] = { WY[1927], WY[1582], WY[1289] }, [WY[647]] = { WY[661], WY[503], WY[53] }, [WY[1457]] = { WY[1541], WY[1494.],
+WY[226] }, [WY[1406]] = { WY[1607], WY[865], WY[49] } }; formatNumber = WY[1105]; formatDuration = WY[1941.]; gradPlus = WY[1311.]; De = WY[15.]; C6 = WY[1028]; Ev = 885. else U2[20] = nil; local WY = UK; U2[20] = WY[327.] - WY[1165]; U2[20] = WY[633.] - WY[327.];
+U2[20] = WY[1165] - WY[2008]; Ev = 1082 end elseif Ev < 3078. then local X9 = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[20], UK[1337]), string.byte(tostring(Cu))), UK[1756]); Ev = if bit32.bxor(bit32.bxor(bit32.bxor(bit32.bxor(bit32.band(X9, UK[1490]), UK[133]), (bit32.bxor(bit32.band(X9, UK[65]), UK[1119.]))), UK[133]), UK[1119.]) ~= X9 then 1185. else 1105
+else local WY = UK; U2[26] = Du:AddLabel(b(WY[541]) .. c(WY[1388], WY[322]), true); Dh = Du:AddLabel(b(WY[1918]) .. c(WY[1388], WY[1927]), true); Da = Du:AddLabel(b(WY[1755.]) .. c(WY[1388], WY[345.]), true); Do = Du:AddLabel(b(WY[451]) .. c(WY[458], WY[1289]), true);
+Ev = 512 end elseif Ev < 3233 then if Ev < 3158 then if Ev < 3120. then if Ev < 3100 then if Ev < 3089 then if Ev < 3084. then if Ev < 3082 then if Ev < 3081. then if Ev < 3080 then Ev = if U2[16] <= UK[1609] then 754 else 494 else Ev = if U2[18.] <= UK[1292] then 772 else 35
+end elseif Ev == 3081. then U2[20] = (U2[20] + UK[1149.]) % UK[1060]; Ev = 1046 else Ev = 4011.; continue end elseif Ev < 3083 then Ev = 1125. elseif Ev == 3083 then Ev = 119 else Ev = 3474.; continue end elseif Ev < 3087. then if Ev < 3086 then if Ev < 3085 then
+Ev = 925 else Ev = 374 end elseif Ev == 3086 then Ev = 435. else Ev = 3239; continue end elseif Ev < 3088 then if Ev == 3087. then U2[10] = (U2[26] * UK[1292] + UK[650]) % UK[2008] + UK[1292]; Ev = 143 else Ev = 3860; continue end elseif Ev == 3088 then Ev = if U2[10] <= UK[1165] then 1267 else 62
+else Ev = 3196; continue end elseif Ev < 3094 then if Ev < 3092 then if Ev < 3091 then if Ev < 3090. then U2[20] = (U2[20] + UK[597.]) % UK[591.]; Ev = 193 else Ev = 116 end elseif Ev == 3091 then local WY = UK; U2[20]:AddToggle(WY[1751], { [WY[592]] = WY[877],
+[WY[181]] = false }); U2[20]:AddToggle(WY[1674.], { [WY[592]] = WY[1218.], [WY[181]] = false }); U2[20]:AddDivider(); U2[20]:AddButton({ [WY[592]] = WY[40], [WY[1441]] = WY[1070] }); U2[20]:AddButton({ [WY[592]] = WY[891.], [WY[1441]] = WY[1345] }); Ev = 677
+else Ev = 3676; continue end elseif Ev < 3093. then local WY = UK; U2[26] = (vector.create((U2[20] * WY[597.] + WY[1620.]) % WY[1478] + WY[1292], (U2[20] * WY[1579] + WY[1165]) % WY[1149.] + WY[1292], (U2[20] * WY[1756] + WY[1060]) % WY[1628] + WY[1292]));
+U2[10] = (vector.create((U2[20] * WY[2008] + WY[1292]) % WY[1478] + WY[1292], (U2[20] * WY[1756] + WY[1292]) % WY[1149.] + WY[1292], (U2[20] * WY[1756] + WY[1413.]) % WY[1628] + WY[1292])); U2[18.] = (vector.create((U2[20] * WY[597.] + WY[1292]) % WY[1478] + WY[1292], (U2[20] * WY[1756] + WY[2008]) % WY[1149.] + WY[1292], (U2[20] * WY[1288] + WY[1628]) % WY[1628] + WY[1292]));
+Ev = if vector.dot(vector.cross(U2[26], U2[10]), U2[18.]) == vector.dot(vector.cross(U2[10], U2[18.]), U2[26]) + WY[1292] then 687. else 473 else Ev = 382 end elseif Ev < 3098 then if Ev < 3096. then if Ev < 3095 then if Ev == 3094 then local WY = UK; Dn = WY[1096];
+Dw = WY[609.]; Ev = 248 else Ev = 3631; continue end elseif Ev == 3095 then Ev = 53 else Ev = 3202; continue end elseif Ev < 3097 then if Ev == 3096. then U2[10], U2[26], U2[20] = nil, nil, nil; U2[20] = UK[1292]; Ev = 2 else Ev = 3632; continue end else Ev = if U2[26] <= UK[327.] then 1074. else 1239.
+end elseif Ev < 3099. then if Ev == 3098 then Ev = 542 else Ev = 2808.; continue end elseif Ev == 3099. then U2[26] = U2[14][UK[1990]]:AddLeftGroupbox(UK[1544], UK[353]); Ev = 962 else Ev = 3431; continue end elseif Ev < 3110 then if Ev < 3106 then if Ev < 3103 then
+if Ev < 3102. then if Ev < 3101 then if Ev == 3100 then Ev = if CP or U2[26] or not C0 and C0 or (CT and not U2[10] or not CP and U2[10]) or (U2[10] and not CP or (Dh or CP)) and ((Dh or C0) and (C0 and not U2[10])) or not (CP or U2[26] or not C0 and C0 or (CT and not U2[10] or not CP and U2[10]) or (U2[10] and not CP or (Dh or CP)) and ((Dh or C0) and (C0 and not U2[10]))) then 840. else 793
+else Ev = 2833; continue end else U2[26] = nil; U2[26] = UK[633.] - UK[1292]; Ev = 275 end else Ev = 790 end elseif Ev < 3105. then if Ev < 3104 then if Ev == 3103 then Ev = 287 else Ev = 3972.; continue end elseif Ev == 3104 then Ev = 31 else Ev = 3521; continue
+end else local WY = UK; U2[10] = { WY[569], WY[1370], WY[200], WY[122], WY[90.], WY[1561], WY[413], WY[986], WY[616], WY[176], WY[754], WY[1271] }; local Ya = U2[20]; U2[18.] = U2[10][Ya % WY[1413.] + WY[1292]]; Ev = if U2[18.]:len() >= U2[18.]:gsub(WY[1246], WY[298], Ya % WY[1165] % WY[2008] + WY[1292]):len() then 372. else 448
+end elseif Ev < 3108. then if Ev < 3107 then if Ev == 3106 then U2[20] = U2[14][UK[1682]]:AddLeftGroupbox(UK[1920.], UK[835]); Ev = 647 else Ev = 3302; continue end elseif Ev == 3107 then Ev = 1169 else Ev = 3972.; continue end elseif Ev < 3109 then if Ev == 3108. then
+Ev = 361 else Ev = 3505; continue end elseif Ev == 3109 then Ev = 113 else Ev = 3160; continue end elseif Ev < 3116 then if Ev < 3114. then if Ev < 3112 then if Ev < 3111. then if Ev == 3110 then Ev = 1157 else Ev = 2973.; continue end elseif Ev == 3111. then
+U2[26] = nil; local WY = UK; U2[26] = WY[1165] - WY[1292]; U2[26] = WY[1292] + WY[1292]; Ev = 959 else Ev = 3847; continue end elseif Ev < 3113 then Ev = 1174 elseif Ev == 3113 then local WY = UK; U2[26] = { WY[839], WY[794], WY[905], WY[1472], WY[862], WY[590],
+WY[1281.], WY[840.], WY[1813] }; local Yb = U2[20]; U2[10] = U2[26][Yb % WY[1620.] + WY[1292]]; Ev = if U2[10]:len() >= U2[10]:gsub(WY[1246], WY[298], Yb % WY[1165] % WY[2008] + WY[1292]):len() then 19 else 350 else Ev = 2977; continue end elseif Ev < 3115 then
+Ev = if (U2[20] * UK[2008] + UK[2008]) * UK[1149.] % UK[1165] == ((U2[20] * UK[2008] + UK[2008]) * UK[1149.] + (UK[1165] + UK[1292])) % UK[1165] then 525. else 1047. else Ev = 579. end elseif Ev < 3118 then if Ev < 3117. then Ev = if U2[26] <= UK[1292] then 402. else 469
+else local WY = UK; U2[26]:AddDropdown(WY[335], { [WY[1697]] = { WY[1291], WY[1794.], WY[1548.] }, [WY[181]] = WY[1291], [WY[592]] = WY[732.], [WY[1977.]] = WY[867.] }); U2[26]:AddToggle(WY[128], { [WY[592]] = WY[1135], [WY[181]] = false }); Ev = 149 end elseif Ev < 3119 then
+if Ev == 3118 then U2[20] = (U2[20] + UK[702.]) % UK[1984]; Ev = 724 else Ev = 3518; continue end else local WY = UK; U2[26]:AddToggle(WY[446], { [WY[592]] = WY[1352], [WY[181]] = false }); U2[26]:AddDivider(); U2[26]:AddButton({ [WY[592]] = WY[505], [WY[1441]] = WY[1748] });
+Ev = 186. end elseif Ev < 3139 then if Ev < 3130 then if Ev < 3125 then if Ev < 3123. then if Ev < 3122 then if Ev < 3121 then if Ev == 3120. then Ev = if U2[18.] <= UK[1292] then 414. else 14 else Ev = 2867; continue end elseif Ev == 3121 then Ev = if U2[10] <= UK[1292] then 1161. else 982
+else Ev = 3874; continue end elseif Ev == 3122 then Ev = 1065. else Ev = 3424; continue end elseif Ev < 3124 then if Ev == 3123. then CF = {}; CD = false; Ev = 150. else Ev = 2884; continue end elseif Ev == 3124 then Ev = 159. else Ev = 3928; continue end elseif Ev < 3128 then
+if Ev < 3127 then if Ev < 3126. then if Ev == 3125 then U2[18.] = (U2[20] * UK[597.] + UK[327.]) % UK[749] + UK[1292]; Ev = 722 else Ev = 3185; continue end else Ev = 87. end elseif Ev == 3127 then U2[20] = (U2[20] + UK[633.]) % UK[1984]; Ev = 1203. else Ev = 3043;
+continue end elseif Ev < 3129. then if Ev == 3128 then U2[26] = U2[14][UK[1953.]]:AddLeftGroupbox(UK[1820], UK[293]); Ev = 536 else Ev = 3521; continue end elseif Ev == 3129. then local WY = UK; U2[10] = (vector.create((U2[26] * WY[597.] + WY[1579]) % WY[1478] + WY[1292], (U2[26] * WY[1292] + WY[633.]) % WY[1149.] + WY[1292], (U2[26] * WY[1288] + WY[1292]) % WY[1628] + WY[1292]));
+local Yc = vector.floor(U2[10]) + vector.ceil(U2[10] * WY[1614.]); Ev = if vector.dot(Yc, Yc) == WY[650] + WY[327.] then 321. else 229 else Ev = 3988; continue end elseif Ev < 3135. then if Ev < 3133 then if Ev < 3132. then if Ev < 3131 then Ev = 766 elseif Ev == 3131 then
+U2[1] = nil; U2[1] = UK[1165] - UK[2008]; Ev = 307 else Ev = 2850.; continue end else local WY = UK; DA = WY[1317.]; Dv = true; Dq = true; Di = WY[2056]; Db = WY[2056]; Ev = 863 end elseif Ev < 3134 then Ev = 75. else U2[20] = (U2[20] + UK[1478]) % UK[1060];
+Ev = 179 end elseif Ev < 3137 then if Ev < 3136 then if Ev == 3135. then local WY = UK; U2[26]:AddToggle(WY[352], { [WY[592]] = WY[755], [WY[181]] = false }); U2[26]:AddDivider(); U2[26]:AddButton({ [WY[592]] = WY[425], [WY[1441]] = WY[974] }); Ev = 42. else
+Ev = 3765.; continue end else local WY = UK; U2[26] = (vector.create((U2[20] * WY[327.] + WY[327.]) % WY[1478] + WY[1292], (U2[20] * WY[597.] + WY[1579]) % WY[1149.] + WY[1292], (U2[20] * WY[1756] + WY[1288]) % WY[1628] + WY[1292])); U2[10] = (vector.create((U2[20] * WY[1292] + WY[597.]) % WY[1478] + WY[1292], (U2[20] * WY[1620.] + WY[1478]) % WY[1149.] + WY[1292], (U2[20] * WY[633.] + WY[1149.]) % WY[1628] + WY[1292]));
+U2[18.] = (vector.create((U2[20] * WY[327.] + WY[597.]) % WY[633.] + WY[1292], (U2[20] * WY[2008] + WY[1292]) % WY[597.] + WY[1292], (U2[20] * WY[633.] + WY[1165]) % WY[1620.] + WY[1292])); Ev = if math.abs((vector.angle(U2[26], U2[10], U2[18.]))) - math.abs((vector.angle(U2[10], U2[26], U2[18.]))) == WY[650] then 573. else 1037
+end elseif Ev < 3138. then Ev = if (U2[24.] * UK[103] + U2[8] * UK[965] + U2[24.] * U2[8]) % UK[1264] == UK[442] then 1153 else 560 elseif Ev == 3138. then U2[10] = (U2[20] * UK[1292] + UK[1292]) % UK[2008] + UK[1292]; Ev = 785 else Ev = 3868; continue end
+elseif Ev < 3148 then if Ev < 3144. then if Ev < 3142 then if Ev < 3141. then if Ev < 3140 then if Ev == 3139 then Ev = 707 else Ev = 4015; continue end elseif Ev == 3140 then CA = false; Cw = false; Cu = false; Eh = false; Ev = 1015 else Ev = 3882.; continue
+end else Ev = 595 end elseif Ev < 3143 then Ev = 1160 else Ev = if (U2[20] * UK[1292] + UK[1337]) % UK[206] == UK[1288] then 666. else 531. end elseif Ev < 3146 then if Ev < 3145 then if Ev == 3144. then Ev = 377 else Ev = 3874; continue end elseif Ev == 3145 then
+U2[20] = (U2[20] + UK[1096]) % UK[4]; Ev = 298 else Ev = 3001; continue end elseif Ev < 3147. then if Ev == 3146 then local WY = UK; isOn = WY[1542.]; getNumber = WY[1954]; copyText = WY[19]; ad_waitForCharacter = WY[304]; ad_waitForCharacter(); U2[14] = Ee:WaitForChild(WY[1780]);
+Ev = 6. else Ev = 3527; continue end else U2[26] = nil; local WY = UK; U2[26] = WY[633.] - WY[1165]; U2[26] = WY[327.] - WY[1165]; U2[26] = WY[633.] - WY[1165]; U2[26] = WY[1292] + WY[1292]; Ev = 731 end elseif Ev < 3154 then if Ev < 3152 then if Ev < 3151 then
+if Ev < 3149 then Ev = 184 elseif Ev < 3150. then if Ev == 3149 then Ev = 293 else Ev = 3911; continue end elseif Ev == 3150. then Ev = 889 else Ev = 3047; continue end else U2[20] = nil; local WY = UK; U2[20] = WY[2008] - WY[1292]; U2[20] = WY[633.] - WY[327.];
+U2[20] = WY[650] + WY[1292]; U2[20] = WY[2008] - WY[1292]; U2[20] = WY[650] + WY[1292]; Ev = 163 end elseif Ev < 3153. then U2[26] = (U2[26] + UK[597.]) % UK[749]; Ev = 583 elseif Ev == 3153. then U2[1] = nil; local WY = UK; U2[1] = WY[327.] - WY[1165]; U2[1] = WY[650] + WY[1292];
+U2[1] = WY[1165] - WY[2008]; U2[1] = WY[650] + WY[1292]; U2[1] = WY[1165] - WY[2008]; Ev = 728 else Ev = 3459.; continue end elseif Ev < 3156. then if Ev < 3155 then if Ev == 3154 then Ev = 738. else Ev = 3922; continue end elseif Ev == 3155 then Ev = 557 else
+Ev = 2803; continue end elseif Ev < 3157 then U2[10] = (U2[20] * UK[1292] + UK[650]) % UK[2008] + UK[1292]; Ev = 584 elseif Ev == 3157 then local WY = UK; U2[26] = (vector.create((U2[20] * WY[327.] + WY[2008]) % WY[1478] + WY[1292], (U2[20] * WY[1165] + WY[327.]) % WY[1149.] + WY[1292], (U2[20] * WY[2008] + WY[1620.]) % WY[1628] + WY[1292]));
+U2[10] = (vector.create((U2[20] * WY[1165] + WY[749]) % WY[1478] + WY[1292], (U2[20] * WY[2008] + WY[2008]) % WY[1149.] + WY[1292], (U2[20] * WY[633.] + WY[1292]) % WY[1628] + WY[1292])); local Yd = vector.dot(U2[26], U2[10]); Ev = if Yd * Yd >= vector.dot(U2[26], U2[26]) * vector.dot(U2[10], U2[10]) + WY[1292] then 346 else 630.
+else Ev = 3321.; continue end elseif Ev < 3195. then if Ev < 3177. then if Ev < 3168. then if Ev < 3163 then if Ev < 3161 then if Ev < 3160 then if Ev < 3159. then if Ev == 3158 then U2[10] = (U2[26] * UK[1292] + UK[1292]) % UK[2008] + UK[1292]; Ev = 277 else
+Ev = 3287; continue end elseif Ev == 3159. then U2[26] = nil; local WY = UK; U2[26] = WY[327.] - WY[1165]; U2[26] = WY[650] + WY[1292]; Ev = 1259 else Ev = 3835; continue end else U2[26] = U2[14][UK[1655]]:AddLeftGroupbox(UK[1549], UK[91]); Ev = 166 end elseif Ev < 3162. then
+if Ev == 3161 then U2[20] = (U2[20] + UK[1329.]) % UK[1984]; Ev = 657. else Ev = 2855; continue end elseif Ev == 3162. then U2[26] = nil; local WY = UK; U2[26] = WY[1165] - WY[2008]; U2[26] = WY[650] + WY[1292]; U2[26] = WY[597.] - WY[633.]; U2[26] = WY[1292] + WY[1292];
+U2[26] = WY[1756] - WY[597.]; U2[26] = WY[650] + WY[1165]; Ev = 978. else Ev = 3730; continue end elseif Ev < 3166 then if Ev < 3165. then if Ev < 3164 then if Ev == 3163 then Ev = 52 else Ev = 3888.; continue end else U2[20] = (U2[10] * UK[1292] + UK[1292]) % UK[2008] + UK[1292];
+Ev = 1244 end else Ev = 950 end elseif Ev < 3167 then local Ye = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[20], UK[327.]), string.byte(tostring(Dk))), UK[1405]); Ev = if bit32.bxor(bit32.bxor(bit32.bxor(bit32.bxor(bit32.band(Ye, UK[761]), UK[408.]), (bit32.bxor(bit32.band(Ye, UK[810.]), UK[687.]))), UK[408.]), UK[687.]) == Ye then 898 else 706
+else U2[20] = (U2[20] + UK[921.]) % UK[1984]; Ev = 242 end elseif Ev < 3173 then if Ev < 3171. then if Ev < 3170 then if Ev < 3169 then if Ev == 3168. then Ev = 117. else Ev = 3236; continue end elseif Ev == 3169 then U2[20] = (U2[20] + UK[702.]) % UK[1984];
+Ev = 1184 else Ev = 3173; continue end elseif Ev == 3170 then Ev = 597. else Ev = 3239; continue end elseif Ev < 3172 then if Ev == 3171. then Ev = 1175 else Ev = 3177.; continue end else local WY = UK; U2[18.] = { WY[1086.], WY[1196], WY[165.], WY[2005], WY[604],
+WY[357.], WY[1700], WY[1385], WY[1228], WY[1824.], WY[1286], WY[1338.], WY[1090] }; Ev = if U2[18.][(U2[20] * WY[1629.] + WY[2054]) % WY[1149.] + WY[1292]] <= U2[18.][(U2[20] * WY[1629.] + WY[2054]) % WY[1149.] + WY[1292]] then 47 else 1151 end elseif Ev < 3175 then
+if Ev < 3174. then local WY = UK; U2[14]:AddLabel(b(WY[753.]), true); U2[14]:AddDivider(); U2[14]:AddToggle(WY[478], { [WY[592]] = WY[2015], [WY[181]] = false }); U2[14]:AddDropdown(WY[511], { [WY[181]] = WY[699.], [WY[592]] = WY[1], [WY[1977.]] = WY[1487],
+[WY[1697]] = { WY[1183], WY[699.], WY[285.], WY[2044], WY[1048] } }); U2[14]:AddDropdown(WY[1739], { [WY[1697]] = { WY[694], WY[258.] }, [WY[592]] = WY[251], [WY[1977.]] = WY[819.], [WY[181]] = WY[694] }); U2[14]:AddSlider(WY[789.], { [WY[1734.]] = WY[650],
+[WY[181]] = WY[1478], [WY[1873]] = WY[1096], [WY[592]] = WY[1648], [WY[1977.]] = WY[1720], [WY[834.]] = -WY[624.] }); U2[14]:AddSlider(WY[1200.], { [WY[1873]] = WY[1244], [WY[1734.]] = WY[650], [WY[592]] = WY[155], [WY[181]] = WY[795.], [WY[1977.]] = WY[527],
+[WY[834.]] = WY[466] }); U2[26] = U2[20][WY[1722.]]:AddRightGroupbox(WY[98], WY[1772]); Ev = 326 elseif Ev == 3174. then Ev = if (U2[18.] * UK[1292] + UK[1756]) % UK[1060] == UK[749] then 602 else 1127 else Ev = 3390.; continue end elseif Ev < 3176 then Ev = 690.
+elseif Ev == 3176 then Ev = 782 else Ev = 3012.; continue end elseif Ev < 3186. then if Ev < 3182 then if Ev < 3180. then if Ev < 3179 then if Ev < 3178 then if Ev == 3177. then D1 = false; Ev = 551 else Ev = 2955.; continue end else U2[26] = (U2[26] + UK[1628]) % UK[1456];
+Ev = 101 end elseif Ev == 3179 then Ev = if (U2[18.] * UK[1478] + UK[327.]) % UK[1413.] == UK[1292] then 92 else 762. else Ev = 3455; continue end elseif Ev < 3181 then if Ev == 3180. then Ev = 624. else Ev = 3322; continue end else Ev = 117. end elseif Ev < 3184 then
+if Ev < 3183. then local WY = UK; U2[10] = (vector.create((U2[20] * WY[1165] + WY[1579]) % WY[1478] + WY[1292], (U2[20] * WY[749] + WY[1478]) % WY[1149.] + WY[1292], (U2[20] * WY[1288] + WY[633.]) % WY[1628] + WY[1292])); U2[18.] = (vector.create((U2[20] * WY[633.] + WY[1292]) % WY[1478] + WY[1292], (U2[20] * WY[1579] + WY[597.]) % WY[1149.] + WY[1292], (U2[20] * WY[1579] + WY[1288]) % WY[1628] + WY[1292]));
+U2[1] = (vector.create((U2[20] * WY[2008] + WY[1620.]) % WY[1478] + WY[1292], (U2[20] * WY[1165] + WY[2008]) % WY[1149.] + WY[1292], (U2[20] * WY[1165] + WY[1756]) % WY[1628] + WY[1292])); U2[12.] = (vector.create((U2[20] * WY[1292] + WY[327.]) % WY[633.] + WY[1292], (U2[20] * WY[633.] + WY[1579]) % WY[597.] + WY[1292], (U2[20] * WY[1292] + WY[2008]) % WY[1620.] + WY[1292]));
+Ev = if vector.dot(vector.cross(U2[10], (vector.cross(U2[18.], U2[1]))), U2[12.]) == vector.dot(U2[18.] * vector.dot(U2[10], U2[1]) - U2[1] * vector.dot(U2[10], U2[18.]), U2[12.]) then 1090 else 832 elseif Ev == 3183. then Ev = 82 else Ev = 3844; continue end
+elseif Ev < 3185 then Ev = if (U2[20] * UK[1465] + UK[327.]) % UK[591.] == UK[1405] then 581 else 1035. else Ev = if U2[1] <= UK[2008] then 1032. else 434 end elseif Ev < 3191 then if Ev < 3189. then if Ev < 3188 then if Ev < 3187 then if Ev == 3186. then DW = nil;
+Ev = 903. else Ev = 3472; continue end elseif Ev == 3187 then Ev = if (U2[18.] * UK[1165] + UK[633.]) * UK[1620.] % UK[327.] == ((U2[18.] * UK[1165] + UK[633.]) * UK[1620.] + (UK[749] + UK[1292])) % UK[327.] then 524 else 591. else Ev = 3106; continue end elseif Ev == 3188 then
+Ev = if (U2[26] * UK[1165] + UK[2008]) % UK[749] == UK[2008] then 1057 else 299 else Ev = 3035; continue end elseif Ev < 3190 then Ev = 796 elseif Ev == 3190 then U2[10] = U2[14][UK[750.]]:AddLeftGroupbox(UK[1323.], UK[712]); Ev = 15. else Ev = 2961.; continue
+end elseif Ev < 3193 then if Ev < 3192. then U2[10] = (U2[10] + UK[1478]) % UK[1456]; Ev = 70 else local Yf = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[20], UK[633.]), string.byte(tostring(U2[14]))), UK[836]); local WY = UK; U2[17] = if bit32.bxor(bit32.lrotate(bit32.bxor(Yf, WY[1424]), WY[1143.]), WY[1126]) ~= bit32.lrotate(Yf, WY[1143.]) then WY[1292] else WY[650];
+U2[24.] = WY[2006] * U2[17] + WY[1489] * (WY[1292] - U2[17]); Ev = 370 end elseif Ev < 3194 then if Ev == 3193 then Ev = if (U2[20] * UK[1035.] + UK[1222]) % UK[4] == UK[1756] then 932 else 882. else Ev = 3559; continue end else Ev = 526 end elseif Ev < 3214 then
+if Ev < 3205 then if Ev < 3200 then if Ev < 3198. then if Ev < 3197 then if Ev < 3196 then local Yg = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[10], UK[749]), string.byte(tostring(DV))), UK[633.]); Ev = if bit32.bxor(bit32.bxor(bit32.bxor(bit32.bxor(bit32.band(Yg, UK[492.]), UK[707]), (bit32.bxor(bit32.band(Yg, UK[283]), UK[27.]))), UK[707]), UK[27.]) ~= Yg then 695 else 1223
+else U2[10] = nil; local WY = UK; U2[10] = WY[327.] - WY[1165]; U2[10] = WY[1165] - WY[2008]; U2[10] = WY[650] + WY[1292]; Ev = 685 end elseif Ev == 3197 then local WY = UK; U2[26] = (vector.create((U2[20] * WY[1579] + WY[327.]) % WY[1478] + WY[1292], (U2[20] * WY[1478] + WY[1620.]) % WY[1149.] + WY[1292], (U2[20] * WY[597.] + WY[2008]) % WY[1628] + WY[1292]));
+U2[10] = (vector.create((U2[20] * WY[1579] + WY[1620.]) % WY[1478] + WY[1292], (U2[20] * WY[2008] + WY[1292]) % WY[1149.] + WY[1292], (U2[20] * WY[2008] + WY[1060]) % WY[1628] + WY[1292])); U2[18.] = (vector.create((U2[20] * WY[327.] + WY[1620.]) % WY[1478] + WY[1292], (U2[20] * WY[1478] + WY[1413.]) % WY[1149.] + WY[1292], (U2[20] * WY[633.] + WY[749]) % WY[1628] + WY[1292]));
+U2[1] = (vector.create((U2[20] * WY[2008] + WY[633.]) % WY[1478] + WY[1292], (U2[20] * WY[1478] + WY[1165]) % WY[1149.] + WY[1292], (U2[20] * WY[1292] + WY[1620.]) % WY[1628] + WY[1292])); Ev = if vector.dot(vector.cross(U2[26], U2[10]), (vector.cross(U2[18.], U2[1]))) == vector.dot(U2[26], U2[18.]) * vector.dot(U2[10], U2[1]) - vector.dot(U2[26], U2[1]) * vector.dot(U2[10], U2[18.]) then 812 else 220
+else Ev = 2868.; continue end elseif Ev < 3199 then if Ev == 3198. then U2[26]:AddToggle(UK[294.], { [UK[592]] = UK[1363], [UK[181]] = false }); Ev = 1170. else Ev = 3866; continue end else U2[26]:AddToggle(UK[274], { [UK[592]] = UK[669.], [UK[181]] = false });
+Ev = 547 end elseif Ev < 3203 then if Ev < 3202 then if Ev < 3201. then U2[20] = (U2[20] + UK[1337]) % UK[591.]; Ev = 478 else Ev = 1083. end elseif Ev == 3202 then Ev = if U2[10] <= UK[1292] then 1217 else 730 else Ev = 3868; continue end elseif Ev < 3204. then
+Ev = if (U2[18.] and U2[10] and (U2[18.] or not U2[18.]) or (U2[10] and U2[18.] or (U2[18.] or U2[18.]))) and not (U2[18.] and U2[10] and (U2[18.] or not U2[18.]) or (U2[10] and U2[18.] or (U2[18.] or U2[18.]))) then 1183 else 763 elseif Ev == 3204. then U2[14] = U2[18.][UK[1871]]:AddLeftGroupbox(UK[1645], UK[293]);
+Ev = 428 else Ev = 2986; continue end elseif Ev < 3210. then if Ev < 3208 then if Ev < 3207. then if Ev < 3206 then Ev = 173 else Ev = 791 end elseif Ev == 3207. then local WY = UK; U2[14]:AddDropdown(WY[1257.], { [WY[592]] = WY[1191.], [WY[1977.]] = WY[884],
+[WY[181]] = {}, [WY[1597]] = true, [WY[1697]] = U2[18.] }); U2[14]:AddDropdown(WY[1159], { [WY[181]] = {}, [WY[1697]] = U2[18.], [WY[592]] = WY[578], [WY[1977.]] = WY[1140.], [WY[1597]] = true }); U2[14]:AddDropdown(WY[311], { [WY[1597]] = true, [WY[181]] = {},
+[WY[1977.]] = WY[1523], [WY[592]] = WY[249.], [WY[1697]] = U2[18.] }); U2[14]:AddDropdown(WY[918.], { [WY[1597]] = true, [WY[1697]] = U2[18.], [WY[592]] = WY[447.], [WY[181]] = {}, [WY[1977.]] = WY[1464.] }); U2[14]:AddDropdown(WY[1392.], { [WY[181]] = {},
+[WY[592]] = WY[1665.], [WY[1977.]] = WY[417.], [WY[1697]] = U2[18.], [WY[1597]] = true }); U2[14]:AddSlider(WY[39.], { [WY[181]] = WY[1317.], [WY[1734.]] = WY[2008], [WY[834.]] = WY[1505], [WY[1977.]] = WY[875], [WY[1873]] = WY[2008], [WY[592]] = WY[1073] });
+U2[20] = U2[26][WY[1477]]:AddRightGroupbox(WY[1180], WY[1581.]); Ev = 1249 else Ev = 3363.; continue end elseif Ev < 3209 then if Ev == 3208 then Ev = 285. else Ev = 3706; continue end elseif Ev == 3209 then U2[20] = (U2[10] * UK[1292] + UK[650]) % UK[2008] + UK[1292];
+Ev = 1014. else Ev = 3119; continue end elseif Ev < 3212 then if Ev < 3211 then Ev = if U2[20] <= UK[1292] then 609. else 1098. elseif Ev == 3211 then U2[26] = (U2[26] + UK[1165]) % UK[749]; Ev = 779 else Ev = 3406; continue end elseif Ev < 3213. then if Ev == 3212 then
+local Yh = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[20], UK[466]), string.byte(tostring(U2[23]))), UK[1609]); Ev = if bit32.bxor(bit32.lrotate(bit32.bxor(Yh, UK[107]), UK[2008]), UK[423.]) == bit32.lrotate(Yh, UK[2008]) then 979 else 1178 else Ev = 3859; continue
+end elseif Ev == 3213. then Ev = 856 else Ev = 3848; continue end elseif Ev < 3223 then if Ev < 3219. then if Ev < 3217 then if Ev < 3216. then if Ev < 3215 then Ev = if U2[20] <= UK[327.] then 303. else 177. elseif Ev == 3215 then Ev = 633. else Ev = 2829.;
+continue end else U2[20] = (U2[20] + UK[633.]) % UK[1984]; Ev = 1070 end elseif Ev < 3218 then local WY = UK; U2[1] = (vector.create((U2[20] * WY[1579] + WY[1579]) % WY[1478] + WY[1292], (U2[20] * WY[633.] + WY[1149.]) % WY[1149.] + WY[1292], (U2[20] * WY[597.] + WY[2008]) % WY[1628] + WY[1292]));
+U2[12.] = (vector.create((U2[20] * WY[2008] + WY[597.]) % WY[1478] + WY[1292], (U2[20] * WY[1620.] + WY[327.]) % WY[1149.] + WY[1292], (U2[20] * WY[327.] + WY[1165]) % WY[1628] + WY[1292])); U2[22] = (vector.create((U2[20] * WY[2008] + WY[2008]) % WY[633.] + WY[1292], (U2[20] * WY[1292] + WY[633.]) % WY[597.] + WY[1292], (U2[20] * WY[1292] + WY[633.]) % WY[1620.] + WY[1292]));
+Ev = if math.abs((vector.angle(U2[1], U2[12.], U2[22]))) - math.abs((vector.angle(U2[12.], U2[1], U2[22]))) == WY[650] then 799 else 952 else Eb = false; local WY = UK; D4 = WY[699.]; DY = WY[694]; DR = WY[1478]; Ev = 529 end elseif Ev < 3221 then if Ev < 3220 then
+if Ev == 3219. then U2[10] = nil; local WY = UK; U2[10] = WY[1165] - WY[2008]; U2[10] = WY[650] + WY[1292]; U2[10] = WY[2008] - WY[1292]; U2[10] = WY[597.] - WY[633.]; U2[10] = WY[1292] + WY[1292]; Ev = 1010 else Ev = 3730; continue end elseif Ev == 3220 then
+local WY = UK; U2[26] = (vector.create((U2[20] * WY[1579] + WY[1292]) % WY[1478] + WY[1292], (U2[20] * WY[1478] + WY[2008]) % WY[1149.] + WY[1292], (U2[20] * WY[1756] + WY[327.]) % WY[1628] + WY[1292])); U2[10] = (vector.create((U2[20] * WY[2008] + WY[749]) % WY[1478] + WY[1292], (U2[20] * WY[2008] + WY[1413.]) % WY[1149.] + WY[1292], (U2[20] * WY[327.] + WY[1143.]) % WY[1628] + WY[1292]));
+U2[18.] = (vector.create((U2[20] * WY[327.] + WY[597.]) % WY[1478] + WY[1292], (U2[20] * WY[1478] + WY[597.]) % WY[1149.] + WY[1292], (U2[20] * WY[327.] + WY[1165]) % WY[1628] + WY[1292])); U2[1] = (vector.create((U2[20] * WY[2008] + WY[633.]) % WY[1478] + WY[1292], (U2[20] * WY[597.] + WY[1620.]) % WY[1149.] + WY[1292], (U2[20] * WY[327.] + WY[1288]) % WY[1628] + WY[1292]));
+Ev = if vector.dot(vector.cross(U2[26], U2[10]), (vector.cross(U2[18.], U2[1]))) == vector.dot(U2[26], U2[18.]) * vector.dot(U2[10], U2[1]) - vector.dot(U2[26], U2[1]) * vector.dot(U2[10], U2[18.]) then 1076 else 479 else Ev = 3310; continue end elseif Ev < 3222. then
+Ev = 1204 else U2[14] = U2[26][UK[1655]]:AddLeftGroupbox(UK[1549], UK[91]); Ev = 166 end elseif Ev < 3228. then if Ev < 3226 then if Ev < 3225. then if Ev < 3224 then Ev = if U2[10] <= UK[1292] then 926 else 250 else DX = os[UK[353]](); Ev = 432. end else local WY = UK;
+U2[26] = { WY[1063], WY[1242.], WY[998], WY[847], WY[1280], WY[920], WY[1967], WY[245], WY[627.], WY[348.], WY[1225] }; local Yi = U2[20]; U2[10] = U2[26][Yi % WY[1478] + WY[1292]]; Ev = if U2[10]:len() <= U2[10]:gsub(WY[1246], WY[298], Yi % WY[1165] % WY[2008] + WY[1292]):len() then 44 else 670
+end elseif Ev < 3227 then if Ev == 3226 then Ev = 1045 else Ev = 3727; continue end elseif Ev == 3227 then local WY = UK; U2[10] = (vector.create((U2[26] * WY[633.] + WY[1620.]) % WY[1478] + WY[1292], (U2[26] * WY[1579] + WY[1149.]) % WY[1149.] + WY[1292], (U2[26] * WY[1149.] + WY[1413.]) % WY[1628] + WY[1292]));
+U2[18.] = (vector.create((U2[26] * WY[1579] + WY[597.]) % WY[1478] + WY[1292], (U2[26] * WY[1579] + WY[1620.]) % WY[1149.] + WY[1292], (U2[26] * WY[1292] + WY[1620.]) % WY[1628] + WY[1292])); U2[1] = (vector.create((U2[26] * WY[327.] + WY[2008]) % WY[633.] + WY[1292], (U2[26] * WY[1165] + WY[2008]) % WY[597.] + WY[1292], (U2[26] * WY[1165] + WY[1165]) % WY[1620.] + WY[1292]));
+Ev = if math.abs((vector.angle(U2[10], U2[18.], U2[1]))) - math.abs((vector.angle(U2[18.], U2[10], U2[1]))) == WY[650] then 262 else 652 else Ev = 3500; continue end elseif Ev < 3231. then if Ev < 3230 then if Ev < 3229 then Ev = 783. elseif Ev == 3229 then
+U2[20] = (U2[20] + UK[1165]) % UK[1060]; Ev = 815 else Ev = 4006; continue end else U2[26] = nil; local WY = UK; U2[26] = WY[1165] - WY[2008]; U2[26] = WY[650] + WY[1292]; U2[26] = WY[633.] - WY[327.]; Ev = 794 end elseif Ev < 3232 then local WY = UK; Du = U2[26]:AddLabel(b(WY[541]) .. c(WY[1388], WY[322]), true);
+Do = U2[26]:AddLabel(b(WY[1918]) .. c(WY[1388], WY[1927]), true); Dh = U2[26]:AddLabel(b(WY[1755.]) .. c(WY[1388], WY[345.]), true); Da = U2[26]:AddLabel(b(WY[451]) .. c(WY[458], WY[1289]), true); Ev = 512 else local Yj = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[26], UK[1620.]), string.byte(tostring(U2[20]))), UK[976]);
+Ev = if bit32.bxor(bit32.bxor(bit32.bxor(bit32.bxor(bit32.band(Yj, UK[802]), UK[947]), (bit32.bxor(bit32.band(Yj, UK[78.]), UK[1970]))), UK[947]), UK[1970]) == Yj then 655 else 461 end elseif Ev < 3311 then if Ev < 3272 then if Ev < 3253 then if Ev < 3243. then
+if Ev < 3238 then if Ev < 3236 then if Ev < 3235 then if Ev < 3234. then Ee = UK[1185.]:GetService(UK[1249]); Ev = 188 elseif Ev == 3234. then Ev = if (U2[10] * UK[1765] + UK[1413.]) % UK[591.] == UK[1165] then 1138 else 897. else Ev = 3109; continue end else
+Ev = 817 end elseif Ev < 3237. then if Ev == 3236 then local WY = UK; U2[26] = (vector.create((U2[20] * WY[327.] + WY[1579]) % WY[1478] + WY[1292], (U2[20] * WY[1620.] + WY[597.]) % WY[1149.] + WY[1292], (U2[20] * WY[749] + WY[1165]) % WY[1628] + WY[1292]));
+U2[10] = (vector.create((U2[20] * WY[1292] + WY[327.]) % WY[1478] + WY[1292], (U2[20] * WY[327.] + WY[327.]) % WY[1149.] + WY[1292], (U2[20] * WY[597.] + WY[1413.]) % WY[1628] + WY[1292])); U2[18.] = (vector.create((U2[20] * WY[2008] + WY[633.]) % WY[633.] + WY[1292], (U2[20] * WY[633.] + WY[1579]) % WY[597.] + WY[1292], (U2[20] * WY[1165] + WY[1292]) % WY[1620.] + WY[1292]));
+Ev = if math.abs((vector.angle(U2[26], U2[10], U2[18.]))) - math.abs((vector.angle(U2[10], U2[26], U2[18.]))) == WY[650] then 137 else 467 else Ev = 3082; continue end else U2[14] = U2[10][UK[750.]]:AddLeftGroupbox(UK[1323.], UK[712]); Ev = 15. end elseif Ev < 3241 then
+if Ev < 3240. then if Ev < 3239 then if Ev == 3238 then Ev = if U2[26] <= UK[633.] then 809 else 1062. else Ev = 3654.; continue end else Ev = 562 end elseif Ev == 3240. then Ev = if U2[16] <= UK[633.] then 1033 else 868 else Ev = 2850.; continue end elseif Ev < 3242 then
+if Ev == 3241 then Ev = if true then 593 else 67 else Ev = 3217; continue end elseif Ev == 3242 then Ev = 628 else Ev = 3760; continue end elseif Ev < 3249. then if Ev < 3246. then if Ev < 3245 then if Ev < 3244 then if Ev == 3243. then local Yk = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[26], UK[466]), string.byte(tostring(U2[10]))), UK[1060]);
+Ev = if bit32.bxor(bit32.lrotate(bit32.bxor(Yk, UK[1884.]), UK[608]), UK[1838]) == bit32.lrotate(Yk, UK[608]) then 431 else 718 else Ev = 3016; continue end elseif Ev == 3244 then Ev = if (U2[20] * UK[597.] + UK[327.]) % UK[1060] == UK[1165] then 13 else 904
+else Ev = 2853.; continue end else Ev = if U2[10] <= UK[1292] then 1190 else 33. end elseif Ev < 3247 then local WY = UK; U2[10]:AddToggle(WY[1952], { [WY[592]] = WY[2045], [WY[181]] = false }); U2[26] = U2[14][WY[111.]]:AddRightGroupbox(WY[1475], WY[1981]);
+Ev = 204. elseif Ev < 3248 then U2[26], U2[20], U2[10] = nil, nil, nil; U2[10] = UK[650]; Ev = 553 else Ev = if true then 515 else 52 end elseif Ev < 3251 then if Ev < 3250 then if Ev == 3249. then local WY = UK; U2[18.]:AddToggle(WY[1822], { [WY[592]] = WY[717.],
+[WY[181]] = false }); U2[18.]:AddToggle(WY[656], { [WY[592]] = WY[575], [WY[181]] = false }); U2[18.]:AddToggle(WY[17], { [WY[592]] = WY[1574], [WY[181]] = false }); U2[18.]:AddToggle(WY[662], { [WY[592]] = WY[1390], [WY[181]] = false }); U2[18.]:AddToggle(WY[972.], { [WY[592]] = WY[1556],
+[WY[181]] = false }); Ev = 453. else Ev = 3412; continue end elseif Ev == 3250 then U2[26] = U2[14][UK[1477]]:AddLeftGroupbox(UK[2048], UK[886]); Ev = 305 else Ev = 2808.; continue end elseif Ev < 3252. then if Ev == 3251 then Ev = 974 else Ev = 3780.; continue
+end elseif Ev == 3252. then Ev = 145 else Ev = 3807.; continue end elseif Ev < 3263 then if Ev < 3259 then if Ev < 3256 then if Ev < 3255. then if Ev < 3254 then Ev = 1179. elseif Ev == 3254 then Ev = 1207 else Ev = 3996.; continue end elseif Ev == 3255. then
+Ev = if true then 872 else 927. else Ev = 3290; continue end elseif Ev < 3257 then if Ev == 3256 then Ev = if (U2[20] * UK[633.] + UK[1149.]) % UK[1060] == UK[1292] then 778 else 1234 else Ev = 2963; continue end elseif Ev < 3258. then Ev = 934 elseif Ev == 3258. then
+Ev = 577 else Ev = 3295; continue end elseif Ev < 3261. then if Ev < 3260 then Ev = 32 elseif Ev == 3260 then Ev = 136 else Ev = 3167; continue end elseif Ev < 3262 then Ev = if (D_ or not Cs) and (not Dp and not Cs) and (not U2[14] or not D_ or DW and D_) and not ((D_ or not Cs) and (not Dp and not Cs) and (not U2[14] or not D_ or DW and D_)) then 1235 else 1247
+elseif Ev == 3262 then Ev = 1228 else Ev = 3078.; continue end elseif Ev < 3268 then if Ev < 3266 then if Ev < 3265 then if Ev < 3264. then if Ev == 3263 then Ev = 827 else Ev = 3287; continue end elseif Ev == 3264. then Ev = if U2[16] <= UK[1355] then 891. else 1236.
+else Ev = 3263; continue end else U2[14] = U2[26][UK[982]]:AddLeftGroupbox(UK[1761.], UK[623]); Ev = 753. end elseif Ev < 3267. then Ev = 418 elseif Ev == 3267. then local WY = UK; U2[18.]:AddToggle(WY[1285], { [WY[592]] = WY[3.], [WY[181]] = false }); U2[18.]:AddDivider();
+U2[18.]:AddButton({ [WY[592]] = WY[741.], [WY[1441]] = WY[784] }); Ev = 4 else Ev = 2804; continue end elseif Ev < 3270. then if Ev < 3269 then Ev = 1024 elseif Ev == 3269 then Ev = 769 else Ev = 10966; continue end elseif Ev < 3271 then if Ev == 3270. then
+Ev = if U2[10] <= UK[2008] then 945. else 758 else Ev = 3139; continue end else U2[10] = (U2[18.] * UK[2008] + UK[1292]) % UK[1165] + UK[1292]; Ev = 587 end elseif Ev < 3292 then if Ev < 3283 then if Ev < 3278 then if Ev < 3276. then if Ev < 3274 then if Ev < 3273. then
+if Ev == 3272 then U2[18.] = nil; local WY = UK; U2[18.] = WY[633.] - WY[327.]; U2[18.] = WY[650] + WY[1292]; U2[18.] = WY[2008] - WY[1292]; U2[18.] = WY[650] + WY[1292]; U2[18.] = WY[2008] - WY[1292]; Ev = 858. else Ev = 3934; continue end elseif Ev == 3273. then
+local Yl = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[20], UK[976]), string.byte(tostring(CX))), UK[1628]); Ev = if bit32.bxor(bit32.lrotate(bit32.bxor(Yl, UK[401]), UK[608]), UK[1996]) ~= bit32.lrotate(Yl, UK[608]) then 496 else 419 else Ev = 3757; continue
+end elseif Ev < 3275 then Ev = 1118 else Ev = if true then 821 else 181 end elseif Ev < 3277 then if Ev == 3276. then Ev = 160 else Ev = 4010; continue end elseif Ev == 3277 then U2[20] = (U2[20] + UK[1620.]) % UK[1060]; Ev = 1210 else Ev = 2775.; continue
+end elseif Ev < 3281 then if Ev < 3280 then if Ev < 3279. then if Ev == 3278 then U2[26] = nil; local WY = UK; U2[26] = WY[633.] - WY[327.]; U2[26] = WY[2008] - WY[1292]; U2[26] = WY[633.] - WY[1165]; Ev = 484 else Ev = 3134; continue end elseif Ev == 3279. then
+Ev = 638 else Ev = 3457; continue end else Ev = if (U2[10] * UK[1165] + UK[1579]) % UK[1060] == UK[1478] then 716 else 511 end elseif Ev < 3282. then local WY = UK; C0 = U2[26]:AddLabel(b(WY[1904]) .. c(WY[204.], WY[1927]), true); CX = U2[26]:AddLabel(b(WY[157]) .. c(WY[204.], WY[345.]), true);
+Ev = 721 elseif Ev == 3282. then Ev = 404 else Ev = 3776; continue end elseif Ev < 3288. then if Ev < 3286 then if Ev < 3285. then if Ev < 3284 then local Ym = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[26], UK[749]), string.byte(tostring(D9))), UK[206]); Ev = if bit32.bxor(bit32.lrotate(bit32.bxor(Ym, UK[222.]), UK[327.]), UK[1793]) == bit32.lrotate(Ym, UK[327.]) then 806 else 678.
+else Ev = 1000 end else D7 = {}; Ev = 737 end elseif Ev < 3287 then Ev = if true then 905 else 211 elseif Ev == 3287 then Ev = 669. else Ev = 4016; continue end elseif Ev < 3290 then if Ev < 3289 then U2[26] = nil; local WY = UK; U2[26] = WY[633.] - WY[327.];
+U2[26] = WY[650] + WY[1292]; U2[26] = WY[2008] - WY[1292]; U2[26] = WY[650] + WY[1292]; Ev = 1007 else Ev = 998 end elseif Ev < 3291. then local WY = UK; U2[26] = { WY[824], WY[1341.], WY[2], WY[652], WY[8], WY[1919], WY[1894], WY[635], WY[1982], WY[297.] };
+Ev = if U2[26][(U2[20] * WY[1478] + WY[1329.]) % WY[1756] + WY[1292]] <= U2[26][(U2[20] * WY[1478] + WY[1329.]) % WY[1756] + WY[1292]] then 664 else 300. else local WY = UK; U2[10] = U2[14][WY[1747]]:AddRightGroupbox(WY[1397], WY[641]); Cy = U2[10]:AddLabel(b(WY[1939]) .. c(WY[1388], WY[322]), true);
+Cv = U2[10]:AddLabel(b(WY[1112]) .. c(WY[1388], WY[602]), true); Ct = U2[10]:AddLabel(b(WY[858.]) .. c(WY[1388], WY[1927]), true); Ef = U2[10]:AddLabel(b(WY[1866.]) .. c(WY[89], WY[345.]), true); Ev = 987. end elseif Ev < 3301 then if Ev < 3297. then if Ev < 3295 then
+if Ev < 3294. then if Ev < 3293 then Ev = 243. else U2[20] = (U2[20] + UK[1165]) % UK[466]; Ev = 410 end elseif Ev == 3294. then Ev = if true then 656 else 382 else Ev = 3183.; continue end elseif Ev < 3296 then Ev = 258. else local WY = UK; U2[14] = U2[1][WY[1747]]:AddLeftGroupbox(WY[893], WY[106]);
+U2[14]:AddLabel(sz(b(createMultiGradientText(WY[1043], U2[26][WY[943]])), WY[466]), true); U2[14]:AddLabel(c(i(WY[1905.]), WY[1239.]), true); U2[14]:AddLabel(c(b(WY[1430]), WY[1940]) .. c(b(WY[193]), WY[602]) .. c(WY[1907], WY[663.]) .. c(b(WY[1792]), WY[1940]) .. c(b(WY[455]), WY[661]), true);
+U2[14]:AddDivider(); U2[14]:AddLabel(sz(b(createMultiGradientText(WY[781], U2[26][WY[1406]])), WY[1143.]), true); U2[14]:AddLabel(sz(b(createMultiGradientText(WY[1488.], U2[26][WY[1406]])), WY[1143.]), true); U2[14]:AddButton({ [WY[592]] = WY[1641.], [WY[1441]] = WY[1897] });
+U2[14]:AddButton({ [WY[592]] = WY[873.], [WY[1441]] = WY[1985] }); U2[4] = U2[1][WY[1747]]:AddLeftGroupbox(WY[1821.], WY[814]); Ev = 714. end elseif Ev < 3299 then if Ev < 3298 then Ev = 217 else Ev = if U2[20] <= UK[1292] then 263 else 1139 end elseif Ev < 3300. then
+if Ev == 3299 then Ev = if U2[16] <= UK[976] then 761 else 1019 else Ev = 3599; continue end elseif Ev == 3300. then U2[10] = nil; local WY = UK; U2[10] = WY[2008] - WY[1292]; U2[10] = WY[650] + WY[1292]; Ev = 314 else Ev = 3318.; continue end elseif Ev < 3306. then
+if Ev < 3304 then if Ev < 3303. then if Ev < 3302 then if Ev == 3301 then U2[14] = U2[18.][UK[705.]]:AddLeftGroupbox(UK[1928], UK[1573]); Ev = 355 else Ev = 3615.; continue end else local Yn = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[20], UK[1609]), string.byte(tostring(U2[26]))), UK[1337]);
+Ev = if bit32.bxor(bit32.bxor(bit32.bxor(bit32.bxor(bit32.band(Yn, UK[140]), UK[445]), (bit32.bxor(bit32.band(Yn, UK[1690]), UK[2049.]))), UK[445]), UK[2049.]) == Yn then 445 else 548 end elseif Ev == 3303. then U2[18.] = { UK[2015], UK[479], UK[1082], UK[164],
+UK[2057], UK[1580], UK[410], UK[964], UK[1969], UK[1097], UK[1411] }; Ev = 112 else Ev = 3936.; continue end elseif Ev < 3305 then if Ev == 3304 then Ev = if (U2[20] * UK[2008] + UK[1165]) * UK[597.] % UK[1165] == ((U2[20] * UK[2008] + UK[1165]) * UK[597.] + UK[650]) % UK[1165] then 232 else 61
+else Ev = 3409; continue end elseif Ev == 3305 then local WY = UK; U2[26] = { WY[1036], WY[415], WY[1959.], WY[775], WY[1064], WY[1754], WY[1932.], WY[1267], WY[1845.], WY[1152.], WY[118], WY[1093], WY[1743.] }; Ev = if U2[26][(U2[20] * WY[1035.] + WY[406]) % WY[1149.] + WY[1292]] <= U2[26][(U2[20] * WY[1035.] + WY[406]) % WY[1149.] + WY[1292]] then 797 else 396.
+else Ev = 3513.; continue end elseif Ev < 3309. then if Ev < 3307 then if Ev == 3306. then Ev = 498. else Ev = 3745; continue end elseif Ev < 3308 then Ev = 881 else Ev = if U2[18.] <= UK[327.] then 279. else 521 end elseif Ev < 3310 then U2[20] = (U2[20] + UK[597.]) % UK[591.];
+Ev = 743 elseif Ev == 3310 then Ev = if U2[16] <= UK[2008] then 571 else 1077. else Ev = 3572; continue end elseif Ev < 3349 then if Ev < 3330. then if Ev < 3321. then if Ev < 3316 then if Ev < 3314 then if Ev < 3313 then if Ev < 3312. then Ev = 889 else local WY = UK;
+CR = D3[WY[277]]; D9 = WY[650]; Ev = 852. end elseif Ev == 3313 then DO = UK[633.]; Ev = 1114 else Ev = 3765.; continue end elseif Ev < 3315. then Ev = 306. else local WY = UK; U2[1] = { WY[1113.], WY[962], WY[630.], WY[645.], WY[1106], WY[76], WY[1778], WY[328],
+WY[1214], WY[1132], WY[1935.] }; local Yo = U2[20]; U2[12.] = U2[1][Yo % WY[1478] + WY[1292]]; Ev = if U2[12.]:len() >= U2[12.]:reverse():rep(Yo % WY[1165] + WY[2008]):len() then 956 else 1243 end elseif Ev < 3319 then if Ev < 3318. then if Ev < 3317 then U2[10] = (U2[10] + UK[633.]) % UK[1060];
+Ev = 482 elseif Ev == 3317 then local Yp = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[26], UK[2008]), string.byte(tostring(U2[20]))), UK[1765]); Ev = if bit32.bxor(bit32.bxor(bit32.bxor(bit32.bxor(bit32.band(Yp, UK[1129]), UK[1438]), (bit32.bxor(bit32.band(Yp, UK[1087]), UK[1278.]))), UK[1438]), UK[1278.]) == Yp then 76 else 1020.
+else Ev = 3327.; continue end else local WY = UK; ad_isDungeonComplete = WY[799]; ad_isDungeonNotStarted = WY[1155.]; ad_cancelTween = WY[473]; function ad_resetPhysics() local Ho; Ho = nil; local Hp = nil; local Hq = nil; Hq = 1; while true do Hq = 13570 - Hq;
+do if Hq < 12999. then break elseif Hq < 13568 then if Hq < 13566. then if Hq < 13565 then break elseif Hq == 13565 then Hp:ChangeState(UK[1209.][UK[1870]][UK[309.]]); Hq = 3. else Hq = 2764; continue end elseif Hq < 13567 then return elseif Hq == 13567 then
+Hq = 2 else Hq = 2764; continue end elseif Hq < 13570 then if Hq < 13569. then break else Ho = ad_getHRP(); Hq = if not Ho then 4 else 0. end elseif Hq < 14532. then if Hq == 13570 then local Yq = UK; Ho[Yq[273.]] = Yq[1618][Yq[958]]; Ho[Yq[1533.]] = Yq[1618][Yq[958]];
+Yq[879.](function() Ho[UK[829]] = UK[1618][UK[958]] end); Yq[879.](function() Ho[UK[899]] = UK[1618][UK[958]] end); Hp = getHumanoid(); Hq = if Hp then 5 else 3. else break end else break end end end end; ad_directTeleport = WY[919]; function ad_tweenTo(en, eo)
+local HA, HB, HC, HD, HE, HF = nil, nil, nil, nil, nil, nil; local HH = nil; HH = 4; while true do HH = 14122 - HH; do if HH < 14114 then if HH < 11647 then break elseif HH < 14112. then if HH < 14111 then break else HF = HE; HH = 9. end elseif HH < 14113 then
+if HH == 14112. then HF = HE; HE = math.clamp(HD / HF, UK[1505], UK[1165]); HA = UK[812][UK[1182.]](HE, UK[1209.][UK[108.]][UK[1290.]], UK[1209.][UK[1540]][UK[391]]); HD, HB = UK[879.](function() return D2:Create(HC, HA, { [UK[1077.]] = en }) end); HE = not HB;
+HF = not HD; HH = if HF then 9. else 11 else HH = 7977.; continue end elseif HH == 14113 then HH = if HF then 0. else 1 else HH = 14121.; continue end elseif HH < 14118. then if HH < 14116 then if HH < 14115. then if HH == 14114 then return else HH = 14117;
+continue end else HD = (en[UK[2060]] - HC[UK[2060]])[UK[1142]]; HH = if HD < UK[1292] then 8 else 6. end elseif HH < 14117 then ad_cancelTween(); HE = eo; HH = if HE then 10 else 3. else return end elseif HH < 14120 then if HH < 14119 then if HH == 14118. then
+HC = ad_getHRP(); HH = if not HC then 5 else 7 else HH = 14117; continue end elseif HH == 14119 then HE = Dz; HH = 10 else HH = 14120; continue end elseif HH < 14121. then break elseif HH < 14122 then CK = HB; HB[UK[907]]:Connect(function(eE) local Hu, Hv, Hw, Hx, Hy, Hz = nil, nil, nil, nil, nil, nil;
+local Ht = nil; Ht = 7; while true do Ht = 7506. - Ht; do if Ht < 7503. then if Ht < 7499 then break elseif Ht < 7501 then if Ht < 7500. then local Yr = UK; Hw = if eE == Yr[1209.][Yr[1661]][Yr[907]] then Yr[1292] else Yr[650]; Hu = Yr[1024] * Hw + Yr[409] * (Yr[1292] - Hw);
+Ht = 6. elseif Ht == 7500. then Hv = UK[971] * Hw + UK[1534] * (UK[1292] - Hw); Ht = 2 else Ht = 9897.; continue end elseif Ht < 7502 then if Ht == 7501 then ad_resetPhysics(); Ht = 3. else Ht = 4305.; continue end elseif Ht == 7502 then CK = nil; Ht = 0. else
+Ht = 288.; continue end elseif Ht < 8336 then if Ht < 7505 then if Ht < 7504 then if Ht == 7503. then local Yr = UK; Hz = if CK == HB then Yr[1292] else Yr[650]; Hx = Yr[1588] * Hz + Yr[2031.] * (Yr[1292] - Hz); Hy = Yr[1702] * Hz + Yr[1675] * (Yr[1292] - Hz);
+Ht = if (Hx * Yr[1308.] + Hy * Yr[333.] + Hx * Hy) % Yr[1264] == Yr[1107.] then 4 else 0. else Ht = 1861; continue end elseif Ht == 7504 then Ht = if (Hu * UK[250] + Hv * UK[399.] + Hu * Hv) % UK[1264] == UK[543.] then 5 else 3. else Ht = 7502; continue end
+elseif Ht < 7506. then break elseif Ht == 7506. then Ht = 1 else break end else break end end end end); HB:Play(); return HB elseif HH == 14122 then return else HH = 14112.; continue end end end end; ad_moveTo = WY[1275.]; function ad_pathfindTweenTo(eJ, eK)
+local HJ; local HK; HJ = nil; HK = nil; local HM, HN, HO, HP, HQ, HS, HT, HU, HV = nil, nil, nil, nil, nil, nil, nil, nil, nil; local HR = nil; HR = 11; while true do HR = 10967 - HR; do if HR < 10966 then if HR < 10956. then if HR < 10955 then if HR < 8425 then
+break elseif HR < 9536 then break elseif HR < 10954 then break elseif HR == 10954 then HR = if HM then 9. else 6. else HR = 10955; continue end else HN = #HM; HT = false; for eV = UK[2008], HN do local HL = nil; HU = eV; local HS = nil; local Ys = UK; HS = Ys[1579];
+while true do if HS < 8 then if HS < 4 then if HS < 2 then if HS < 1 then HO = tick() - HN < HQ + Ys[1317.]; HS = Ys[1165] else HV = HU; Ys[879.](function() HL:Cancel() end); CK = nil; HS = Ys[2008] end elseif HS < 3. then HS = Ys[1149.] else HS = if HO then Ys[1060] else Ys[1478]
+end elseif HS < 6. then if HS < 5 then HT = true; HS = Ys[1149.] else HO = HL[Ys[1661]] == Ys[1209.][Ys[1661]][Ys[210.]]; HS = if HO then Ys[650] else Ys[1165] end elseif HS < 7 then HS = if DJ[Ys[1902.]] then Ys[1756] else Ys[1288] else HS = Ys[1413.] end
+elseif HS < 12. then if HS < 10 then if HS < 9. then HP = (HN[Ys[2060]] - HO)[Ys[1142]]; HS = if HP > Ys[419] then Ys[1143.] else Ys[2008] else return false end elseif HS < 11 then return false else HS = Ys[1292] end elseif HS < 14 then if HS < 13 then HS = if true then Ys[633.] else Ys[1292]
+else break end elseif HS < 15. then HQ = HP / eK; HP = Ys[812][Ys[1182.]](HQ, Ys[1209.][Ys[108.]][Ys[1384]], Ys[1209.][Ys[1540]][Ys[391]]); local Yt = Ys[359][Ys[1182.]]; HL = D2:Create(HN, HP, { [Ys[1077.]] = Ys[1207](HO) }); CK = HL; HL:Play(); HN = tick();
+HS = Ys[1413.] elseif HS < 16 then HV = HU; HN = HM[HV]; local Yu = Ys[1618][Ys[1182.]]; HO = HN[Ys[2060]] + Ys[1417](Ys[650], Ys[1165], Ys[650]); HN = ad_getHRP(); HS = if not HN then Ys[1620.] else Ys[749] else local Yv = Ys[1957][Ys[438.]]; Ys[1433](); HS = Ys[597.]
+end end; if HT then break end end; HN = ad_getHRP(); HR = if HN then 2 else 0. end elseif HR < 10961 then if HR < 10958 then if HR < 10957 then HJ = ad_getHRP(); HR = if not HJ then 8 else 1 elseif HR == 10957 then HM = HK[UK[485]] ~= UK[1209.][UK[1325]][UK[638]];
+HR = 13 else HR = 10958; continue end elseif HR < 10959. then if HR == 10958 then return false else HR = 10956.; continue end elseif HR < 10960 then return false elseif HR == 10960 then HM = UK[978.]; HR = 4 else HR = 10959.; continue end elseif HR < 10963 then
+if HR < 10962. then HM = HK:GetWaypoints(); HR = if #HM < UK[2008] then 3. else 12. else break end elseif HR < 10964 then if HR == 10963 then eK = HM; local Ys = UK; HK = Dr:CreatePath({ [Ys[666.]] = Ys[1165], [Ys[389]] = Ys[633.], [Ys[1058]] = true, [Ys[437]] = Ys[749],
+[Ys[435.]] = Ys[978.], [Ys[682]] = Ys[327.] }); HN, HM = Ys[879.](function() HK:ComputeAsync(HJ[UK[2060]], eJ) end); HM = not HN; HR = if HM then 13 else 10 else HR = 1929.; continue end elseif HR < 10965. then if HR == 10964 then return false else HR = 10965.;
+continue end elseif HR == 10965. then local Yw = UK[1618][UK[1182.]]; HN[UK[1077.]] = UK[359][UK[1182.]](eJ + UK[1417](UK[650], UK[1165], UK[650])); HR = 0. else HR = 10957; continue end elseif HR < 11804 then if HR < 10967 then if HR == 10966 then HM = eK;
+HR = if HM then 4 else 7 else HR = 8425; continue end elseif HR == 10967 then return true else HR = 10956.; continue end else break end end end end; adf_isEnemyAlive = WY[149]; adf_getEnemyPart = WY[412]; adf_getEnemies = WY[92]; adf_isValidTarget = WY[368];
+adf_pickTarget = WY[629]; adTP_getNearestTeleportPad = WY[127]; function adf_checkAndHandleTeleportPad() local IR, IS, IT, IU, IV, IW, IY, IZ, I_, I0, I1, I2 = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local IX = nil; IX = 11; while true do
+IX = 16296. - IX; do if IX < 16283 then if IX < 12828. then break elseif IX < 16279 then if IX < 15142 then break elseif IX < 16278. then break else IS = ad_getHRP(); I_ = if not IS then UK[1292] else UK[650]; IY = UK[342.] * I_ + UK[1934] * (UK[1292] - I_);
+IZ = UK[1946] * I_ + UK[198.] * (UK[1292] - I_); IX = if (IY * UK[871] + IZ * UK[1663] + IY * IZ) % UK[1264] == UK[1227.] then 5 else 14 end elseif IX < 16281. then if IX < 16280 then return true else CK = IV; IV[UK[907]]:Connect(function() CK = nil; ad_resetPhysics();
+local Yx = UK[1957][UK[438.]]; UK[1433](UK[1576]); CS = nil; CW = nil; CI = false end); IV:Play(); return true end elseif IX < 16282 then if IX == 16281. then IW = IV <= UK[1439]; IX = 3. else IX = 10444; continue end else IU, IV = adTP_getNearestTeleportPad();
+IW = IU; IX = if IW then 15. else 3. end elseif IX < 16290. then if IX < 16286 then if IX < 16284. then if IX == 16283 then IX = if (I0 * UK[161] + I1 * UK[269] + I0 * I1) % UK[1264] == UK[951.] then 2 else 4 else IX = 16294; continue end elseif IX < 16285 then
+if IX == 16284. then return false else IX = 15142; continue end elseif IX == 16285 then IX = if CI then 17 else 6. else IX = 10444; continue end elseif IX < 16288 then if IX < 16287. then I1 = UK[554] * I2 + UK[1811] * (UK[1292] - I2); IX = 13 elseif IX == 16287. then
+IX = if IW then 16 else 1 else IX = 16285; continue end elseif IX < 16289 then break elseif IX == 16289 then IX = 4 else IX = 16279; continue end elseif IX < 16293. then if IX < 16291 then IX = if #adf_getEnemies() > UK[650] then 12. else 18. elseif IX < 16292 then
+return false else return false end elseif IX < 16295 then if IX < 16294 then I2 = if IW then UK[1292] else UK[650]; I0 = UK[2070.] * I2 + UK[831.] * (UK[1292] - I2); IX = 10 elseif IX == 16294 then CI = true; ad_cancelTween(); local Yy = UK[1618][UK[1182.]];
+IR = UK[359][UK[1182.]](IU[UK[2060]] + UK[1417](UK[650], IU[UK[2013.]][UK[2043.]] / UK[2008] + UK[1165], UK[650])); IU = math.clamp(IV / UK[978.], UK[192.], UK[2051]); IT = UK[812][UK[1182.]](IU, UK[1209.][UK[108.]][UK[1384]]); IU, IV = UK[879.](function()
+return D2:Create(IS, IT, { [UK[1077.]] = IR }) end); IW = IU; IX = if IW then 0. else 9. else IX = 16282; continue end elseif IX < 16296. then if IX == 16295 then CI = false; IX = 7 else IX = 7112; continue end else IW = IV; IX = 9. end end end end; adf_stopMovement = WY[61];
+function adf_startMovement() local Je = nil; Je = 3.; while true do Je = 4098. - Je; do if Je < 6848 then if Je < 4097 then if Je < 4095. then break elseif Je < 4096 then if Je == 4095. then Je = if CO then 1 else 0. else Je = 74; continue end else break end
+elseif Je < 4098. then if Je == 4097 then return else Je = 4096; continue end elseif Je < 4557. then if Je == 4098. then local Yz = UK; CM = Yz[650]; CI = false; CO = D8[Yz[1236.]]:Connect(function(gj, gk) local Jb, Jc = nil, nil; local Jd = nil; Jd = 7; while true do
+Jd = 11420 - Jd; do if Jd < 11412. then if Jd < 11404 then if Jd < 11400. then break elseif Jd < 11402 then if Jd < 11401 then if Jd == 11400. then Jd = if Jb then 13 else 14 else Jd = 14323; continue end elseif Jd == 11401 then return else Jd = 10883; continue
+end elseif Jd < 11403. then function calculateTargetCFrame(gs) local I4, I5, I6, I8, I9, Ja = nil, nil, nil, nil, nil, nil; local I7 = nil; I7 = 9.; while true do I7 = 12335 - I7; do if I7 < 12326 then if I7 < 12319 then if I7 < 10688 then break elseif I7 < 11540 then
+break elseif I7 < 12318. then break else local YA = UK; I6 = gs[YA[1077.]][YA[1407.]] * -YA[1579]; I5 = YA[359][YA[1182.]](I4 + I6, I4); I7 = 12. end elseif I7 < 12322 then if I7 < 12320 then I7 = if D4 == UK[1183] then 17 else 2 elseif I7 < 12321. then if I7 == 12320 then
+I7 = 8 else I7 = 12321.; continue end else break end elseif I7 < 12324. then if I7 < 12323 then if I7 == 12322 then local YB = UK[1618][UK[1182.]]; local YA = UK; I6 = I4 - YA[1417](YA[650], DR, YA[650]); I5 = YA[359][YA[1182.]](I6, I4); I7 = 15. else I7 = 11540;
+continue end elseif I7 == 12323 then I7 = 4 else I7 = 12321.; continue end elseif I7 < 12325 then return nil elseif I7 == 12325 then local YA = UK; CM = (CM + DL * gk) % (math.pi * YA[2008]); local YC = YA[1618][YA[1182.]]; I6 = I4 + YA[1417](math.cos(CM) * DF, DR, math.sin(CM) * DF);
+I5 = YA[359][YA[1182.]](I6, I4); I7 = 4 else I7 = 12332; continue end elseif I7 < 12333. then if I7 < 12329 then if I7 < 12327. then local YA = UK; Ja = if not gs then YA[1292] else YA[650]; I8 = YA[1435] * Ja + YA[4] * (YA[1292] - Ja); I9 = YA[1911.] * Ja + YA[1692.] * (YA[1292] - Ja);
+I7 = if (I8 * YA[454] + I9 * YA[119] + I8 * I9) % YA[1264] == YA[1067] then 11 else 6. elseif I7 < 12328 then I7 = 12. elseif I7 == 12328 then local YD = UK[1618][UK[1182.]]; I5 = UK[359][UK[1182.]](I4 + UK[1417](UK[650], UK[650], UK[327.]), I4); I7 = 8 else
+I7 = 12322; continue end elseif I7 < 12331 then if I7 < 12330. then if I7 == 12329 then local YA = UK; I4 = gs[YA[2060]]; I5 = nil; I7 = if D4 == YA[699.] then 1 else 5 else I7 = 11540; continue end elseif I7 == 12330. then I7 = if D4 == UK[1048] then 10 else 16
+else I7 = 12320; continue end elseif I7 < 12332 then if I7 == 12331 then I7 = 0. else I7 = 12334; continue end else local YA = UK; Ja = if D4 == YA[2044] then YA[1292] else YA[650]; I8 = YA[1640] * Ja + YA[467] * (YA[1292] - Ja); I9 = YA[1912] * Ja + YA[146] * (YA[1292] - Ja);
+I7 = if (I8 * YA[868] + I9 * YA[1503.] + I8 * I9) % YA[1264] == YA[228.] then 13 else 15. end elseif I7 < 12813. then if I7 < 12334 then I7 = if D4 == UK[285.] then 7 else 3. elseif I7 < 12335 then if I7 == 12334 then local YE = UK[1618][UK[1182.]]; local YA = UK;
+I6 = I4 + YA[1417](YA[650], DR, YA[650]); I5 = YA[359][YA[1182.]](I6, I4); I7 = 0. else I7 = 11540; continue end elseif I7 == 12335 then return I5 else I7 = 15780.; continue end else break end end end end; Jb = adf_getEnemies(); Jd = if #Jb > UK[650] then 1 else 11
+else Jb = ad_getHRP(); Jd = if not Jb then 0. else 18. end elseif Jd < 11408 then if Jd < 11406. then if Jd < 11405 then ad_moveTo(Jc); Jd = 15. else Jd = 6. end elseif Jd < 11407 then if Jd == 11406. then Jd = if Eb then 19 else 8 else Jd = 11420; continue
+end elseif Jd == 11407 then adf_stopMovement(); return else Jd = 15540.; continue end elseif Jd < 11410 then if Jd < 11409. then if Jd == 11408 then return else Jd = 11413; continue end elseif Jd == 11409. then CW = nil; Jd = if adf_checkAndHandleTeleportPad() then 4 else 2
+else Jd = 11400.; continue end elseif Jd < 11411 then if Jd == 11410 then CW = Jb[UK[1825]]; Jc = calculateTargetCFrame(Jb[UK[1394]]); Jd = if Jc then 16 else 15. else Jd = 11413; continue end else break end elseif Jd < 11420 then if Jd < 11416 then if Jd < 11414 then
+if Jd < 11413 then if Jd == 11412. then Jd = if CI then 12. else 17 else Jd = 15540.; continue end else Jb = DJ[UK[1902.]]; Jd = if Jb then 20 else 5 end elseif Jd < 11415. then Jd = 9. elseif Jd == 11415. then Jb = not isOn(UK[478]); Jd = 20 else Jd = 11401;
+continue end elseif Jd < 11418. then if Jd < 11417 then return elseif Jd == 11417 then return else Jd = 11404; continue end elseif Jd < 11419 then Jd = 6. else Jb = adf_pickTarget(); Jd = if not Jb then 3. else 10 end elseif Jd < 13543 then if Jd < 11861 then
+if Jd < 11704 then if Jd == 11420 then return else Jd = 11417; continue end else break end else break end else break end end end end); Je = 2 else break end else break end else break end end end end; function adeq_fire(gE, gF, gG) UK[879.](function() Ds:FireServer(gE, gF, gG)
+end) end; adeq_oldHP = WY[1543]; adeq_oldSTR = WY[312.]; adeq_oldMAG = WY[1622]; adeq_total = WY[1354]; adeq_isLoaded = WY[653]; adeq_waitForLoaded = WY[1312]; adeq_waitForSlot = WY[2072]; adeq_waitForUnequip = WY[1335.]; adeq_getInv = WY[618.]; adeq_getEquippedInSlot = WY[1109];
+adeq_collect = WY[1326.]; adeq_score = WY[912.]; function adeq_sort(hj, hk) table.sort(hj, function(hl, hm) local JQ, JR, JS, JU, JV, JW = nil, nil, nil, nil, nil, nil; local JT = nil; JT = 1; while true do JT = 8789 - JT; do if JT < 8781. then if JT < 8774 then
+if JT < 7766 then break elseif JT < 8772. then break elseif JT < 8773 then JT = if (JU * UK[2030] + JV * UK[54.] + JU * JV) % UK[1264] == UK[615.] then 0. else 11 else JQ = UK[650]; JT = 9. end elseif JT < 8777 then if JT < 8775. then if JT == 8774 then JR, JQ = adeq_total(hl), adeq_total(hm);
+JT = if JR ~= JQ then 4 else 7 else JT = 8784.; continue end elseif JT < 8776 then if JT == 8775. then JS = UK[2056]; JT = 8 else JT = 11406.; continue end elseif JT == 8776 then JR = tostring(JQ); JS = (hm:GetAttribute(UK[472])); JT = if JS then 8 else 14
+else JT = 8781.; continue end elseif JT < 8779 then if JT < 8778. then return JR > JQ elseif JT == 8778. then JQ = UK[650]; JT = 0. else JT = 11406.; continue end elseif JT < 8780 then break elseif JT == 8780 then JR = JQ; local YF = UK; JQ = (hm:GetAttribute(YF[1340]));
+JW = if JQ then YF[1292] else YF[650]; JU = YF[305] * JW + YF[800] * (YF[1292] - JW); JT = 3. else JT = 8777; continue end elseif JT < 8788 then if JT < 8784. then if JT < 8782 then if JT == 8781. then return JR < tostring(JS) else JT = 11406.; continue end
+elseif JT < 8783 then if JT == 8782 then JQ = (hl:GetAttribute(UK[1340])); JT = if JQ then 9. else 16 else JT = 8774; continue end else JQ = (hl:GetAttribute(UK[472])); JT = if JQ then 13 else 2 end elseif JT < 8786 then if JT < 8785 then return JR > JS else
+return JR > JQ end elseif JT < 8787. then JV = UK[1537] * JW + UK[1956.] * (UK[1292] - JW); JT = 17 else JQ = UK[2056]; JT = 13 end elseif JT < 10721 then if JT < 8789 then if JT == 8788 then JR, JQ = adeq_score(hl, hk), adeq_score(hm, hk); JT = if JR ~= JQ then 12. else 15.
+else JT = 11406.; continue end elseif JT < 9796 then if JT == 8789 then JS = JQ; JT = if JR ~= JS then 5 else 6. else break end else break end else break end end end end) end; adeq_fastPrime = WY[231.]; adeq_doEquipWeapon = WY[961]; adeq_doEquipArmor = WY[1685];
+adeq_doEquipHelmet = WY[214]; adeq_doEquipHeroes = WY[1899.]; adeq_collectSpells = WY[774.]; adeq_doEquipSpells = WY[244]; adeq_doEquipUltimate = WY[264.]; D0[WY[1567]]:Connect(WY[1890.]); Dk = WY[633.]; Ev = 654. end elseif Ev < 3320 then local YG = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[20], UK[836]), string.byte(tostring(U2[26]))), UK[1165]);
+Ev = if bit32.bxor(bit32.bxor(bit32.bxor(bit32.bxor(bit32.band(YG, UK[631]), UK[1376]), (bit32.bxor(bit32.band(YG, UK[987.]), UK[1224.]))), UK[1376]), UK[1224.]) ~= YG then 1158. else 911 elseif Ev == 3320 then Ev = if (U2[20] * UK[1292] + UK[327.]) * UK[976] % UK[327.] == ((U2[20] * UK[1292] + UK[327.]) * UK[976] + (UK[327.] + UK[1292])) % UK[327.] then 246. else 631
+else Ev = 3339.; continue end elseif Ev < 3326 then if Ev < 3324. then if Ev < 3323 then if Ev < 3322 then Ev = 421 elseif Ev == 3322 then Ev = 337 else Ev = 4028; continue end else Ev = if U2[16] <= UK[1001] then 1209. else 1121 end elseif Ev < 3325 then if Ev == 3324. then
+local WY = UK; Dv = WY[1317.]; DA = true; Db = true; Dq = WY[2056]; Di = WY[2056]; Ev = 863 else Ev = 3382; continue end else U2[18.] = nil; local WY = UK; U2[18.] = WY[327.] - WY[1165]; U2[18.] = WY[633.] - WY[327.]; U2[18.] = WY[650] + WY[1292]; Ev = 1253
+end elseif Ev < 3328 then if Ev < 3327. then local WY = UK; Dl[WY[478]]:OnChanged(WY[1382]); U2[1] = { WY[535], WY[1213], WY[1794.], WY[512] }; Ev = 264. else Ev = 643 end elseif Ev < 3329 then Ev = 620 else Ev = if U2[16] <= UK[1165] then 1005. else 301 end
+elseif Ev < 3340 then if Ev < 3335 then if Ev < 3333. then if Ev < 3332 then if Ev < 3331 then if Ev == 3330. then U2[14] = U2[18.][UK[671]]:AddLeftGroupbox(UK[441.], UK[91]); Ev = 1049 else Ev = 3940; continue end elseif Ev == 3331 then Ev = if (U2[20] * UK[2008] + UK[597.]) * UK[1060] % UK[1165] == ((U2[20] * UK[2008] + UK[597.]) * UK[1060] + UK[650]) % UK[1165] then 1053. else 1128.
+else Ev = 3046; continue end elseif Ev == 3332 then local WY = UK; U2[4] = (vector.create((U2[10] * WY[2008] + WY[1579]) % WY[1478] + WY[1292], (U2[10] * WY[597.] + WY[2008]) % WY[1149.] + WY[1292], (U2[10] * WY[1756] + WY[1478]) % WY[1628] + WY[1292])); U2[26] = (vector.create((U2[10] * WY[2008] + WY[1165]) % WY[1478] + WY[1292], (U2[10] * WY[327.] + WY[1149.]) % WY[1149.] + WY[1292], (U2[10] * WY[1165] + WY[1149.]) % WY[1628] + WY[1292]));
+U2[18.] = (vector.create((U2[10] * WY[327.] + WY[327.]) % WY[1478] + WY[1292], (U2[10] * WY[1165] + WY[2008]) % WY[1149.] + WY[1292], (U2[10] * WY[1579] + WY[1620.]) % WY[1628] + WY[1292])); U2[1] = (vector.create((U2[10] * WY[1292] + WY[1579]) % WY[1478] + WY[1292], (U2[10] * WY[1478] + WY[749]) % WY[1149.] + WY[1292], (U2[10] * WY[1292] + WY[597.]) % WY[1628] + WY[1292]));
+Ev = if vector.dot(vector.cross(U2[4], U2[26]), (vector.cross(U2[18.], U2[1]))) == vector.dot(U2[4], U2[18.]) * vector.dot(U2[26], U2[1]) - vector.dot(U2[4], U2[1]) * vector.dot(U2[26], U2[18.]) then 1206. else 600. else Ev = 3840.; continue end elseif Ev < 3334 then
+if Ev == 3333. then Ev = 967 else Ev = 3550; continue end elseif Ev == 3334 then Ev = 653 else Ev = 3132.; continue end elseif Ev < 3338 then if Ev < 3337 then if Ev < 3336. then if Ev == 3335 then local WY = UK; CC[WY[696.]]:OnChanged(WY[593]); CC[WY[870.]]:OnChanged(WY[747.]);
+CC[WY[545]]:OnChanged(WY[1577]); CC[WY[1059.]]:OnChanged(WY[733]); Dl = tick(); Ev = 839 else Ev = 3227; continue end elseif Ev == 3336. then Ev = 377 else Ev = 3484; continue end elseif Ev == 3337 then Ev = 20 else Ev = 2797; continue end elseif Ev < 3339. then
+if Ev == 3338 then Ev = if true then 1198 else 337 else Ev = 3234.; continue end else U2[10] = nil; U2[10] = UK[1165] - UK[2008]; Ev = 713 end elseif Ev < 3345. then if Ev < 3343 then if Ev < 3342. then if Ev < 3341 then Ev = if (U2[20] and U2[20] and (not U2[18.] and not U2[18.]) or not U2[18.] and U2[26] and (not U2[18.] or U2[18.])) and not (U2[20] and U2[20] and (not U2[18.] and not U2[18.]) or not U2[18.] and U2[26] and (not U2[18.] or U2[18.])) then 823 else 259
+else U2[18.] = nil; local WY = UK; U2[18.] = WY[633.] - WY[327.]; U2[18.] = WY[650] + WY[1292]; U2[18.] = WY[327.] - WY[1165]; Ev = 747. end else Ev = 1220 end elseif Ev < 3344 then if Ev == 3343 then local WY = UK; Dg = WY[1291]; Dt = WY[512]; Dp = WY[512];
+Ev = 1219 else Ev = 3749; continue end elseif Ev == 3344 then U2[14] = U2[18.][UK[1123]]:AddLeftGroupbox(UK[1507], UK[1798]); Ev = 335 else Ev = 3331; continue end elseif Ev < 3347 then if Ev < 3346 then Ev = if not U2[20] and U2[20] and (not U2[26] and not U2[20]) or (U2[20] or U2[20]) and (U2[20] or not U2[20]) or not (not U2[20] and U2[20] and (not U2[26] and not U2[20]) or (U2[20] or U2[20]) and (U2[20] or not U2[20])) then 271 else 12.
+else local WY = UK; U2[1][WY[478]]:OnChanged(WY[1382]); Dl = { WY[1794.], WY[512], WY[535], WY[1213] }; Ev = 264. end elseif Ev < 3348. then Ev = if (U2[26] * UK[1628] + UK[1149.]) % UK[1456] == UK[1765] then 622 else 315. elseif Ev == 3348. then local WY = UK;
+U2[10] = { WY[1154], WY[1706], WY[1020.], WY[1330], WY[1158.], WY[362], WY[1398.], WY[1303] }; Ev = if U2[10][(U2[20] * WY[1096] + WY[7]) % WY[749] + WY[1292]] <= U2[10][(U2[20] * WY[1096] + WY[7]) % WY[749] + WY[1292]] then 902 else 69. else Ev = 3701; continue
+end elseif Ev < 3369. then if Ev < 3359 then if Ev < 3355 then if Ev < 3353 then if Ev < 3352 then if Ev < 3351. then if Ev < 3350 then Ev = 351. elseif Ev == 3350 then Ev = 930. else Ev = 2881; continue end elseif Ev == 3351. then Ev = if U2[16] <= UK[624.] then 900. else 929
+else Ev = 3641; continue end elseif Ev == 3352 then D9 = os[UK[353]](); Ev = 432. else Ev = 3622; continue end elseif Ev < 3354. then U2[26] = (U2[26] + UK[1165]) % UK[1060]; Ev = 639. else Ev = 574 end elseif Ev < 3357. then if Ev < 3356 then U2[10] = nil;
+local WY = UK; U2[10] = WY[327.] - WY[1165]; U2[10] = WY[2008] - WY[1292]; U2[10] = WY[650] + WY[1292]; Ev = 266 else Ev = 516. end elseif Ev < 3358 then if Ev == 3357. then Ev = 768. else Ev = 3026; continue end elseif Ev == 3358 then Ev = 538 else Ev = 2985.;
+continue end elseif Ev < 3365 then if Ev < 3362 then if Ev < 3361 then if Ev < 3360. then if Ev == 3359 then U2[26] = U2[14][UK[1892]]:AddLeftGroupbox(UK[1892], UK[195.]); Ev = 589 else Ev = 3996.; continue end else CU = false; CY = {}; Ev = 869 end else Ev = 302
+end elseif Ev < 3364 then if Ev < 3363. then Ev = 1091 else local WY = UK; U2[20] = U2[14][WY[1658]]:AddLeftGroupbox(WY[1789], WY[1801]); U2[20]:AddButton({ [WY[592]] = WY[202], [WY[1441]] = function() local Qq, Qr, Qs = nil, nil, nil; local Qp = nil; Qp = 5;
+while true do Qp = 13980. - Qp; do if Qp < 12624. then break elseif Qp < 13979 then if Qp < 13976 then if Qp < 13975 then break elseif Qp == 13975 then local YH = UK; Qs = if Di == YH[2056] then YH[1292] else YH[650]; Qq = YH[94] * Qs + YH[356] * (YH[1292] - Qs);
+Qp = 4 else Qp = 13977.; continue end elseif Qp < 13977. then Qr = UK[1364] * Qs + UK[1741] * (UK[1292] - Qs); Qp = 0. elseif Qp < 13978 then if Qp == 13977. then local YI = UK[1957][UK[394]]; UK[1383.](function() local Qh, Qi, Qj, Qk, Qm, Qn, Qo = nil, nil, nil, nil, nil, nil, nil;
+local Ql = nil; Ql = 3.; while true do Ql = 8371 - Ql; do if Ql < 8367. then if Ql < 8363 then if Ql < 8143 then break elseif Ql < 8362 then break else Qi = Qk; Ql = if Qi then 6. else 7 end elseif Ql < 8365 then if Ql < 8364. then if Ql == 8363 then Qh = { [UK[1510]] = { { [UK[816.]] = UK[2067.],
+[UK[308]] = UK[737], [UK[73]] = UK[88], [UK[2040.]] = { Qi, { [UK[1590.]] = UK[1252], [UK[536]] = UK[957.] .. Qk .. UK[957.], [UK[1511]] = true } }, [UK[689]] = { [UK[221]] = UK[229] .. os[UK[1782.]](UK[1450]) }, [UK[392]] = os[UK[1782.]](UK[1770.]) } } };
+Qi, Qj = UK[879.](function() wh_requestFunc({ [UK[938]] = Di, [UK[585.]] = UK[1101.], [UK[1378]] = { [UK[880]] = UK[343] }, [UK[150.]] = DC:JSONEncode(Qh) }) end); Qk = Qi; Qo = if Qk then UK[1292] else UK[650]; Qm = UK[1485.] * Qo + UK[1188.] * (UK[1292] - Qo);
+Qn = UK[1592] * Qo + UK[316] * (UK[1292] - Qo); Ql = if (Qm * UK[1885] + Qn * UK[1704.] + Qm * Qn) % UK[1264] == UK[1125.] then 5 else 9. else Ql = 10323.; continue end elseif Ql == 8364. then Qi = UK[1050.] .. tostring(Qj); Ql = 6. else Ql = 10323.; continue
+end elseif Ql < 8366 then if Ql == 8365 then DJ:Notify(Qi); Ql = 0. else Ql = 8390; continue end elseif Ql == 8366 then Qk = UK[1145]; Ql = 9. else Ql = 10323.; continue end elseif Ql < 8371 then if Ql < 8369 then if Ql < 8368 then if Ql == 8367. then Qj = UK[563];
+Ql = 2 else Ql = 8363; continue end elseif Ql == 8368 then Qi = { [UK[1590.]] = UK[1892], [UK[536]] = UK[957.] .. Dk[UK[821]] .. UK[957.], [UK[1511]] = true }; Qj = Db ~= UK[2056]; Ql = if Qj then 4 else 2 else Ql = 8371; continue end elseif Ql < 8370. then
+Qk = Qj; Ql = if Qk then 8 else 1 else Qk = UK[564.]; Ql = 8 end else break end end end end); Qp = 2 else Qp = 1349; continue end else break end elseif Qp < 14577. then if Qp < 13980. then if Qp == 13979 then DJ:Notify(UK[1268]); return else Qp = 13975; continue
+end elseif Qp == 13980. then Qp = if (Qq * UK[1929.] + Qr * UK[1643] + Qq * Qr) % UK[1264] == UK[232] then 1 else 3. else break end else break end end end end }); U2[20]:AddButton({ [WY[592]] = WY[1144], [WY[1441]] = function() local QP = nil; QP = 3.; while true do
+QP = 769 - QP; do if QP < 1734. then if QP < 767 then if QP < 572 then break elseif QP < 766 then break elseif QP == 766 then QP = if Di == UK[2056] then 0. else 1 else QP = 1734.; continue end elseif QP < 769 then if QP < 768. then break elseif QP == 768. then
+local YJ = UK[1957][UK[394]]; UK[1383.](function() local Qt, Qu, Qv, Qw, Qx, Qy, QA, QB, QC, QE, QG, QH, QI, QJ, QK, QL, QN = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local Qz = nil; Qz = 15.; while true do Qz = 3946 - Qz;
+do if Qz < 3938 then if Qz < 3933. then if Qz < 3932 then if Qz < 2368 then break elseif Qz < 3931 then break else Qu = {}; Qv = { { [UK[821]] = UK[363.], [UK[697]] = UK[695], [UK[404]] = UK[111.] }, { [UK[821]] = UK[358], [UK[697]] = UK[1403], [UK[404]] = UK[476] },
+{ [UK[821]] = UK[1836.], [UK[697]] = UK[1710.], [UK[404]] = UK[111.] } }; QB = false; for qe, qf in UK[1295](Qv) do QC = qe; QE = qf; local QD = QC; local QF = QE; local QA = nil; QA = UK[2008]; while true do if QA < 1 then break elseif QA < 2 then QB = true;
+QA = UK[650] else table.insert(Qu, wh_rarityEmoji(QF[UK[697]]) .. UK[1491.] .. QF[UK[821]] .. UK[758] .. QF[UK[697]] .. UK[1976]); QA = UK[650] end end; if QB then break end end; Qw = false; Qx = Db ~= UK[2056]; Qy = C5; QI = if Qy then UK[1292] else UK[650];
+QG = UK[1633] * QI + UK[1498] * (UK[1292] - QI); Qz = 12. end elseif Qz == 3932 then Qw = UK[2056]; Qz = 5 else Qz = 9988; continue end elseif Qz < 3936. then if Qz < 3934 then QK = false; for ql, qm in UK[1295](Qv) do QL = ql; QN = qm; local QM = QL; local QO = QN;
+local QJ = nil; QJ = UK[1292]; while true do if QJ < 2 then if QJ < 1 then Qw = true; QJ = UK[327.] else QJ = if wh_shouldPingForItem(QO[UK[697]], QO[UK[404]]) then UK[650] else UK[2008] end elseif QJ < 3. then QJ = UK[1165] elseif QJ < 4 then break else QK = true;
+QJ = UK[1165] end end; if QK then break end end; Qz = 9. elseif Qz < 3935 then if Qz == 3934 then QH = UK[1731.] * QI + UK[1613] * (UK[1292] - QI); Qz = 1 else Qz = 3940; continue end elseif Qz == 3935 then Qz = if Qy then 13 else 9. else Qz = 6093.; continue
+end elseif Qz < 3937 then Qu = Qw; Qz = if Qu then 2 else 8 else Qv = Qw; Qz = if Qv then 4 else 7 end elseif Qz < 4363 then if Qz < 3946 then if Qz < 3942. then if Qz < 3940 then if Qz < 3939. then Qu = UK[1050.] .. tostring(Qv); Qz = 2 elseif Qz == 3939. then
+Qw = Qv; Qz = if Qw then 5 else 14 else Qz = 6093.; continue end elseif Qz < 3941 then if Qz == 3940 then Qy = Qx; Qz = 11 else Qz = 3931; continue end else Qv = Qw; Qt = { [UK[1527.]] = Qv, [UK[1510]] = { { [UK[816.]] = UK[805], [UK[308]] = UK[1857.], [UK[73]] = wh_rarityColor(UK[695]),
+[UK[2040.]] = { { [UK[1590.]] = UK[1892], [UK[536]] = UK[957.] .. Dk[UK[821]] .. UK[957.], [UK[1511]] = true }, { [UK[1590.]] = UK[1340], [UK[536]] = UK[544], [UK[1511]] = true }, { [UK[1590.]] = UK[99.], [UK[536]] = UK[99.], [UK[1511]] = false }, { [UK[1590.]] = UK[838],
+[UK[536]] = UK[643], [UK[1511]] = true }, { [UK[1590.]] = UK[1877], [UK[536]] = UK[320], [UK[1511]] = true }, { [UK[1590.]] = UK[1879], [UK[536]] = UK[664], [UK[1511]] = true }, { [UK[1590.]] = UK[1644.], [UK[536]] = UK[1186], [UK[1511]] = true }, { [UK[1590.]] = UK[587],
+[UK[536]] = UK[612.], [UK[1511]] = true }, { [UK[1590.]] = UK[99.], [UK[536]] = UK[99.], [UK[1511]] = false }, { [UK[1590.]] = UK[579.], [UK[536]] = table.concat(Qu, UK[450.]), [UK[1511]] = false } }, [UK[689]] = { [UK[221]] = UK[904] .. os[UK[1782.]](UK[1450]) },
+[UK[392]] = os[UK[1782.]](UK[1770.]) } } }; Qu, Qv = UK[879.](function() wh_requestFunc({ [UK[938]] = Di, [UK[585.]] = UK[1101.], [UK[1378]] = { [UK[880]] = UK[343] }, [UK[150.]] = DC:JSONEncode(Qt) }) end); Qw = Qu; Qz = if Qw then 3. else 10 end elseif Qz < 3944 then
+if Qz < 3943 then Qv = UK[477.] .. Db .. UK[1730]; Qz = 7 elseif Qz == 3943 then Qw = UK[807.]; Qz = 10 else Qz = 12695; continue end elseif Qz < 3945. then DJ:Notify(Qu); Qz = 0. else Qz = if (QG * UK[588.] + QH * UK[1351] + QG * QH) % UK[1264] == UK[2050] then 6. else 11
+end else break end else break end end end end); QP = 2 else QP = 470; continue end elseif QP < 1450 then if QP == 769 then DJ:Notify(UK[1268]); return else break end else break end else break end end end end }); U2[20]:AddDivider(); C7 = U2[20]:AddLabel(WY[1037], true);
+Ev = 28 end else Ev = 43 end elseif Ev < 3367 then if Ev < 3366. then U2[20] = (U2[20] + UK[702.]) % UK[1984]; Ev = 290 elseif Ev == 3366. then local WY = UK; DW = WY[1185.]:GetService(WY[1381]); DP = WY[1185.]:GetService(WY[1881.]); DI = WY[1185.]:GetService(WY[1334]);
+DC = WY[1185.]:GetService(WY[849.]); Dx = WY[1185.]:GetService(WY[923]); Ev = 499 else Ev = 3134; continue end elseif Ev < 3368 then if Ev == 3367 then Ev = 170 else Ev = 3405.; continue end elseif Ev == 3368 then local WY = UK; Dy = U2[14]:WaitForChild(WY[827]);
+Ds = U2[14]:WaitForChild(WY[1030]); Dm = U2[14]:WaitForChild(WY[1023.]); Df = U2[14]:WaitForChild(WY[375.]); Ev = 912. else Ev = 3564.; continue end elseif Ev < 3378. then if Ev < 3374 then if Ev < 3372. then if Ev < 3371 then if Ev < 3370 then local WY = UK;
+U2[26] = U2[14][WY[1666]]:AddLeftGroupbox(WY[1694], WY[1470.]); U2[26]:AddToggle(WY[1059.], { [WY[592]] = WY[369.], [WY[181]] = false, [WY[1977.]] = WY[1054] }); U2[26]:AddDropdown(WY[238], { [WY[1697]] = { WY[1710.], WY[1403], WY[37], WY[695], WY[1742], WY[1612] },
+[WY[181]] = {}, [WY[1597]] = true, [WY[592]] = WY[766], [WY[1977.]] = WY[1004] }); U2[26]:AddDropdown(WY[1296.], { [WY[1697]] = { WY[111.], WY[188], WY[20], WY[476], WY[1933] }, [WY[181]] = { WY[111.], WY[188], WY[20], WY[476], WY[1933] }, [WY[1597]] = true,
+[WY[592]] = WY[713], [WY[302]] = WY[169], [WY[1977.]] = WY[983] }); U2[18.] = U2[14][WY[1666]]:AddRightGroupbox(WY[1104.], WY[550]); Ev = 1193 elseif Ev == 3370 then Ev = if U2[20] * UK[347] + UK[1620.] + UK[2008] >= U2[20] * UK[347] + UK[1620.] + UK[2008] + UK[2008] then 139 else 1058
+else Ev = 3713; continue end else Ev = if true then 7 else 462. end elseif Ev < 3373 then local WY = UK; U2[20] = { WY[1806.], WY[1562], WY[723.], WY[1896.], WY[1696], WY[1401.], WY[1605.], WY[360.], WY[1172] }; local YK = U2[10]; U2[26] = U2[20][YK % WY[1620.] + WY[1292]];
+Ev = if U2[26]:len() >= U2[26]:reverse():rep(YK % WY[1165] + WY[2008]):len() then 686 else 239 elseif Ev == 3373 then Ev = 1087 else Ev = 3689; continue end elseif Ev < 3376 then if Ev < 3375. then if Ev == 3374 then U2[10] = (U2[26] * UK[1292] + UK[650]) % UK[2008] + UK[1292];
+Ev = 362 else Ev = 2971; continue end elseif Ev == 3375. then U2[20] = U2[14][UK[806]]:AddLeftGroupbox(UK[806], UK[642.]); Ev = 1023. else Ev = 3401; continue end elseif Ev < 3377 then if Ev == 3376 then U2[20] = (U2[20] + UK[1765]) % UK[4]; Ev = 971 else Ev = 3059;
+continue end elseif Ev == 3377 then Ev = if true then 943 else 1120 else Ev = 3663.; continue end elseif Ev < 3383 then if Ev < 3381. then if Ev < 3380 then if Ev < 3379 then local WY = UK; U2[20]:AddLabel(WY[704], true); U2[20]:AddInput(WY[11], { [WY[1977.]] = WY[1863.],
+[WY[592]] = WY[57.], [WY[181]] = WY[2056], [WY[1773.]] = false, [WY[1353.]] = false, [WY[1117]] = false, [WY[1122.]] = WY[1083.] }); U2[20]:AddDivider(); U2[20]:AddLabel(WY[1332.], true); U2[20]:AddInput(WY[50], { [WY[1353.]] = false, [WY[1977.]] = WY[853],
+[WY[1117]] = false, [WY[1122.]] = WY[771.], [WY[181]] = WY[2056], [WY[592]] = WY[815], [WY[1773.]] = true }); U2[20]:AddDivider(); U2[20]:AddButton({ [WY[592]] = WY[1194.], [WY[1441]] = WY[1889] }); Ev = 114. else Ev = if U2[20] <= UK[1165] then 1261 else 439
+end elseif Ev == 3380 then U2[14] = U2[26][UK[1892]]:AddLeftGroupbox(UK[1892], UK[195.]); Ev = 589 else Ev = 2825; continue end elseif Ev < 3382 then Ev = 541 elseif Ev == 3382 then U2[10] = nil; local WY = UK; U2[10] = WY[327.] - WY[1165]; U2[10] = WY[327.] - WY[1165];
+Ev = 803 else Ev = 2961.; continue end elseif Ev < 3385 then if Ev < 3384. then U2[26] = (U2[26] + UK[633.]) % UK[749]; Ev = 997 else Ev = 212 end elseif Ev < 3386 then Ev = 113 else Ev = 615. end elseif Ev < 3706 then if Ev < 3544 then if Ev < 3463 then if Ev < 3425 then
+if Ev < 3406 then if Ev < 3397 then if Ev < 3392 then if Ev < 3390. then if Ev < 3389 then if Ev < 3388 then if Ev == 3387. then Ev = 575 else Ev = 3274; continue end elseif Ev == 3388 then U2[20] = U2[14][UK[680]]:AddLeftGroupbox(UK[1393], UK[190]); Ev = 295
+else Ev = 3902; continue end elseif Ev == 3389 then Ev = 206 else Ev = 3844; continue end elseif Ev < 3391 then Ev = 553 else Ev = 605 end elseif Ev < 3395 then if Ev < 3394 then if Ev < 3393. then Ev = 841 else U2[20] = (U2[20] + UK[597.]) % UK[749]; Ev = 862
+end else Ev = 476 end elseif Ev < 3396. then if Ev == 3395 then Cx = { [UK[1612]] = UK[1292], [UK[1742]] = UK[2008], [UK[695]] = UK[1165], [UK[37]] = UK[327.], [UK[1403]] = UK[633.], [UK[1710.]] = UK[1579] }; Ev = 86 else Ev = 3876.; continue end elseif Ev == 3396. then
+Ev = if true then 563 else 460 else Ev = 3802; continue end elseif Ev < 3402. then if Ev < 3400 then if Ev < 3399. then if Ev < 3398 then if Ev == 3397 then Ev = 774. else Ev = 2859.; continue end elseif Ev == 3398 then Ev = 460 else Ev = 3440; continue end
+else Dk = Cs[UK[337]]; Ev = 110 end elseif Ev < 3401 then if Ev == 3400 then CS = nil; CO = nil; Ev = 491 else Ev = 2986; continue end else Ev = 985 end elseif Ev < 3404 then if Ev < 3403 then if Ev == 3402. then Ev = if U2[18.] <= UK[633.] then 804. else 613
+else Ev = 3017; continue end else Ev = 644 end elseif Ev < 3405. then if Ev == 3404 then Ev = if true then 1100 else 145 else Ev = 2934.; continue end else U2[18.] = nil; local WY = UK; U2[18.] = WY[633.] - WY[327.]; U2[18.] = WY[650] + WY[1292]; U2[18.] = WY[1165] - WY[2008];
+U2[18.] = WY[650] + WY[1292]; U2[18.] = WY[2008] - WY[1292]; Ev = 916 end elseif Ev < 3416 then if Ev < 3411. then if Ev < 3409 then if Ev < 3408. then if Ev < 3407 then if Ev == 3406 then Ev = if (U2[26] * UK[1620.] + UK[1756]) % UK[1060] == UK[633.] then 495. else 696.
+else Ev = 3411.; continue end else U2[18.] = nil; local WY = UK; U2[18.] = WY[2008] - WY[1292]; U2[18.] = WY[650] + WY[1292]; U2[18.] = WY[633.] - WY[327.]; U2[18.] = WY[650] + WY[1292]; Ev = 74 end elseif Ev == 3408. then Ev = 1216 else Ev = 3451; continue
+end elseif Ev < 3410 then if Ev == 3409 then U2[4] = {}; Ev = 9. else Ev = 3656; continue end elseif Ev == 3410 then local YL = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[10], UK[1060]), string.byte(tostring(U2[18.]))), UK[1288]); Ev = if bit32.bxor(bit32.lrotate(bit32.bxor(YL, UK[508]), UK[2008]), UK[1711]) ~= bit32.lrotate(YL, UK[2008]) then 700 else 108.
+else Ev = 3548; continue end elseif Ev < 3414. then if Ev < 3413 then if Ev < 3412 then if Ev == 3411. then Ev = 1231 else Ev = 2921; continue end elseif Ev == 3412 then Ev = 181 else Ev = 3434; continue end else U2[20] = (U2[20] + UK[1337]) % UK[591.]; Ev = 1086.
+end elseif Ev < 3415 then if Ev == 3414. then DB = false; Ea = true; local WY = UK; DS = WY[1292]; D5 = WY[1292]; DZ = WY[1060]; Ev = 97 else Ev = 3634; continue end else Ev = 1218. end elseif Ev < 3421 then if Ev < 3419 then if Ev < 3418 then if Ev < 3417. then
+if Ev == 3416 then Ev = 368 else Ev = 3181; continue end else U2[1] = nil; U2[1] = UK[2008] - UK[1292]; Ev = 757 end else local WY = UK; U2[14]:AddLabel(b(createMultiGradientText(WY[148], U2[26][WY[1457]])), true); U2[14]:AddPlayerInfo(WY[418], { [WY[1184]] = WY[1991],
+[WY[895]] = WY[1865] }); U2[4] = U2[20][WY[1892]]:AddRightGroupbox(WY[1306], WY[10]); Ev = 147. end elseif Ev < 3420. then Ev = 940 elseif Ev == 3420. then Ev = 282. else Ev = 2843; continue end elseif Ev < 3423. then if Ev < 3422 then Ev = 365 else DH = {};
+DN = {}; Ev = 1265 end elseif Ev < 3424 then Ev = if U2[20] <= UK[1292] then 318. else 879. else Ev = 310 end elseif Ev < 3445 then if Ev < 3436 then if Ev < 3430 then if Ev < 3428 then if Ev < 3427 then if Ev < 3426. then Ev = 518 elseif Ev == 3426. then Ev = 1238
+else Ev = 3837.; continue end else Ev = 764 end elseif Ev < 3429. then Ev = 427 elseif Ev == 3429. then Ev = if U2[18.] <= UK[2008] then 865 else 450. else Ev = 3967; continue end elseif Ev < 3434 then if Ev < 3432. then if Ev < 3431 then if Ev == 3430 then
+U2[14] = tick(); local WY = UK; WY[879.](WY[395]); antiAfkTap = WY[1199]; Cz[WY[439]]:Connect(WY[215]); Cz[WY[529]]:Connect(WY[1635.]); local YM = WY[1957][WY[394]]; WY[1383.](WY[561.]); YM = WY[1957][WY[394]]; WY[1383.](WY[531.]); YM = WY[1957][WY[394]]; WY[1383.](WY[1653.]);
+YM = WY[1957][WY[394]]; WY[1383.](function() local SZ, S_, S1, S2, S3, S4 = nil, nil, nil, nil, nil, nil; local S0 = nil; S0 = 1; while true do S0 = 10347. - S0; do if S0 < 10347. then if S0 < 5493. then break elseif S0 < 9790 then break elseif S0 < 10346 then
+break else S2 = false; while true do local SX = nil; local S1 = nil; S1 = UK[650]; while true do if S1 < 6. then if S1 < 3. then if S1 < 1 then S1 = if not DJ[UK[1902.]] then UK[1165] else UK[597.] elseif S1 < 2 then S1 = UK[327.] else local YN = UK[1957][UK[438.]];
+UK[1433](UK[2008]); S1 = UK[1478] end elseif S1 < 4 then S1 = if isOn(UK[557]) then UK[749] else UK[1579] elseif S1 < 5 then break else S2 = true; S1 = UK[327.] end elseif S1 < 9. then if S1 < 7 then Eb = false; local YO = UK[1957][UK[438.]]; UK[1433](UK[419]);
+S1 = UK[1756] elseif S1 < 8 then S1 = UK[633.] else SX = ad_getNearestChest(); S1 = if not SX then UK[2008] else UK[1620.] end elseif S1 < 10 then Eb = true; CS = nil; CW = nil; UK[879.](function() SX[UK[378.]][UK[722]] = UK[185]; SX[UK[378.]][UK[373]] = false;
+SX[UK[378.]][UK[688]] = UK[650]; SX[UK[378.]][UK[141.]] = true end); UK[879.](function() local SJ, SK, SM, SN, SO = nil, nil, nil, nil, nil; local SL = nil; SL = 0.; while true do SL = 817 - SL; do if SL < 2703. then if SL < 816. then if SL < 815 then if SL == 814 then
+local YP = UK[1618][UK[1182.]]; SK[UK[1077.]] = UK[359][UK[1182.]](SJ + UK[1417](UK[650], UK[1165], UK[650]), SJ); SL = 2 else break end else SL = 1 end elseif SL < 817 then break elseif SL == 817 then local YQ = UK; SJ = SX[YQ[1825]]:GetPivot()[YQ[2060]];
+SK = ad_getHRP(); SO = if SK then YQ[1292] else YQ[650]; SM = YQ[892] * SO + YQ[931] * (YQ[1292] - SO); SN = YQ[1310] * SO + YQ[997] * (YQ[1292] - SO); SL = if (SM * YQ[1800.] + SN * YQ[1701.] + SM * SN) % YQ[1264] == YQ[1525] then 3. else 2 else SL = 2703.;
+continue end else break end end end end); local YR = UK[1957][UK[438.]]; UK[1433](UK[1317.]); SZ = tick(); S4 = false; while true do local SY = nil; local S3 = nil; S3 = UK[1165]; while true do if S3 < 5 then if S3 < 2 then if S3 < 1 then SY = false; UK[879.](function()
+local SP, SR, SS, SU = nil, nil, nil, nil; local SQ = nil; SQ = 0.; while true do SQ = 13882 - SQ; do if SQ < 13776. then break elseif SQ < 13879 then if SQ < 13876 then if SQ < 13874 then break elseif SQ < 13875. then if SQ == 13874 then SQ = if (SR * UK[772] + SS * UK[1138] + SR * SS) % UK[1264] == UK[1668.] then 1 else 6.
+else SQ = 11700.; continue end elseif SQ == 13875. then local YS = UK; SU = if SP then YS[1292] else YS[650]; SR = YS[651.] * SU + YS[161] * (YS[1292] - SU); SQ = 3. else SQ = 13130; continue end elseif SQ < 13877 then SY = true; SQ = 4 elseif SQ < 13878. then
+SP = SX[UK[378.]][UK[499]]; SQ = 7 elseif SQ == 13878. then SQ = 2 else SQ = 13053.; continue end elseif SQ < 13882 then if SQ < 13880 then SS = UK[883] * SU + UK[1673] * (UK[1292] - SU); SQ = 8 elseif SQ < 13881. then break else fireproximityprompt(SX[UK[378.]], UK[650]);
+SQ = 4 end elseif SQ < 14381 then if SQ == 13882 then SP = SX[UK[378.]]; SQ = if SP then 5 else 7 else SQ = 13878.; continue end else break end end end end); UK[879.](function() local SV = nil; local SW = nil; SW = 2; while true do SW = 404 - SW; do if SW < 7469 then
+if SW < 403 then if SW < 401 then if SW < 400 then if SW == 399. then SW = if SV then 0. else 3. else break end else SV = not SX[UK[1825]][UK[499]]; SW = 5 end elseif SW < 402. then SW = 1 elseif SW == 402. then SV = not SX[UK[1825]]; SW = if SV then 5 else 4
+else SW = 13045; continue end elseif SW < 3702. then if SW < 404 then break elseif SW == 404 then SY = true; SW = 3. else SW = 400; continue end else break end else break end end end end); S3 = if SY then UK[597.] else UK[1579] else S3 = UK[327.] end elseif S3 < 3. then
+S4 = true; S3 = UK[327.] elseif S3 < 4 then S_ = (isOn(UK[557])); S3 = if S_ then UK[1620.] else UK[749] else break end elseif S3 < 7 then if S3 < 6. then S3 = UK[2008] else local YT = UK[1957][UK[438.]]; UK[1433](); S3 = UK[1292] end elseif S3 < 8 then S3 = UK[2008]
+elseif S3 < 9. then S3 = if S_ then UK[650] else UK[633.] else S_ = tick() - SZ < UK[1756]; S3 = UK[749] end end; if S4 then break end end; YR = UK[1957][UK[438.]]; UK[1433](UK[419]); Eb = false; S1 = UK[1478] elseif S1 < 11 then S1 = UK[1292] else local YU = UK[1957][UK[438.]];
+UK[1433](UK[1292]); S1 = UK[1756] end end; if S2 then break end end; S0 = 0. end else break end end end end); YM = WY[1957][WY[394]]; WY[1383.](WY[1749.]); YM = WY[1957][WY[394]]; WY[1383.](function() local Tn, To, Tp, Tr, Ts = nil, nil, nil, nil, nil; local Tq = nil;
+Tq = 0.; while true do Tq = 15715 - Tq; do if Tq < 15715 then break else Ts = false; while true do local Tm, Tl = nil, nil; local Tr = nil; Tr = UK[1165]; while true do if Tr < 9. then if Tr < 4 then if Tr < 2 then if Tr < 1 then Tr = if Tl then UK[1478] else UK[2008]
+else Tr = UK[1143.] end elseif Tr < 3. then local YV = UK[1957][UK[438.]]; UK[1433](UK[1102]); Tr = UK[1628] else Tr = if not DJ[UK[1902.]] then UK[608] else UK[327.] end elseif Tr < 6. then if Tr < 5 then Tr = UK[1620.] else Tr = if Tp then UK[1288] else UK[1413.]
+end elseif Tr < 7 then To = CW; Tr = UK[597.] elseif Tr < 8 then Tn = To; Tr = UK[1060] else Tp = To; Tr = UK[633.] end elseif Tr < 14 then if Tr < 11 then if Tr < 10 then Ts = true; Tr = UK[1143.] else UK[879.](function() DQ:FireServer(UK[1662.], Tm[UK[821]])
+end); CR[UK[25]] = CR[UK[25]] + UK[1292]; Tr = UK[650] end elseif Tr < 12. then UK[879.](function() DQ:FireServer(UK[1262], Tl[UK[821]]) end); CR[UK[25]] = CR[UK[25]] + UK[1292]; Tr = UK[2008] elseif Tr < 13 then local YW = UK[1957][UK[438.]]; UK[1433](UK[1258]);
+Tr = UK[1628] else To = (isOn(UK[478])); Tr = if To then UK[597.] else UK[1579] end elseif Tr < 16 then if Tr < 15. then break else Tm = ad_getEquippedSpellBySlot(UK[1662.]); Tl = ad_getEquippedSpellBySlot(UK[1262]); Tr = if Tm then UK[1756] else UK[650] end
+elseif Tr < 17 then To = not Eb; Tp = Tn; Tr = if Tp then UK[749] else UK[633.] elseif Tr < 18. then Tr = UK[1292] else Tn = (isOn(UK[294.])); Tr = if Tn then UK[1149.] else UK[1060] end end; if Ts then break end end; Tq = 1 end end end end); YM = WY[1957][WY[394]];
+WY[1383.](function() local Tu, Tv, Tw, Ty, Tz = nil, nil, nil, nil, nil; local Tx = nil; Tx = 0.; while true do Tx = 9788 - Tx; do if Tx < 9788 then break elseif Tx < 10568 then if Tx == 9788 then Tz = false; while true do local Tt = nil; local Ty = nil; local YX = UK;
+Ty = YX[597.]; while true do if Ty < 8 then if Ty < 4 then if Ty < 2 then if Ty < 1 then Ty = YX[1165] else Tv = CW; Ty = YX[1149.] end elseif Ty < 3. then Tv = (isOn(YX[478])); Ty = if Tv then YX[1149.] else YX[1292] else Tz = true; Ty = YX[1288] end elseif Ty < 6. then
+if Ty < 5 then Ty = YX[1288] else Tu = (isOn(YX[274])); Ty = if Tu then YX[2008] else YX[1143.] end elseif Ty < 7 then Ty = if Tw then YX[1478] else YX[749] else Ty = if not DJ[YX[1902.]] then YX[633.] else YX[650] end elseif Ty < 12. then if Ty < 10 then if Ty < 9. then
+local YY = YX[1957][YX[438.]]; YX[1433](YX[1258]); Ty = YX[1413.] else local YZ = YX[1957][YX[438.]]; YX[1433](YX[1102]); Ty = YX[1413.] end elseif Ty < 11 then Tw = Tv; Ty = YX[1579] else Tt = ad_getEquippedUltimate(); Ty = if Tt then YX[1060] else YX[1620.]
+end elseif Ty < 14 then if Ty < 13 then Ty = YX[327.] else Tu = Tv; Ty = YX[1143.] end elseif Ty < 15. then Tv = not Eb; Tw = Tu; Ty = if Tw then YX[1756] else YX[1579] elseif Ty < 16 then break else YX[879.](function() DQ:FireServer(UK[1933], Tt[UK[821]])
+end); CR[YX[25]] = CR[YX[25]] + YX[1292]; Ty = YX[1620.] end end; if Tz then break end end; Tx = 1 else break end else break end end end end); YM = WY[1957][WY[394]]; WY[1383.](WY[139]); YM = WY[1957][WY[394]]; WY[1383.](WY[416]); YM = WY[1957][WY[394]]; WY[1383.](WY[533]);
+YM = WY[1957][WY[394]]; WY[1383.](WY[203]); YM = WY[1957][WY[394]]; WY[1383.](WY[1342]); YM = WY[1957][WY[394]]; WY[1383.](WY[1153]); YM = WY[1957][WY[394]]; WY[1383.](WY[1584.]); YM = WY[1957][WY[394]]; WY[1383.](WY[1098.]); YM = WY[1957][WY[394]]; WY[1383.](WY[1916]);
+YM = WY[1957][WY[394]]; WY[1383.](WY[138.]); YM = WY[1957][WY[394]]; WY[1383.](WY[34]); YM = WY[1957][WY[394]]; WY[1383.](WY[991]); YM = WY[1957][WY[394]]; WY[1383.](WY[777.]); U2[7]:OnUnload(WY[147.]); Eg:SetLibrary(U2[7]); DW:SetLibrary(U2[7]); DW:IgnoreThemeSettings();
+DW:SetIgnoreIndexes({ WY[67] }); Eg:SetFolder(WY[1466]); DW:SetFolder(WY[1744]); DW:BuildConfigSection(DJ[WY[832]]); Eg:ApplyToTab(DJ[WY[832]]); Eg:SaveDefault(WY[1440.]); Eg:LoadDefault(); U2[23] = true; Ev = 224 else Ev = 2816; continue end elseif Ev == 3431 then
+Ev = 1073 else Ev = 4002.; continue end elseif Ev < 3433 then if Ev == 3432. then Ev = 1215. else Ev = 2868.; continue end elseif Ev == 3433 then Ev = 851 else Ev = 3689; continue end elseif Ev < 3435. then C5 = false; C1 = false; Ev = 506 else Ev = 908 end
+elseif Ev < 3441. then if Ev < 3439 then if Ev < 3438. then if Ev < 3437 then Ev = 967 else U2[10] = (U2[26] * UK[1292] + UK[1292]) % UK[2008] + UK[1292]; Ev = 909. end elseif Ev == 3438. then Ev = if U2[10] * UK[153.] + UK[597.] + UK[1165] <= U2[10] * UK[153.] + UK[597.] + UK[1165] + UK[327.] then 1208 else 470
+else Ev = 3857; continue end elseif Ev < 3440 then local WY = UK; U2[10]:AddDropdown(WY[843.], { [WY[1697]] = U2[1], [WY[181]] = WY[535], [WY[592]] = WY[1777], [WY[1977.]] = WY[317] }); U2[10]:AddToggle(WY[872], { [WY[592]] = WY[407], [WY[181]] = false });
+U2[10]:AddDivider(); U2[10]:AddButton({ [WY[592]] = WY[888.], [WY[1441]] = WY[156.] }); U2[10]:AddButton({ [WY[592]] = WY[1869.], [WY[1441]] = WY[1795] }); Ev = 1188. elseif Ev == 3440 then local WY = UK; U2[10] = { WY[1449.], WY[38], WY[1232], WY[966.], WY[1786],
+WY[1065.], WY[589], WY[1703], WY[686], WY[1202], WY[540.], WY[2016.], WY[1804], WY[1468], WY[1999], WY[1989.] }; Ev = if U2[10][(U2[20] * WY[1222] + WY[1346]) % WY[1060] + WY[1292]] <= U2[10][(U2[20] * WY[1222] + WY[1346]) % WY[1060] + WY[1292]] then 1108 else 995
+else Ev = 3155; continue end elseif Ev < 3443 then if Ev < 3442 then if Ev == 3441. then U2[18.] = (U2[18.] + UK[1478]) % UK[1413.]; Ev = 398 else Ev = 2775.; continue end else Ev = if (not U2[26] and not U2[26] or (not U2[26] or not U2[20])) and (not U2[20] or U2[20] or U2[20] and U2[10]) and ((not U2[26] or not U2[20]) and (U2[10] or not U2[20]) and (U2[10] or U2[10] or not U2[20] and U2[20])) and ((U2[20] and U2[20] or U2[26] and U2[10] or (not U2[26] or U2[20] or not U2[26] and not U2[10])) and ((not U2[26] or U2[26] or U2[20] and U2[10]) and (not U2[20] or U2[26] or U2[20] and not U2[10]))) and not ((not U2[26] and not U2[26] or (not U2[26] or not U2[20])) and (not U2[20] or U2[20] or U2[20] and U2[10]) and ((not U2[26] or not U2[20]) and (U2[10] or not U2[20]) and (U2[10] or U2[10] or not U2[20] and U2[20])) and ((U2[20] and U2[20] or U2[26] and U2[10] or (not U2[26] or U2[20] or not U2[26] and not U2[10])) and ((not U2[26] or U2[26] or U2[20] and U2[10]) and (not U2[20] or U2[26] or U2[20] and not U2[10])))) then 489. else 784
+end elseif Ev < 3444. then if Ev == 3443 then Ev = if U2[10] <= UK[2008] then 559 else 503 else Ev = 3786.; continue end else U2[20] = (U2[20] + UK[597.]) % UK[591.]; Ev = 1107. end elseif Ev < 3454 then if Ev < 3450. then if Ev < 3448 then if Ev < 3447. then
+if Ev < 3446 then if Ev == 3445 then U2[26] = (U2[26] + UK[1288]) % UK[1060]; Ev = 222. else Ev = 3161; continue end else Ev = if U2[10] <= UK[1292] then 102. else 1152. end else Ev = 709 end elseif Ev < 3449 then U2[10] = (U2[10] + UK[1405]) % UK[1456]; Ev = 247
+elseif Ev == 3449 then Ev = 211 else Ev = 3005; continue end elseif Ev < 3452 then if Ev < 3451 then Ev = 1228 elseif Ev == 3451 then Ev = 555. else Ev = 3633.; continue end elseif Ev < 3453. then Ev = 115 elseif Ev == 3453. then Ev = if not U2[26] and U2[26] or not U2[10] and not U2[10] or U2[26] and U2[26] and (U2[10] or U2[26]) or not (not U2[26] and U2[26] or not U2[10] and not U2[10] or U2[26] and U2[26] and (U2[10] or U2[26])) then 1237 else 407
+else Ev = 3226; continue end elseif Ev < 3459. then if Ev < 3457 then if Ev < 3456. then if Ev < 3455 then if Ev == 3454 then Ev = 817 else Ev = 3767; continue end else Ev = 615. end else Ev = 209 end elseif Ev < 3458 then CE = {}; CB = {}; Ev = 37 else local WY = UK;
+U2[26]:AddLabel(b(createMultiGradientText(WY[148], U2[4][WY[1457]])), true); U2[26]:AddPlayerInfo(WY[418], { [WY[1184]] = WY[1991], [WY[895]] = WY[1865] }); U2[20] = U2[14][WY[1892]]:AddRightGroupbox(WY[1306], WY[10]); Ev = 147. end elseif Ev < 3461 then if Ev < 3460 then
+Ev = 1012 else U2[20] = (U2[20] + UK[1149.]) % UK[1060]; Ev = 21. end elseif Ev < 3462. then if Ev == 3461 then Ev = if U2[16] <= UK[1765] then 440 else 210. else Ev = 3560; continue end elseif Ev == 3462. then U2[18.] = (U2[10] * UK[1292] + UK[2008]) % UK[1165] + UK[1292];
+Ev = 1111 else Ev = 3732.; continue end elseif Ev < 3503 then if Ev < 3482 then if Ev < 3473 then if Ev < 3468. then if Ev < 3466 then if Ev < 3465. then if Ev < 3464 then if Ev == 3463 then Ev = if true then 1255 else 668 else Ev = 3012.; continue end elseif Ev == 3464 then
+U2[26] = (U2[20] * UK[1292] + UK[2008]) % UK[597.] + UK[1292]; Ev = 933. else Ev = 3649; continue end elseif Ev == 3465. then U2[26] = CT:AddLabel(b(UK[1595]) .. c(UK[204.], UK[1198]), true); Ev = 617 else Ev = 3994; continue end elseif Ev < 3467 then Ev = if (U2[20] * UK[633.] + UK[1579]) % UK[749] == UK[1165] then 530 else 18.
+else U2[20] = (U2[10] * UK[1292] + UK[327.]) % UK[633.] + UK[1292]; Ev = 651. end elseif Ev < 3471. then if Ev < 3470 then if Ev < 3469 then if Ev == 3468. then Ev = 429. else Ev = 3286; continue end elseif Ev == 3469 then U2[26] = (U2[26] + UK[1413.]) % UK[1456];
+Ev = 208 else Ev = 3991; continue end elseif Ev == 3470 then local WY = UK; U2[14][WY[750.]] = U2[14][WY[1386.]]:AddSubTab(WY[750.], WY[712]); U2[14][WY[923]] = U2[14][WY[1386.]]:AddSubTab(WY[923], WY[338]); U2[14][WY[680]] = U2[14][WY[1386.]]:AddSubTab(WY[680], WY[190]);
+U2[14][WY[1532]] = U2[14][WY[1386.]]:AddSubTab(WY[1532], WY[296]); U2[14][WY[806]] = U2[14][WY[1386.]]:AddSubTab(WY[806], WY[642.]); U2[14][WY[111.]] = U2[14][WY[1298]]:AddSubTab(WY[134], WY[1554.]); U2[14][WY[1655]] = U2[14][WY[1298]]:AddSubTab(WY[1655], WY[91]);
+U2[14][WY[1933]] = U2[14][WY[1298]]:AddSubTab(WY[1933], WY[293]); U2[14][WY[1066]] = U2[14][WY[1030]]:AddSubTab(WY[111.], WY[1554.]); U2[14][WY[705.]] = U2[14][WY[1030]]:AddSubTab(WY[188], WY[1573]); U2[14][WY[1682]] = U2[14][WY[1030]]:AddSubTab(WY[20], WY[835]);
+U2[14][WY[671]] = U2[14][WY[1030]]:AddSubTab(WY[1655], WY[91]); U2[14][WY[1953.]] = U2[14][WY[1030]]:AddSubTab(WY[1933], WY[293]); U2[14][WY[525.]] = U2[14][WY[1030]]:AddSubTab(WY[420.], WY[166]); U2[14][WY[1990]] = U2[14][WY[484]]:AddSubTab(WY[852.], WY[353]);
+U2[14][WY[1123]] = U2[14][WY[484]]:AddSubTab(WY[968], WY[1798]); U2[14][WY[982]] = U2[14][WY[484]]:AddSubTab(WY[1752.], WY[623]); U2[14][WY[1871]] = U2[14][WY[484]]:AddSubTab(WY[443], WY[293]); U2[14][WY[1841]] = U2[14][WY[2029]]:AddSubTab(WY[765.], WY[44]);
+U2[14][WY[1666]] = U2[14][WY[2029]]:AddSubTab(WY[1564], WY[886]); U2[14][WY[1658]] = U2[14][WY[2029]]:AddSubTab(WY[1735], WY[1801]); Ev = 1028 else Ev = 2800; continue end elseif Ev < 3472 then if Ev == 3471. then Ev = 132. else Ev = 2879; continue end elseif Ev == 3472 then
+Ev = 462. else Ev = 3433; continue end elseif Ev < 3478 then if Ev < 3476 then if Ev < 3475 then if Ev < 3474. then Ev = 371 elseif Ev == 3474. then local WY = UK; Dd = loadstring(WY[1185.]:HttpGet(Dl .. WY[452]))(); WY[879.](WY[1128.]); U2[4] = loadstring(WY[1185.]:HttpGet(Dl .. WY[1156]))();
+U2[7] = loadstring(WY[1185.]:HttpGet(Dl .. WY[1336]))(); DJ = Dd[WY[1944.]]; U2[23] = Dd[WY[1460]]; Ev = 226 else Ev = 4008.; continue end elseif Ev == 3475 then Ev = if (U2[20] * UK[1292] + UK[1756]) % UK[1060] == UK[650] then 409 else 1250 else Ev = 3059;
+continue end elseif Ev < 3477. then if Ev == 3476 then U2[26] = nil; U2[26] = UK[633.] - UK[327.]; Ev = 359 else Ev = 3718; continue end elseif Ev == 3477. then Ev = if true then 568 else 238 else Ev = 3304; continue end elseif Ev < 3480. then if Ev < 3479 then
+Ev = 843. else U2[20] = (U2[20] + UK[749]) % UK[466]; Ev = 272 end elseif Ev < 3481 then if Ev == 3480. then Ev = 527 else Ev = 3269; continue end elseif Ev == 3481 then U2[20] = (U2[20] + UK[1165]) % UK[466]; Ev = 171. else Ev = 3594.; continue end elseif Ev < 3493 then
+if Ev < 3488 then if Ev < 3486. then if Ev < 3484 then if Ev < 3483. then if Ev == 3482 then C4:AddDivider(); U2[26] = C4:AddLabel(b(UK[1174]) .. c(UK[204.], UK[602]), true); Ev = 586 else Ev = 3906.; continue end elseif Ev == 3483. then U2[20] = (U2[20] + UK[597.]) % UK[749];
+Ev = 183. else Ev = 2792; continue end elseif Ev < 3485 then if Ev == 3484 then U2[26], U2[1], U2[18.], U2[10] = nil, nil, nil, nil; U2[10] = UK[749]; Ev = 413 else Ev = 3409; continue end else Ev = 1031 end elseif Ev < 3487 then if Ev == 3486. then Ev = if U2[18.] <= UK[1165] then 944 else 329
+else Ev = 3492.; continue end else Ev = 98 end elseif Ev < 3491 then if Ev < 3490 then if Ev < 3489. then Ev = 546. else local WY = UK; U2[10] = { WY[565], WY[1474], WY[1014.], WY[1469], WY[1615], WY[894.], WY[1163], WY[1529], WY[890] }; local Y_ = U2[20];
+U2[18.] = U2[10][Y_ % WY[1620.] + WY[1292]]; Ev = if U2[18.]:len() >= U2[18.]:reverse():rep(Y_ % WY[1165] + WY[2008]):len() then 349 else 153. end elseif Ev == 3490 then DU = UK[633.]; Ev = 1114 else Ev = 2968; continue end elseif Ev < 3492. then if Ev == 3491 then
+U2[20] = (U2[10] * UK[1292] + UK[650]) % UK[2008] + UK[1292]; Ev = 820 else Ev = 3735.; continue end elseif Ev == 3492. then Ev = 71 else Ev = 2794; continue end elseif Ev < 3498. then if Ev < 3496 then if Ev < 3495. then if Ev < 3494 then DD = U2[14]:WaitForChild(UK[750.]);
+Ev = 475 else U2[20] = (U2[20] + UK[1620.]) % UK[1060]; Ev = 1192 end else Ev = if U2[10] <= UK[1292] then 578 else 39. end elseif Ev < 3497 then Ev = 751 elseif Ev == 3497 then U2[10] = nil; local WY = UK; U2[10] = WY[327.] - WY[1165]; U2[10] = WY[650] + WY[1292];
+Ev = 848 else Ev = 3464; continue end elseif Ev < 3500 then if Ev < 3499 then if Ev == 3498. then local WY = UK; DL = WY[1862]; DF = WY[1143.]; Dz = WY[795.]; Ev = 105. else Ev = 3349; continue end elseif Ev == 3499 then Ev = 2 else Ev = 3243.; continue end
+elseif Ev < 3501. then if Ev == 3500 then Ev = 286 else Ev = 3988; continue end elseif Ev < 3502 then U2[20] = (U2[20] + UK[921.]) % UK[1984]; Ev = 1181 elseif Ev == 3502 then U2[20], U2[26] = nil, nil; U2[26] = UK[327.]; Ev = 789. else Ev = 3746; continue
+end elseif Ev < 3525. then if Ev < 3515 then if Ev < 3509 then if Ev < 3506 then if Ev < 3505 then if Ev < 3504. then if Ev == 3503 then Ev = if (U2[10] * UK[2008] + UK[2008]) * UK[327.] % UK[1165] == ((U2[10] * UK[2008] + UK[2008]) * UK[327.] + UK[650]) % UK[1165] then 780. else 1097
+else Ev = 3402.; continue end else Ev = 597. end elseif Ev == 3505 then local WY = UK; U2[14]:AddToggle(WY[1019], { [WY[302]] = WY[292], [WY[592]] = WY[1115], [WY[181]] = false }); U2[14]:AddToggle(WY[152], { [WY[181]] = false, [WY[302]] = WY[81.], [WY[592]] = WY[1715] });
+U2[14]:AddDivider(); U2[14]:AddButton({ [WY[592]] = WY[1774], [WY[1441]] = WY[859] }); U2[14]:AddButton({ [WY[592]] = WY[1339], [WY[1441]] = WY[66.] }); U2[10] = U2[26][WY[750.]]:AddRightGroupbox(WY[955], WY[246.]); Ev = 830 else Ev = 3803; continue end elseif Ev < 3507. then
+if Ev == 3506 then local WY = UK; U2[1]:AddDropdown(WY[843.], { [WY[181]] = WY[535], [WY[592]] = WY[1777], [WY[1697]] = U2[10], [WY[1977.]] = WY[317] }); U2[1]:AddToggle(WY[872], { [WY[592]] = WY[407], [WY[181]] = false }); U2[1]:AddDivider(); U2[1]:AddButton({ [WY[592]] = WY[888.],
+[WY[1441]] = WY[156.] }); U2[1]:AddButton({ [WY[592]] = WY[1869.], [WY[1441]] = WY[1795] }); Ev = 1188. else Ev = 3742; continue end elseif Ev < 3508 then U2[18.], U2[10] = nil, nil; U2[10] = UK[650]; Ev = 136 elseif Ev == 3508 then Ev = if (U2[18.] * UK[1292] + UK[327.]) % UK[749] == UK[1165] then 1052 else 777.
+else Ev = 2877.; continue end elseif Ev < 3512 then if Ev < 3511 then if Ev < 3510. then U2[1] = nil; local WY = UK; U2[1] = WY[749] - WY[1579]; U2[1] = WY[650] + WY[2008]; Ev = 66. else Ev = if U2[1] <= UK[1292] then 855. else 81. end else Ev = 422 end elseif Ev < 3513. then
+if Ev == 3512 then Ev = if (U2[26] * UK[1292] + UK[327.]) % UK[1060] == UK[1292] then 741. else 1230. else Ev = 3535; continue end elseif Ev < 3514 then Ev = 198. else Ev = 771. end elseif Ev < 3521 then if Ev < 3519. then if Ev < 3518 then if Ev < 3516. then
+U2[10] = (U2[20] * UK[1292] + UK[650]) % UK[2008] + UK[1292]; Ev = 828. elseif Ev < 3517 then if Ev == 3516. then U2[26], U2[18.], U2[10], U2[20] = nil, nil, nil, nil; U2[20] = UK[1756]; Ev = 626 else Ev = 4018; continue end elseif Ev == 3517 then Ev = if true then 1201 else 918.
+else Ev = 3486.; continue end elseif Ev == 3518 then U2[20] = (U2[20] + UK[1288]) % UK[591.]; Ev = 1104. else Ev = 2906; continue end elseif Ev < 3520 then if Ev == 3519. then Ev = 244 else Ev = 3380; continue end else U2[20] = (U2[20] + UK[921.]) % UK[1984];
+Ev = 1088 end elseif Ev < 3523 then if Ev < 3522. then if Ev == 3521 then local WY = UK; U2[18.] = U2[26][WY[1666]]:AddLeftGroupbox(WY[1694], WY[1470.]); U2[18.]:AddToggle(WY[1059.], { [WY[181]] = false, [WY[1977.]] = WY[1054], [WY[592]] = WY[369.] }); U2[18.]:AddDropdown(WY[238], { [WY[1597]] = true,
+[WY[1697]] = { WY[1403], WY[1710.], WY[695], WY[1742], WY[37], WY[1612] }, [WY[181]] = {}, [WY[1977.]] = WY[1004], [WY[592]] = WY[766] }); U2[18.]:AddDropdown(WY[1296.], { [WY[302]] = WY[169], [WY[1597]] = true, [WY[181]] = { WY[111.], WY[476], WY[20], WY[1933],
+WY[188] }, [WY[592]] = WY[713], [WY[1697]] = { WY[20], WY[476], WY[1933], WY[111.], WY[188] }, [WY[1977.]] = WY[983] }); U2[14] = U2[26][WY[1666]]:AddRightGroupbox(WY[1104.], WY[550]); Ev = 1193 else Ev = 3604; continue end else U2[14] = U2[26][UK[1933]]:AddLeftGroupbox(UK[669.], UK[293]);
+Ev = 291. end elseif Ev < 3524 then Ev = 1202 else U2[20] = (U2[20] + UK[1329.]) % UK[1984]; Ev = 164 end elseif Ev < 3535 then if Ev < 3531. then if Ev < 3529 then if Ev < 3528. then if Ev < 3526 then if Ev == 3525. then Ev = 567. else Ev = 3883; continue
+end elseif Ev < 3527 then U2[20], U2[26] = nil, nil; U2[26] = UK[633.]; Ev = 294. elseif Ev == 3527 then U2[10] = nil; local WY = UK; U2[10] = WY[2008] - WY[1292]; U2[10] = WY[650] + WY[1292]; U2[10] = WY[327.] - WY[1165]; U2[10] = WY[650] + WY[1292]; Ev = 483.
+else Ev = 3145; continue end elseif Ev == 3528. then Ev = if U2[16] <= UK[836] then 283 else 1168 else Ev = 3810.; continue end elseif Ev < 3530 then Ev = if (U2[10] * UK[2008] + UK[1165]) * UK[1060] % UK[1165] == ((U2[10] * UK[2008] + UK[1165]) * UK[1060] + (UK[1165] + UK[1292])) % UK[1165] then 826 else 157
+else Ev = if true then 1071. else 50 end elseif Ev < 3533 then if Ev < 3532 then U2[20] = (U2[20] + UK[921.]) % UK[1984]; Ev = 133 elseif Ev == 3532 then Ev = 645. else Ev = 3925; continue end elseif Ev < 3534. then if Ev == 3533 then U2[20] = (U2[10] * UK[1292] + UK[1292]) % UK[2008] + UK[1292];
+Ev = 1022 else Ev = 3155; continue end elseif Ev == 3534. then local Y0 = UK[1957][UK[394]]; UK[1383.](UK[1960]); Ev = 941 else Ev = 3988; continue end elseif Ev < 3540. then if Ev < 3538 then if Ev < 3537. then if Ev < 3536 then Ev = 1120 else U2[26] = nil;
+local WY = UK; U2[26] = WY[1579] - WY[2008]; U2[26] = WY[650] + WY[327.]; U2[26] = WY[1620.] - WY[597.]; Ev = 381. end else Ev = 173 end elseif Ev < 3539 then U2[10] = (U2[10] + UK[1165]) % UK[1060]; Ev = 693. else U2[20] = (U2[20] + UK[1329.]) % UK[1984];
+Ev = 880 end elseif Ev < 3542 then if Ev < 3541 then if Ev == 3540. then U2[14] = U2[20][UK[1841]]:AddLeftGroupbox(UK[908], UK[1835]); Ev = 1027 else Ev = 3108.; continue end elseif Ev == 3541 then local WY = UK; U2[26]:AddToggle(WY[1952], { [WY[592]] = WY[2045],
+[WY[181]] = false }); U2[14] = U2[10][WY[111.]]:AddRightGroupbox(WY[1475], WY[1981]); Ev = 204. else Ev = 3971; continue end elseif Ev < 3543. then if Ev == 3542 then Ev = 456. else Ev = 3392; continue end elseif Ev == 3543. then Ev = 619 else Ev = 2934.; continue
+end elseif Ev < 3627. then if Ev < 3586 then if Ev < 3564. then if Ev < 3555. then if Ev < 3550 then if Ev < 3548 then if Ev < 3547 then if Ev < 3545 then U2[20] = nil; local WY = UK; U2[20] = WY[1165] - WY[2008]; U2[20] = WY[650] + WY[1292]; U2[20] = WY[2008] - WY[1292];
+U2[20] = WY[327.] - WY[1165]; Ev = 658 elseif Ev < 3546. then if Ev == 3545 then Ev = 343 else Ev = 3796; continue end else Ev = if U2[16] <= UK[1465] then 1094 else 742 end elseif Ev == 3547 then local Y1 = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[18.], UK[1149.]), string.byte(tostring(U2[20]))), UK[2008]);
+Ev = if bit32.bxor(bit32.bxor(bit32.bxor(bit32.bxor(bit32.band(Y1, UK[1265]), UK[1709]), (bit32.bxor(bit32.band(Y1, UK[1906]), UK[482]))), UK[1709]), UK[482]) == Y1 then 572 else 612. else Ev = 4001; continue end elseif Ev < 3549. then Ev = 970 else U2[26] = nil;
+local WY = UK; U2[26] = WY[327.] - WY[1165]; U2[26] = WY[650] + WY[1292]; U2[26] = WY[327.] - WY[1165]; U2[26] = WY[650] + WY[1292]; Ev = 1072 end elseif Ev < 3553 then if Ev < 3552. then if Ev < 3551 then Ev = 598 elseif Ev == 3551 then D_ = false; Ed = {};
+D6 = {}; Ev = 308 else Ev = 3651.; continue end else Ev = 606. end elseif Ev < 3554 then if Ev == 3553 then U2[20] = (U2[20] + UK[1329.]) % UK[1984]; Ev = 1042 else Ev = 3668; continue end elseif Ev == 3554 then local Y2 = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[20], UK[1143.]), string.byte(tostring(U2[26]))), UK[1579]);
+Ev = if bit32.bxor(bit32.bxor(bit32.bxor(bit32.bxor(bit32.band(Y2, UK[1402]), UK[851]), (bit32.bxor(bit32.band(Y2, UK[1805]), UK[787]))), UK[851]), UK[787]) ~= Y2 then 459. else 78. else Ev = 3082; continue end elseif Ev < 3560 then if Ev < 3558. then if Ev < 3557 then
+if Ev < 3556 then if Ev == 3555. then U2[20] = (U2[20] + UK[702.]) % UK[1984]; Ev = 334 else Ev = 3522.; continue end else Ev = 951. end elseif Ev == 3557 then local WY = UK; Dt = WY[1291]; Dp = WY[512]; Dg = WY[512]; Ev = 1219 else Ev = 3033.; continue end
+elseif Ev < 3559 then if Ev == 3558. then Eb = UK[1185.]:GetService(UK[1725.]); Ev = 477. else Ev = 2904.; continue end elseif Ev == 3559 then local Y3 = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[20], UK[1620.]), string.byte(tostring(Dx))), UK[1756]); Ev = if bit32.bxor(bit32.bxor(bit32.bxor(bit32.bxor(bit32.band(Y3, UK[1396]), UK[361]), (bit32.bxor(bit32.band(Y3, UK[1425.]), UK[1408]))), UK[361]), UK[1408]) ~= Y3 then 65 else 1029.
+else Ev = 2768; continue end elseif Ev < 3562 then if Ev < 3561. then function sFLY(q_) local Rf; Rf = nil; local Rg, Rh, Ri, Rj, Rk, Rl, Rn, Ro, Rp = nil, nil, nil, nil, nil, nil, nil, nil, nil; local Rm = nil; Rm = 14; while true do Rm = 4309 - Rm; do if Rm < 4302. then
+if Rm < 4291 then if Rm < 4290. then if Rm < 3864. then break elseif Rm < 4289 then break elseif Rm == 4289 then Rm = if true then 6. else 16 else Rm = 4297; continue end elseif Rm == 4290. then Rm = 20 else Rm = 8384; continue end elseif Rm < 4296. then if Rm < 4293. then
+if Rm < 4292 then if Rm == 4291 then return else Rm = 4290.; continue end else break end elseif Rm < 4294 then if Rm == 4293. then Rg = Rk:FindFirstChildOfClass(UK[985]); Rm = 3. else Rm = 4291; continue end elseif Rm < 4295 then if Rm == 4294 then DM:Disconnect();
+Rm = 11 else Rm = 4304; continue end elseif Rm == 4295 then Rk = Cs[UK[337]]; Rl = Rk[UK[1988]]; Rm = if Rl then 8 else 5 else Rm = 269; continue end elseif Rm < 4299. then if Rm < 4297 then if Rm == 4296. then DE:Disconnect(); Rm = 10 else Rm = 14319.; continue
+end elseif Rm < 4298 then Rh = ad_getHRP(); Rp = if not Rh then UK[1292] else UK[650]; Rn = UK[825.] * Rp + UK[864.] * (UK[1292] - Rp); Ro = UK[1520] * Rp + UK[1368.] * (UK[1292] - Rp); Rm = if (Rn * UK[1675] + Ro * UK[428] + Rn * Ro) % UK[1264] == UK[1190] then 18. else 7
+elseif Rm == 4298 then Rm = if DE then 13 else 10 else Rm = 4301; continue end elseif Rm < 4300 then Rm = 12. elseif Rm < 4301 then if Rm == 4300 then Rm = if DM then 15. else 11 else Rm = 4294; continue end else Rk = Rl; Rg = Rk:FindFirstChildOfClass(UK[985]);
+Rm = if not Rg then 0. else 3. end elseif Rm < 4306 then if Rm < 4304 then if Rm < 4303 then Rf = { [UK[110]] = UK[650], [UK[131]] = UK[650], [UK[471.]] = UK[650], [UK[1243]] = UK[650], [UK[284]] = UK[650], [UK[30.]] = UK[650] }; Ri = UK[650]; Rj = { [UK[110]] = UK[650],
+[UK[131]] = UK[650], [UK[471.]] = UK[650], [UK[1243]] = UK[650], [UK[284]] = UK[650], [UK[30.]] = UK[650] }; function FLY() Ea = true; local Y4 = UK; local rf = Y4[1205][Y4[1182.]](Y4[500]); local rg = Y4[1205][Y4[1182.]](Y4[170]); rf[Y4[241]] = Y4[1177]; rf[Y4[499]] = Rh;
+rg[Y4[499]] = Rh; rf[Y4[340]] = Y4[1618][Y4[1182.]](Y4[518], Y4[518], Y4[518]); rf[Y4[1077.]] = Rh[Y4[1077.]]; rg[Y4[273.]] = Y4[1618][Y4[1182.]](Y4[650], Y4[650], Y4[650]); rg[Y4[1570]] = Y4[1618][Y4[1182.]](Y4[518], Y4[518], Y4[518]); local Y5 = Y4[1957][Y4[394]];
+Y4[1383.](function() local QY, QZ, Q_, Q0, Q2, Q3, Q4 = nil, nil, nil, nil, nil, nil, nil; local Q1 = nil; Q1 = 24.; while true do Q1 = 9791 - Q1; do if Q1 < 9765. then if Q1 < 9753. then if Q1 < 9745 then if Q1 < 9742 then if Q1 < 9740 then if Q1 < 9739 then
+break else Q_ = Rf[UK[110]] + Rf[UK[131]] ~= UK[650]; Q1 = 19 end elseif Q1 < 9741. then if Q1 == 9740 then QZ = getNumber(UK[220], UK[609.]); Q_ = Rf[UK[471.]] + Rf[UK[1243]] ~= UK[650]; Q1 = if Q_ then 19 else 52 else Q1 = 925; continue end elseif Q1 == 9741. then
+Q1 = if true then 8 else 13 else Q1 = 4833.; continue end elseif Q1 < 9744. then if Q1 < 9743 then Q1 = if Q_ then 30. else 0. else local Y6 = UK[359][UK[1182.]]; rg[UK[273.]] = (QY[UK[1077.]][UK[1407.]] * (Rf[UK[110]] + Rf[UK[131]]) + (QY[UK[1077.]] * UK[1207](Rf[UK[471.]] + Rf[UK[1243]], (Rf[UK[110]] + Rf[UK[131]] + Rf[UK[284]] + Rf[UK[30.]]) * UK[1317.], UK[650])[UK[1297]] - QY[UK[1077.]][UK[1297]])) * Ri;
+Rj = { [UK[110]] = Rf[UK[110]], [UK[131]] = Rf[UK[131]], [UK[471.]] = Rf[UK[471.]], [UK[1243]] = Rf[UK[1243]] }; Q1 = 16 end else Q1 = if QZ then 48. else 25 end elseif Q1 < 9749 then if Q1 < 9748 then if Q1 < 9746 then if Q1 == 9745 then QZ = Rf[UK[471.]] + Rf[UK[1243]] ~= UK[650];
+Q1 = if QZ then 15. else 4 else Q1 = 9782; continue end elseif Q1 < 9747. then break elseif Q1 == 9747. then Q1 = if QZ then 26 else 31 else Q1 = 7646; continue end elseif Q1 == 9748 then Q0 = Q_; Q1 = 34 else Q1 = 7920.; continue end elseif Q1 < 9751 then
+if Q1 < 9750. then if Q1 == 9749 then QZ = DJ[UK[1902.]]; Q1 = 33. else Q1 = 9768.; continue end elseif Q1 == 9750. then Q1 = 16 else Q1 = 9769; continue end elseif Q1 < 9752 then Rg[UK[1923.]] = false; Q1 = 22 else Q1 = if Q0 then 37 else 23 end elseif Q1 < 9759. then
+if Q1 < 9756. then if Q1 < 9755 then if Q1 < 9754 then if Q1 == 9753. then QZ = Rf[UK[110]] + Rf[UK[131]] ~= UK[650]; Q1 = 28 else Q1 = 9742; continue end elseif Q1 == 9754 then local Y7 = UK[359][UK[1182.]]; rg[UK[273.]] = (QY[UK[1077.]][UK[1407.]] * (Rj[UK[110]] + Rj[UK[131]]) + (QY[UK[1077.]] * UK[1207](Rj[UK[471.]] + Rj[UK[1243]], (Rj[UK[110]] + Rj[UK[131]] + Rf[UK[284]] + Rf[UK[30.]]) * UK[1317.], UK[650])[UK[1297]] - QY[UK[1077.]][UK[1297]])) * Ri;
+Q1 = 41 else Q1 = 9781; continue end elseif Q1 == 9755 then Q1 = 50 else Q1 = 925; continue end elseif Q1 < 9758 then if Q1 < 9757 then if Q1 == 9756. then Q1 = 13 else Q1 = 7920.; continue end else Q1 = if Q0 then 21. else 2 end elseif Q1 == 9758 then Q1 = if QZ then 12. else 6.
+else Q1 = 9773; continue end elseif Q1 < 9762. then if Q1 < 9761 then if Q1 < 9760 then if Q1 == 9759. then QZ = not Ea; Q1 = if QZ then 33. else 42. else Q1 = 9766; continue end elseif Q1 == 9760 then Q_ = Ri ~= UK[650]; Q0 = QZ; Q4 = if Q0 then UK[1292] else UK[650];
+Q2 = UK[120.] * Q4 + UK[1733] * (UK[1292] - Q4); Q3 = UK[237.] * Q4 + UK[1647.] * (UK[1292] - Q4); Q1 = if (Q2 * UK[735.] + Q3 * UK[963.] + Q2 * Q3) % UK[1264] == UK[434] then 3. else 39. else Q1 = 9779; continue end else Ri = QZ; Q1 = 46 end elseif Q1 < 9764 then
+if Q1 < 9763 then if Q1 == 9762. then Q1 = 1 else Q1 = 9757; continue end elseif Q1 == 9763 then Q1 = if QZ then 11 else 20 else Q1 = 9754; continue end elseif Q1 == 9764 then Q_ = Rf[UK[284]] + Rf[UK[30.]] ~= UK[650]; Q1 = 49 else Q1 = 9780.; continue end
+elseif Q1 < 9780. then if Q1 < 9773 then if Q1 < 9769 then if Q1 < 9767 then if Q1 < 9766 then QZ = Rf[UK[284]] + Rf[UK[30.]] == UK[650]; Q1 = 31 else QZ = Rf[UK[471.]] + Rf[UK[1243]] == UK[650]; Q1 = if QZ then 14 else 44 end elseif Q1 < 9768. then if Q1 == 9767 then
+Q1 = 50 else Q1 = 9741.; continue end elseif Q1 == 9768. then rg[UK[273.]] = UK[1618][UK[1182.]](UK[650], UK[650], UK[650]); Q1 = 41 else Q1 = 9739; continue end elseif Q1 < 9772 then if Q1 < 9771. then if Q1 < 9770 then if Q1 == 9769 then Q1 = 45. else Q1 = 9783.;
+continue end else Ri = UK[650]; Q1 = 2 end else QZ = Rf[UK[284]] + Rf[UK[30.]] ~= UK[650]; Q1 = 11 end else Q1 = if Q_ then 49 else 27. end elseif Q1 < 9776 then if Q1 < 9775 then if Q1 < 9774. then Q1 = if QY then 35 else 36. elseif Q1 == 9774. then Rg[UK[1923.]] = true;
+Q1 = 51. else Q1 = 9763; continue end elseif Q1 == 9775 then rf[UK[1077.]] = QY[UK[1077.]]; QY = not Ea; Q1 = if QY then 18. else 7 else Q1 = 9755; continue end elseif Q1 < 9778 then if Q1 < 9777. then if Q1 == 9776 then Q1 = if QZ then 47 else 9. else Q1 = 9782;
+continue end else QZ = Rf[UK[110]] + Rf[UK[131]] == UK[650]; Q1 = 44 end elseif Q1 < 9779 then if Q1 == 9778 then Rf = { [UK[110]] = UK[650], [UK[131]] = UK[650], [UK[471.]] = UK[650], [UK[1243]] = UK[650], [UK[284]] = UK[650], [UK[30.]] = UK[650] }; Rj = { [UK[110]] = UK[650],
+[UK[131]] = UK[650], [UK[471.]] = UK[650], [UK[1243]] = UK[650], [UK[284]] = UK[650], [UK[30.]] = UK[650] }; Ri = UK[650]; rf:Destroy(); rg:Destroy(); Q1 = if Rg then 40 else 22 else Q1 = 9747.; continue end elseif Q1 == 9779 then Q1 = 13 else Q1 = 9766; continue
+end elseif Q1 < 9787 then if Q1 < 9784 then if Q1 < 9782 then if Q1 < 9781 then Q_ = Ri ~= UK[650]; Q0 = not QZ; Q1 = if Q0 then 43 else 34 else Q1 = if QZ then 17 else 51. end elseif Q1 < 9783. then if Q1 == 9782 then QZ = Rf[UK[284]] + Rf[UK[30.]] ~= UK[650];
+Q1 = 47 else Q1 = 9785; continue end elseif Q1 == 9783. then local Y8 = UK[1957][UK[438.]]; UK[1433](); Y8 = UK[1560.][UK[64]]; QY = UK[928]; Q1 = if not QY then 32 else 1 else Q1 = 9769; continue end elseif Q1 < 9786. then if Q1 < 9785 then QY = DJ[UK[1902.]];
+Q1 = 18. elseif Q1 == 9785 then Q1 = 50 else Q1 = 9773; continue end else QZ = Rg; Q1 = 10 end elseif Q1 < 9790 then if Q1 < 9789. then if Q1 < 9788 then if Q1 == 9787 then QZ = Rf[UK[110]] + Rf[UK[131]] ~= UK[650]; Q1 = 15. else Q1 = 2370.; continue end elseif Q1 == 9788 then
+Q0 = Q_; Q1 = 39. else Q1 = 9787; continue end else Q1 = 46 end elseif Q1 < 9818 then if Q1 < 9791 then if Q1 == 9790 then QZ = not q_; Q1 = if QZ then 5 else 10 else Q1 = 9783.; continue end elseif Q1 == 9791 then QZ = Rf[UK[471.]] + Rf[UK[1243]] ~= UK[650];
+Q1 = if QZ then 28 else 38 else Q1 = 9769; continue end else break end end end end) end; DM = DW[UK[439]]:Connect(function(rq, rr) local Q5, Q6, Q8, Q9, Ra = nil, nil, nil, nil, nil; local Q7 = nil; Q7 = 28; while true do Q7 = 8361. - Q7; do if Q7 < 8347 then
+if Q7 < 8338 then if Q7 < 8333 then break elseif Q7 < 8335 then if Q7 < 8334. then if Q7 == 8333 then Q7 = if rr then 23 else 12. else Q7 = 8334.; continue end else Q5 = Q6; Q7 = if rq[UK[658]] == UK[1209.][UK[658]][UK[1423]] then 5 else 1 end elseif Q7 < 8336 then
+Q7 = 15. elseif Q7 < 8337. then Rf[UK[284]] = Q5 * UK[2008]; Q7 = 15. elseif Q7 == 8337. then Q6 = rq[UK[658]] == UK[1209.][UK[658]][UK[284]]; Q7 = if Q6 then 9. else 16 else Q7 = 8351; continue end elseif Q7 < 8342 then if Q7 < 8340. then if Q7 < 8339 then
+return else Rf[UK[471.]] = -Q5; Q7 = 19 end elseif Q7 < 8341 then if Q7 == 8340. then Rf[UK[1243]] = Q5; Q7 = 8 else Q7 = 8334.; continue end else Q7 = 7 end elseif Q7 < 8344 then if Q7 < 8343. then Q7 = 18. elseif Q7 == 8343. then Q7 = 20 else Q7 = 8346.;
+continue end elseif Q7 < 8345 then if Q7 == 8344 then Q7 = if rq[UK[658]] == UK[1209.][UK[658]][UK[1604]] then 21. else 13 else Q7 = 8359; continue end elseif Q7 < 8346. then Q7 = if Q6 then 11 else 26 else Q7 = 8 end elseif Q7 < 8356 then if Q7 < 8351 then
+if Q7 < 8349. then if Q7 < 8348 then Q5 = DS; Q7 = 2 else Q6 = rq[UK[658]] == UK[1209.][UK[658]][UK[30.]]; Q7 = if Q6 then 4 else 6. end elseif Q7 < 8350 then Q5 = q_; Q7 = if Q5 then 14 else 2 else Rf[UK[30.]] = -Q5 * UK[2008]; Q7 = 26 end elseif Q7 < 8353 then
+if Q7 < 8352. then local Y9 = UK; Ra = if rq[Y9[658]] == Y9[1209.][Y9[658]][Y9[23]] then Y9[1292] else Y9[650]; Q8 = Y9[1443.] * Ra + Y9[380] * (Y9[1292] - Ra); Q9 = Y9[931] * Ra + Y9[1550] * (Y9[1292] - Ra); Q7 = if (Q8 * Y9[863] + Q9 * Y9[823] + Q8 * Q9) % Y9[1264] == Y9[1995.] then 22 else 17
+elseif Q7 == 8352. then Q6 = D5; Q7 = 16 else Q7 = 8358.; continue end elseif Q7 < 8354 then Q7 = 19 elseif Q7 < 8355. then break else Q7 = if Q6 then 25 else 24. end elseif Q7 < 8360 then if Q7 < 8358. then if Q7 < 8357 then Rf[UK[110]] = Q5; Q7 = 20 elseif Q7 == 8357 then
+Q6 = D5; Q7 = 6. else Q7 = 8350; continue end elseif Q7 < 8359 then if Q7 == 8358. then Rf[UK[131]] = -Q5; Q7 = 18. else Q7 = 15837.; continue end else Q6 = Q5; Q7 = if Q6 then 27. else 0. end elseif Q7 < 10471 then if Q7 < 8361. then Q7 = if rq[UK[658]] == UK[1209.][UK[658]][UK[1493]] then 3. else 10
+elseif Q7 == 8361. then Q6 = DZ; Q7 = 27. else Q7 = 8338; continue end else break end end end end); DE = DW[UK[498.]]:Connect(function(rB, rC) local Rc, Rd, Re = nil, nil, nil; local Rb = nil; Rb = 11; while true do Rb = 3692 - Rb; do if Rb < 3682 then if Rb < 3674 then
+if Rb < 3670 then break elseif Rb < 3672. then if Rb < 3671 then if Rb == 3670 then Rb = 7 else Rb = 3679; continue end else Rb = 10 end elseif Rb < 3673 then if Rb == 3672. then Rb = if rB[UK[658]] == UK[1209.][UK[658]][UK[284]] then 5 else 12. else Rb = 3688;
+continue end elseif Rb == 3673 then Rf[UK[1243]] = UK[650]; Rb = 7 else Rb = 3689; continue end elseif Rb < 3678. then if Rb < 3676 then if Rb < 3675. then break else local Za = UK; Re = if rB[Za[658]] == Za[1209.][Za[658]][Za[1493]] then Za[1292] else Za[650];
+Rc = Za[927.] * Re + Za[1080.] * (Za[1292] - Re); Rb = 3. end elseif Rb < 3677 then if Rb == 3676 then return else Rb = 3690.; continue end else Rb = if rB[UK[658]] == UK[1209.][UK[658]][UK[1423]] then 2 else 17 end elseif Rb < 3680 then if Rb < 3679 then if Rb == 3678. then
+Rb = if (Rc * UK[1410.] + Rd * UK[1764.] + Rc * Rd) % UK[1264] == UK[1445] then 8 else 6. else Rb = 3687.; continue end else Rb = if rB[UK[658]] == UK[1209.][UK[658]][UK[30.]] then 9. else 20 end elseif Rb < 3681. then if Rb == 3680 then Rb = 22 else Rb = 3671;
+continue end else Rb = if rC then 16 else 15. end elseif Rb < 3690. then if Rb < 3686 then if Rb < 3684. then if Rb < 3683 then Rb = 18. elseif Rb == 3683 then Rf[UK[284]] = UK[650]; Rb = 22 else Rb = 3688; continue end elseif Rb < 3685 then Rf[UK[131]] = UK[650];
+Rb = 21. else Rb = 4 end elseif Rb < 3688 then if Rb < 3687. then Rb = if rB[UK[658]] == UK[1209.][UK[658]][UK[23]] then 0. else 1 elseif Rb == 3687. then Rf[UK[30.]] = UK[650]; Rb = 12. else Rb = 3686; continue end elseif Rb < 3689 then Rb = 21. elseif Rb == 3689 then
+Rd = UK[1849] * Re + UK[637] * (UK[1292] - Re); Rb = 14 else Rb = 1539.; continue end elseif Rb < 5267 then if Rb < 3692 then if Rb < 3691 then Rf[UK[110]] = UK[650]; Rb = 10 else Rb = if rB[UK[658]] == UK[1209.][UK[658]][UK[1604]] then 19 else 13 end elseif Rb < 4233. then
+if Rb == 3692 then Rf[UK[471.]] = UK[650]; Rb = 4 else Rb = 8999; continue end else break end else break end end end end); FLY(); Rm = 17 else local Zb = UK[1957][UK[438.]]; UK[1433](); Rm = if Rk:FindFirstChildOfClass(UK[985]) then 4 else 19 end elseif Rm < 4305. then
+Rl = Rk[UK[1567]]:Wait(); Rm = 8 elseif Rm == 4305. then Rm = 16 else Rm = 8029; continue end elseif Rm < 6452 then if Rm < 4309 then if Rm < 4307 then Rk = DM; Rm = if Rk then 1 else 2 elseif Rm < 4308. then if Rm == 4307 then Rk = DE; Rm = 1 else Rm = 4291;
+continue end else Rm = if Rk then 9. else 12. end elseif Rm < 4367 then if Rm == 4309 then Rm = 20 else break end else break end else break end end end end; Ev = 1187 else U2[10] = nil; local WY = UK; U2[10] = WY[327.] - WY[1165]; U2[10] = WY[1165] - WY[2008];
+U2[10] = WY[650] + WY[1292]; U2[10] = WY[2008] - WY[1292]; Ev = 268 end elseif Ev < 3563 then if Ev == 3562 then Ev = if true then 391 else 1216 else Ev = 2948; continue end elseif Ev == 3563 then U2[16] = { [UK[484]] = U2[14]:AddTab(UK[484], UK[956]), [UK[1477]] = U2[14]:AddTab(UK[1448], UK[1581.]),
+[UK[1722.]] = U2[14]:AddTab(UK[1722.], UK[701]), [UK[1298]] = U2[14]:AddTab(UK[1298], UK[1554.]), [UK[1386.]] = U2[14]:AddTab(UK[1386.], UK[293]), [UK[1030]] = U2[14]:AddTab(UK[1552], UK[1573]), [UK[1892]] = U2[14]:AddTab(UK[1892], UK[195.]), [UK[2029]] = U2[14]:AddTab(UK[2029], UK[1835]),
+[UK[832]] = U2[14]:AddTab(UK[832], UK[44]), [UK[1747]] = U2[14]:AddTab(UK[1747], UK[173]) }; Ev = 100 else Ev = 3757; continue end elseif Ev < 3576. then if Ev < 3572 then if Ev < 3568 then if Ev < 3567. then if Ev < 3566 then if Ev < 3565 then Ev = 1003 elseif Ev == 3565 then
+U2[26] = nil; local WY = UK; U2[26] = WY[1579] - WY[327.]; U2[26] = WY[650] + WY[2008]; U2[26] = WY[749] - WY[327.]; U2[26] = WY[1165] + WY[1292]; U2[26] = WY[1165] - WY[1292]; Ev = 194 else Ev = 3883; continue end else Ev = 357. end else local WY = UK; Dw = WY[1096];
+Dn = WY[609.]; Ev = 248 end elseif Ev < 3570. then if Ev < 3569 then if Ev == 3568 then Ev = 197 else Ev = 4001; continue end elseif Ev == 3569 then U2[14] = U2[20][UK[806]]:AddLeftGroupbox(UK[806], UK[642.]); Ev = 1023. else Ev = 3441.; continue end elseif Ev < 3571 then
+if Ev == 3570. then Ev = 111. else Ev = 3744.; continue end else local WY = UK; U2[1]:AddDropdown(WY[678.], { [WY[592]] = WY[1434.], [WY[181]] = WY[512], [WY[1697]] = U2[26], [WY[1977.]] = WY[1617.] }); U2[1]:AddToggle(WY[820], { [WY[592]] = WY[1557.], [WY[181]] = false });
+U2[1]:AddDivider(); U2[1]:AddButton({ [WY[592]] = WY[135.], [WY[1441]] = WY[182] }); Ev = 1256 end elseif Ev < 3574 then if Ev < 3573. then if Ev == 3572 then Ev = 725 else Ev = 2778.; continue end elseif Ev == 3573. then U2[16] = DJ:CreateWindow({ [UK[1808]] = UK[893],
+[UK[559]] = UK[1868], [UK[1108]] = UK[725], [UK[1938.]] = UK[235], [UK[1127]] = UK[235], [UK[2058.]] = false, [UK[1994]] = UK[2008], [UK[710]] = { [UK[1419.]] = false, [UK[1379]] = true, [UK[1344.]] = false, [UK[1555]] = true, [UK[2039]] = true, [UK[990.]] = true } });
+Ev = 260 else Ev = 3729.; continue end elseif Ev < 3575 then Ev = if (not U2[18.] or U2[18.]) and (not U2[10] or not U2[18.]) and (not U2[10] or not U2[18.] or not U2[10] and not U2[10]) and (U2[10] and not U2[10] and (U2[18.] and not U2[10]) or U2[18.] and U2[18.] and (not U2[10] and not U2[10])) or not ((not U2[18.] or U2[18.]) and (not U2[10] or not U2[18.]) and (not U2[10] or not U2[18.] or not U2[10] and not U2[10]) and (U2[10] and not U2[10] and (U2[18.] and not U2[10]) or U2[18.] and U2[18.] and (not U2[10] and not U2[10]))) then 661 else 509
+else local WY = UK; U2[26] = (vector.create((U2[20] * WY[633.] + WY[1292]) % WY[1478] + WY[1292], (U2[20] * WY[1292] + WY[1413.]) % WY[1149.] + WY[1292], (U2[20] * WY[749] + WY[1149.]) % WY[1628] + WY[1292])); U2[10] = (vector.create((U2[20] * WY[1292] + WY[633.]) % WY[1478] + WY[1292], (U2[20] * WY[1165] + WY[1413.]) % WY[1149.] + WY[1292], (U2[20] * WY[597.] + WY[749]) % WY[1628] + WY[1292]));
+U2[18.] = (vector.create((U2[20] * WY[597.] + WY[749]) % WY[1478] + WY[1292], (U2[20] * WY[1579] + WY[1620.]) % WY[1149.] + WY[1292], (U2[20] * WY[749] + WY[1756]) % WY[1628] + WY[1292])); U2[1] = (vector.create((U2[20] * WY[327.] + WY[327.]) % WY[1478] + WY[1292], (U2[20] * WY[597.] + WY[1165]) % WY[1149.] + WY[1292], (U2[20] * WY[749] + WY[1478]) % WY[1628] + WY[1292]));
+Ev = if vector.dot(vector.cross(U2[26], U2[10]), (vector.cross(U2[18.], U2[1]))) == vector.dot(U2[26], U2[18.]) * vector.dot(U2[10], U2[1]) - vector.dot(U2[26], U2[1]) * vector.dot(U2[10], U2[18.]) + WY[633.] then 1257. else 537. end elseif Ev < 3582. then
+if Ev < 3580 then if Ev < 3578 then if Ev < 3577 then Ev = 663. else U2[10] = (U2[10] + UK[553]) % UK[591.]; Ev = 77 end elseif Ev < 3579. then if Ev == 3578 then Ea, D5, DZ, DS, DM, DE, DB, Dw, Dn, U2[10] = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+U2[10] = UK[1143.]; Ev = 513. else Ev = 3747.; continue end elseif Ev == 3579. then U2[1] = nil; local WY = UK; U2[1] = WY[2008] - WY[1292]; U2[1] = WY[1579] - WY[633.]; U2[1] = WY[650] + WY[1292]; U2[1] = WY[327.] - WY[2008]; Ev = 1254. else Ev = 3934; continue
+end elseif Ev < 3581 then if Ev == 3580 then U2[18.] = nil; local WY = UK; U2[18.] = WY[633.] - WY[327.]; U2[18.] = WY[650] + WY[1292]; Ev = 660. else Ev = 3389; continue end else Ev = if (not DO and U2[14] or not D0 and D0) and (not U2[4] or DO or not U2[4] and U2[20]) and not ((not DO and U2[14] or not D0 and D0) and (not U2[4] or DO or not U2[4] and U2[20])) then 1189 else 457
+end elseif Ev < 3584 then if Ev < 3583 then local WY = UK; U2[26]:AddDropdown(WY[1623.], { [WY[1697]] = { WY[1481], WY[201.] }, [WY[181]] = WY[1481], [WY[592]] = WY[276.], [WY[302]] = WY[2011], [WY[1977.]] = WY[299] }); U2[26]:AddToggle(WY[1724], { [WY[592]] = WY[1565],
+[WY[181]] = false }); U2[26]:AddDivider(); U2[26]:AddButton({ [WY[592]] = WY[1625], [WY[1441]] = WY[1431.] }); U2[26]:AddButton({ [WY[592]] = WY[715], [WY[1441]] = WY[744.] }); Ev = 637 elseif Ev == 3583 then Ev = 873. else Ev = 3161; continue end elseif Ev < 3585. then
+if Ev == 3584 then Ev = 1144 else Ev = 2990; continue end else U2[26]:AddDivider(); C4 = U2[26]:AddLabel(b(UK[1174]) .. c(UK[204.], UK[602]), true); Ev = 586 end elseif Ev < 3609. then if Ev < 3598 then if Ev < 3592 then if Ev < 3589 then if Ev < 3588. then
+if Ev < 3587 then if Ev == 3586 then U2[14] = U2[20][UK[680]]:AddLeftGroupbox(UK[1393], UK[190]); Ev = 295 else Ev = 2870; continue end elseif Ev == 3587 then U2[26] = nil; local WY = UK; U2[26] = WY[1756] - WY[1579]; U2[26] = WY[1292] + WY[1165]; U2[26] = WY[749] - WY[597.];
+U2[26] = WY[650] + WY[1292]; U2[26] = WY[1579] - WY[633.]; U2[26] = WY[650] + WY[1292]; Ev = 679 else Ev = 3241; continue end elseif Ev == 3588. then Ev = 1117 else Ev = 2845; continue end elseif Ev < 3591. then if Ev < 3590 then if Ev == 3589 then Ev = 324.
+else Ev = 3393.; continue end elseif Ev == 3590 then Ev = 917 else Ev = 3598; continue end elseif Ev == 3591. then U2[4] = nil; local WY = UK; U2[4] = WY[1579] - WY[633.]; U2[4] = WY[650] + WY[1292]; U2[4] = WY[327.] - WY[1165]; U2[4] = WY[650] + WY[1292];
+Ev = 816. else Ev = 3963.; continue end elseif Ev < 3596 then if Ev < 3594. then if Ev < 3593 then if Ev == 3592 then U2[10] = (U2[20] * UK[1292] + UK[1292]) % UK[2008] + UK[1292]; Ev = 535 else Ev = 2915; continue end else local WY = UK; CQ = WY[650]; CN = WY[650];
+CL = WY[650]; CJ = WY[650]; CH = WY[650]; Ev = 187 end elseif Ev < 3595 then Ev = 91 elseif Ev == 3595 then Ev = if U2[18.] <= UK[2008] then 90. else 330. else Ev = 3974; continue end elseif Ev < 3597. then U2[12.] = nil; local WY = UK; U2[12.] = WY[597.] - WY[633.];
+U2[12.] = WY[327.] - WY[2008]; U2[12.] = WY[650] + WY[2008]; Ev = 1056. elseif Ev == 3597. then local WY = UK; U2[20] = { WY[524], WY[845], WY[1518.], WY[1253], WY[1726], WY[2059], WY[1017.], WY[21.], WY[101] }; local Zc = U2[18.]; U2[26] = U2[20][Zc % WY[1620.] + WY[1292]];
+Ev = if U2[26]:len() >= U2[26]:gsub(WY[1246], WY[298], Zc % WY[1165] % WY[2008] + WY[1292]):len() then 684. else 704 else Ev = 3702.; continue end elseif Ev < 3603. then if Ev < 3601 then if Ev < 3600. then if Ev < 3599 then U2[26] = (U2[26] + UK[1628]) % UK[1456];
+Ev = 1199 else local WY = UK; D9 = CR[WY[277]]; D3 = WY[650]; Ev = 852. end elseif Ev == 3600. then U2[1] = nil; local WY = UK; U2[1] = WY[2008] - WY[1292]; U2[1] = WY[327.] - WY[1165]; U2[1] = WY[2008] - WY[1292]; Ev = 1054 else Ev = 2807; continue end elseif Ev < 3602 then
+Ev = 288. else U2[10] = (U2[10] + UK[633.]) % UK[1060]; Ev = 1212. end elseif Ev < 3607 then if Ev < 3606. then if Ev < 3604 then Ev = 517 elseif Ev < 3605 then if Ev == 3604 then updateCharParts(Dk[UK[1988]]); Ev = 255. else Ev = 3747.; continue end else U2[26] = nil;
+U2[26] = UK[1165] - UK[2008]; Ev = 953 end elseif Ev == 3606. then U2[18.] = (U2[18.] + UK[633.]) % UK[1413.]; Ev = 1034 else Ev = 3910; continue end elseif Ev < 3608 then if Ev == 3607 then local WY = UK; U2[20]:AddLabel(WY[1002.], true); U2[20]:AddLabel(WY[179], true);
+U2[20]:AddDivider(); U2[26] = { WY[37], WY[1710.], WY[1612], WY[1742], WY[695], WY[1403] }; Ev = 363. else Ev = 3859; continue end elseif Ev == 3608 then Ev = if (D1 and not U2[4] or (U2[4] or not U2[20])) and (not U2[4] and U2[26] and (not D1 or not U2[20])) or not ((D1 and not U2[4] or (U2[4] or not U2[20])) and (not U2[4] and U2[26] and (not D1 or not U2[20]))) then 745 else 1200.
+else Ev = 3952; continue end elseif Ev < 3618. then if Ev < 3614 then if Ev < 3612. then if Ev < 3611 then if Ev < 3610 then Ev = if (U2[26] * UK[633.] + UK[597.]) % UK[749] == UK[2008] then 968 else 0. else Ev = 1119. end elseif Ev == 3611 then local Zd = UK[1957][UK[394]];
+UK[1383.](UK[1960]); Ev = 941 else Ev = 3939.; continue end elseif Ev < 3613 then if Ev == 3612. then Ev = if (U2[10] * UK[633.] + UK[749]) % UK[206] == UK[2008] then 123. else 640 else Ev = 3433; continue end else Ev = if (U2[20] * UK[597.] + UK[1292]) % UK[749] == UK[1165] then 867. else 854
+end elseif Ev < 3616 then if Ev < 3615. then if Ev == 3614 then local WY = UK; U2[10] = (vector.create((U2[20] * WY[633.] + WY[1620.]) % WY[1478] + WY[1292], (U2[20] * WY[1165] + WY[1756]) % WY[1149.] + WY[1292], (U2[20] * WY[749] + WY[1060]) % WY[1628] + WY[1292]));
+U2[18.] = (vector.create((U2[20] * WY[1165] + WY[633.]) % WY[1478] + WY[1292], (U2[20] * WY[1292] + WY[1413.]) % WY[1149.] + WY[1292], (U2[20] * WY[1478] + WY[1628]) % WY[1628] + WY[1292])); U2[1] = (vector.create((U2[20] * WY[327.] + WY[633.]) % WY[633.] + WY[1292], (U2[20] * WY[327.] + WY[1165]) % WY[597.] + WY[1292], (U2[20] * WY[1165] + WY[633.]) % WY[1620.] + WY[1292]));
+Ev = if math.abs((vector.angle(U2[10], U2[18.], U2[1]))) - math.abs((vector.angle(U2[18.], U2[10], U2[1]))) == WY[650] + WY[633.] then 384. else 913 else Ev = 2840; continue end elseif Ev == 3615. then U2[26] = nil; U2[26] = UK[1165] - UK[2008]; Ev = 17 else
+Ev = 3969.; continue end elseif Ev < 3617 then if Ev == 3616 then Ev = 392 else Ev = 2996; continue end else Ev = if true then 1004 else 1251. end elseif Ev < 3623 then if Ev < 3621. then if Ev < 3620 then if Ev < 3619 then if Ev == 3618. then U2[4] = nil;
+local WY = UK; U2[4] = WY[2008] - WY[1292]; U2[4] = WY[633.] - WY[327.]; U2[4] = WY[633.] - WY[327.]; U2[4] = WY[650] + WY[1292]; Ev = 698 else Ev = 3568; continue end elseif Ev == 3619 then local WY = UK; wh_requestFunc = WY[260]; wh_formatNumber = WY[1272.];
+wh_rarityColor = WY[1535]; wh_rarityEmoji = WY[440]; wh_shouldPingForItem = WY[1950.]; wh_snapshotStats = WY[266]; ad_isHelmetByName = WY[948.]; ad_isBodyArmorByName = WY[209]; function wh_sendWebhook() local UM = math.max; local F_, F0, F1, F2, F3, F4, F5, F6, F7, F8, F9, Ga, Gc, Gd, Ge, Gf, Gg, Gh, Gj, Gl, Gm, Gn, Gp = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local Gb = nil; Gb = 37; while true do Gb = 8669 - Gb; do if Gb < 8635 then if Gb < 8621 then if Gb < 8615 then if Gb < 7436 then break elseif Gb < 8611 then if Gb < 7935. then break elseif Gb < 8610. then break else return end elseif Gb < 8613. then if Gb < 8612 then
+if Gb == 8611 then F8 = F0; F_ = { [UK[1527.]] = F8, [UK[1510]] = { { [UK[816.]] = UK[1247], [UK[308]] = UK[1857.], [UK[73]] = F9, [UK[2040.]] = { { [UK[1590.]] = UK[171.], [UK[536]] = UK[957.] .. Dk[UK[821]] .. UK[957.], [UK[1511]] = true }, { [UK[1590.]] = UK[780.],
+[UK[536]] = UK[957.] .. tostring(F1) .. UK[957.], [UK[1511]] = true }, { [UK[1590.]] = UK[99.], [UK[536]] = UK[99.], [UK[1511]] = false }, { [UK[1590.]] = UK[2022.], [UK[536]] = UK[646] .. wh_formatNumber(F3) .. UK[957.], [UK[1511]] = true }, { [UK[1590.]] = UK[1373],
+[UK[536]] = UK[646] .. wh_formatNumber(F4) .. UK[957.], [UK[1511]] = true }, { [UK[1590.]] = UK[1234], [UK[536]] = UK[646] .. wh_formatNumber(F5) .. UK[957.], [UK[1511]] = true }, { [UK[1590.]] = UK[1263.], [UK[536]] = UK[957.] .. tostring(F6) .. UK[957.],
+[UK[1511]] = true }, { [UK[1590.]] = UK[538], [UK[536]] = UK[957.] .. tostring(F7) .. UK[957.], [UK[1511]] = true }, { [UK[1590.]] = UK[99.], [UK[536]] = UK[99.], [UK[1511]] = false }, { [UK[1590.]] = UK[1025] .. tostring(#CU) .. UK[2032], [UK[536]] = F2, [UK[1511]] = false } },
+[UK[689]] = { [UK[221]] = UK[904] .. os[UK[1782.]](UK[1450]) }, [UK[392]] = os[UK[1782.]](UK[1770.]) } } }; UK[879.](function() wh_requestFunc({ [UK[938]] = Di, [UK[585.]] = UK[1101.], [UK[1378]] = { [UK[880]] = UK[343] }, [UK[150.]] = DC:JSONEncode(F_) })
+end); CR[UK[1521.]] = CR[UK[1521.]] + UK[1292]; CR[UK[459.]] = CR[UK[459.]] + F3; CR[UK[400]] = CR[UK[400]] + F4; CR[UK[944]] = CR[UK[944]] + F6; CU = {}; local Ze = UK[1957][UK[438.]]; UK[1433](UK[633.]); C1 = false; Gb = 49 else Gb = 8631.; continue end else
+Gb = if Ga then 21. else 44 end elseif Gb < 8614 then if Gb == 8613. then return else Gb = 8663; continue end elseif Gb == 8614 then Gb = if F1 then 4 else 48. else Gb = 13603; continue end elseif Gb < 8618 then if Gb < 8616. then F2 = UK[650]; Gb = 35 elseif Gb < 8617 then
+F2 = F0; F0 = #CU > UK[650]; Gb = if F0 then 23 else 46 else F2 = F1; Gb = if F2 then 35 else 54. end elseif Gb < 8619. then if Gb == 8618 then Gb = if F1 then 47 else 42. else Gb = 8612; continue end elseif Gb < 8620 then if Gb == 8619. then return else Gb = 8645;
+continue end else break end elseif Gb < 8628. then if Gb < 8624 then if Gb < 8622. then F2 = F1; Gb = if F2 then 9. else 41 elseif Gb < 8623 then if Gb == 8622. then F1 = UM(UK[650], F0[UK[411.]][UK[248]] - CL); Gb = 42. else Gb = 8639; continue end else F8 = F0;
+Gb = if F8 then 13 else 39. end elseif Gb < 8626 then if Gb < 8625. then if Gb == 8624 then F0 = F2; Gb = if F0 then 53 else 19 else Gb = 8640.; continue end elseif Gb == 8625. then F8 = F0; Gb = if F8 then 38 else 26 else Gb = 8650; continue end elseif Gb < 8627 then
+F1 = F0; F6 = F2; Gb = if F1 then 20 else 33. elseif Gb == 8627 then F2 = F1; Gb = if F2 then 11 else 40 else Gb = 8619.; continue end elseif Gb < 8631. then if Gb < 8629 then F2 = UK[650]; Gb = 9. elseif Gb < 8630 then if Gb == 8629 then F2 = UK[650]; Gb = 11
+else Gb = 8622.; continue end else F8 = UK[457]; Gb = 13 end elseif Gb < 8633 then if Gb < 8632 then F8 = UK[477.] .. Db .. UK[1867]; Gb = 26 elseif Gb == 8632 then Gb = if C1 then 56 else 16 else Gb = 8668; continue end elseif Gb < 8634. then if Gb == 8633 then
+F1 = F0[UK[1340]][UK[248]]; Gb = 10 else Gb = 8623; continue end elseif Gb == 8634. then F1 = F0; F7 = F2; Gb = if F1 then 18. else 27. else Gb = 8647; continue end elseif Gb < 8655. then if Gb < 8645 then if Gb < 8640. then if Gb < 8637. then if Gb < 8636 then
+if Gb == 8635 then Gb = if F1 then 31 else 22 else Gb = 7935.; continue end elseif Gb == 8636 then Gb = if F1 then 8 else 52 else Gb = 8633; continue end elseif Gb < 8638 then if Gb == 8637. then F0 = UK[650]; Gb = 0. else Gb = 8622.; continue end elseif Gb < 8639 then
+F1 = UM(UK[650], F0[UK[1876]][UK[248]] - CJ); Gb = 22 elseif Gb == 8639 then Gb = if Di == UK[2056] then 59 else 6. else Gb = 8622.; continue end elseif Gb < 8642 then if Gb < 8641 then if Gb == 8640. then F2 = table.concat(F0, UK[450.]); Gb = 45. else Gb = 8624;
+continue end elseif Gb == 8641 then F2 = F1; Gb = if F2 then 15. else 25 else Gb = 8846; continue end elseif Gb < 8643. then Gb = if F1 then 36. else 10 elseif Gb < 8644 then F0 = F8; Gb = if F0 then 58 else 24. else F2 = UK[650]; Gb = 15. end elseif Gb < 8650 then
+if Gb < 8647 then if Gb < 8646. then F0 = UK[2056]; Gb = 58 elseif Gb == 8646. then F0 = wh_rarityColor(CU[UK[1292]][UK[697]]); Gb = 46 else Gb = 4354; continue end elseif Gb < 8648 then F2 = F1; Gb = if F2 then 43 else 7 elseif Gb < 8649. then if Gb == 8648 then
+Gm = false; for cT, cU in UK[1295](CU) do Gn = cT; Gp = cU; local Go = Gn; local Gq = Gp; local Gl = nil; Gl = UK[327.]; while true do if Gl < 2 then if Gl < 1 then Gl = UK[2008] else Gm = true; Gl = UK[2008] end elseif Gl < 3. then break elseif Gl < 4 then
+F0 = true; Gl = UK[1292] else Gl = if wh_shouldPingForItem(Gq[UK[697]], Gq[UK[404]]) then UK[1165] else UK[650] end end; if Gm then break end end; Gb = 44 else Gb = 8622.; continue end elseif Gb == 8649. then F1 = F0:FindFirstChild(UK[162.]); Gb = 33. else
+Gb = 8612; continue end elseif Gb < 8652. then if Gb < 8651 then if Gb == 8650 then F0 = UK[1757]; Gb = 53 else Gb = 8648; continue end else F1 = F0:FindFirstChild(UK[1340]); Gb = 27. end elseif Gb < 8653 then if Gb == 8652. then F1 = F0:FindFirstChild(UK[1876]);
+Gb = 34 else Gb = 8646.; continue end elseif Gb < 8654 then if Gb == 8653 then Gb = if not CY then 50 else 30. else Gb = 8660; continue end elseif Gb == 8654 then F1 = F0; F4 = F2; Ge = if F1 then UK[1292] else UK[650]; Gc = UK[18.] * Ge + UK[60.] * (UK[1292] - Ge);
+Gd = UK[817] * Ge + UK[1315] * (UK[1292] - Ge); Gb = if (Gc * UK[934] + Gd * UK[1716.] + Gc * Gd) % UK[1264] == UK[2052.] then 12. else 51. else Gb = 8653; continue end elseif Gb < 8665 then if Gb < 8660 then if Gb < 8657 then if Gb < 8656 then F1 = F0:FindFirstChild(UK[1486]);
+Gb = 55 elseif Gb == 8656 then F0 = false; F9 = F8; F8 = Db ~= UK[2056]; Ga = C5; Gb = if Ga then 3. else 57. else Gb = 8636; continue end elseif Gb < 8658. then if Gb == 8657 then F1 = F0:FindFirstChild(UK[411.]); Gb = 51. else Gb = 8627; continue end elseif Gb < 8659 then
+if Gb == 8658. then F1 = F0; F5 = F2; Gb = if F1 then 17 else 34 else Gb = 8846; continue end else F0 = F1; Gb = if F0 then 0. else 32 end elseif Gb < 8662 then if Gb < 8661. then if Gb == 8660 then F1 = F0; F3 = F2; Gb = if F1 then 5 else 2 else Gb = 8630;
+continue end else F1 = UM(UK[650], F0[UK[162.]][UK[248]] - CH); Gb = 52 end elseif Gb < 8663 then F2 = UK[650]; Gb = 43 elseif Gb < 8664. then C1 = true; CY = false; local Zf = UK[1957][UK[438.]]; UK[1433](UK[2008]); F0 = Dk:FindFirstChild(UK[468.]); F1 = F0;
+Gb = if F1 then 14 else 55 else F1 = F0:FindFirstChild(UK[187]); Gb = 2 end elseif Gb < 8846 then if Gb < 8667. then if Gb < 8666 then F1 = UM(UK[650], F0[UK[1486]][UK[248]] - CQ); Gb = 48. else Ga = F8; Gb = 57. end elseif Gb < 8668 then Gb = if F1 then 1 else 28
+elseif Gb < 8669 then F1 = UM(UK[650], F0[UK[187]][UK[248]] - CN); Gb = 28 elseif Gb == 8669 then F1 = F0; table.sort(CU, function(cJ, cK) local FX, FY = nil, nil; local FZ = nil; FZ = 0.; while true do FZ = 10373 - FZ; do if FZ < 10372 then if FZ < 10051 then
+break elseif FZ < 10369 then if FZ < 10368. then break elseif FZ == 10368. then return FX < FY else FZ = 10051; continue end elseif FZ < 10370 then break elseif FZ < 10371. then if FZ == 10370 then FY = UK[1579]; FZ = 5 else FZ = 15387.; continue end else FY = Cx[cK[UK[697]]];
+FZ = if FY then 5 else 3. end elseif FZ < 12327. then if FZ < 10741 then if FZ < 10373 then if FZ == 10372 then FX = UK[1579]; FZ = 2 else FZ = 3295; continue end elseif FZ == 10373 then FX = Cx[cJ[UK[697]]]; FZ = if FX then 2 else 1 else FZ = 10369; continue
+end else break end else break end end end end); F0 = {}; Gg = false; for cM, cN in UK[1295](CU) do Gh = cM; Gj = cN; local Gi = Gh; local Gk = Gj; local Gf = nil; Gf = UK[2008]; while true do if Gf < 1 then break elseif Gf < 2 then Gg = true; Gf = UK[650] else
+table.insert(F0, wh_rarityEmoji(Gk[UK[697]]) .. UK[1491.] .. Gk[UK[821]] .. UK[758] .. Gk[UK[697]] .. UK[1976]); Gf = UK[650] end end; if Gg then break end end; F2 = #F0 > UK[650]; Gb = if F2 then 29 else 45. else Gb = 13603; continue end else break end end
+end end; Dk:WaitForChild(WY[1915])[WY[1652]]:Connect(WY[365]); local Zg = WY[1957][WY[394]]; WY[1383.](function() local GD; GD = nil; local GE, GG, GH, GI = nil, nil, nil, nil; local GF = nil; GF = 3.; while true do GF = 11563 - GF; do if GF < 11561 then if GF < 11558 then
+break elseif GF < 11559. then GD = GE:WaitForChild(UK[523], UK[624.]); GF = if not GD then 4 else 1 elseif GF < 11560 then if GF == 11559. then return else GF = 13786; continue end else local Zh = UK; GE = Zh[1560.]:WaitForChild(Zh[1968.], Zh[624.]); GI = if not GE then Zh[1292] else Zh[650];
+GG = Zh[1029.] * GI + Zh[1636] * (Zh[1292] - GI); GH = Zh[1621] * GI + Zh[925] * (Zh[1292] - GI); GF = if (GG * Zh[856] + GH * Zh[1459] + GG * GH) % Zh[1264] == Zh[649] then 2 else 5 end elseif GF < 11767 then if GF < 11562. then return elseif GF < 11563 then
+GD:GetPropertyChangedSignal(UK[248]):Connect(function() local GA, GB, GC = nil, nil, nil; local Gz = nil; Gz = 4; while true do Gz = 2816 - Gz; do if Gz < 2815 then if Gz < 2812 then if Gz < 2810 then break elseif Gz < 2811. then local Zi = UK[1957][UK[394]];
+UK[1383.](wh_sendWebhook); Gz = 3. else break end elseif Gz < 2813 then Gz = if GD[UK[248]] == true then 0. else 2 elseif Gz < 2814. then Gz = 1 elseif Gz == 2814. then local Zj = UK; GC = if GD[Zj[248]] == false then Zj[1292] else Zj[650]; GA = Zj[516.] * GC + Zj[1569.] * (Zj[1292] - GC);
+GB = Zj[1631] * GC + Zj[1501] * (Zj[1292] - GC); Gz = if (GA * Zj[709] + GB * Zj[1654] + GA * GB) % Zj[1264] == Zj[87.] then 6. else 3. else Gz = 5807; continue end elseif Gz < 5807 then if Gz < 2816 then Gz = 5 elseif Gz < 5407 then if Gz == 2816 then wh_snapshotStats();
+Gz = 1 else break end else break end else break end end end end); GF = 0. else break end else break end end end end); DD[WY[1071.]]:Connect(WY[1429]); ad_getHRP = WY[1273]; getHumanoid = WY[910]; makeVec = WY[247]; updateCharParts = WY[1815.]; Dk[WY[1567]]:Connect(function(dz)
+local dD; local dI; local dH; updateCharParts(dz); dD = dz[UK[2024]]:Connect(function(dA) local G0 = nil; G0 = 0.; while true do G0 = 9793 - G0; do if G0 < 9792. then if G0 < 6827 then break elseif G0 < 9790 then break elseif G0 < 9791 then G0 = 2 else break
+end elseif G0 < 10942 then if G0 < 9793 then table.insert(CF, dA); G0 = 3. elseif G0 == 9793 then G0 = if dA:IsA(UK[878]) then 1 else 3. else break end else break end end end end); dH = dz[UK[109]]:Connect(function(dE) local G1 = nil; local G2 = nil; G2 = 3.;
+while true do G2 = 2786 - G2; do if G2 < 3538 then if G2 < 2785 then if G2 < 2784. then if G2 == 2783 then G1 = table.find(CF, dE); G2 = if G1 then 0. else 2 else break end elseif G2 == 2784. then G2 = 1 else G2 = 2786; continue end elseif G2 < 2786 then break
+elseif G2 == 2786 then table.remove(CF, G1); G2 = 2 else G2 = 3538; continue end else break end end end end); dI = nil; dI = dz:WaitForChild(UK[985])[UK[29]]:Connect(function() dD:Disconnect(); dH:Disconnect(); dI:Disconnect() end) end); Ev = 203 else Ev = 3393.;
+continue end elseif Ev == 3620 then Ev = 963. else Ev = 3850; continue end elseif Ev < 3622 then Ev = 681. else Ev = 1225 end elseif Ev < 3625 then if Ev < 3624. then U2[14] = U2[10][UK[111.]]:AddLeftGroupbox(UK[869], UK[1554.]); Ev = 156. else Ev = 155 end
+elseif Ev < 3626 then U2[1] = (U2[10] * UK[1165] + UK[1292]) % UK[327.] + UK[1292]; Ev = 845 elseif Ev == 3626 then Ev = 627. else Ev = 2876; continue end elseif Ev < 3665 then if Ev < 3646 then if Ev < 3637 then if Ev < 3632 then if Ev < 3630. then if Ev < 3629 then
+if Ev < 3628 then if Ev == 3627. then Ev = 57. else Ev = 3348.; continue end elseif Ev == 3628 then Ev = 838 else Ev = 3530; continue end elseif Ev == 3629 then Ev = if (U2[20] * UK[1165] + UK[767]) % UK[1984] == UK[236] then 1252 else 8 else Ev = 3266; continue
+end elseif Ev < 3631 then if Ev == 3630. then local Zk = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[26], UK[327.]), string.byte(tostring(U2[20]))), UK[836]); Ev = if bit32.bxor(bit32.lrotate(bit32.bxor(Zk, UK[213.]), UK[1405]), UK[430]) ~= bit32.lrotate(Zk, UK[1405]) then 490 else 221
+else Ev = 3916; continue end elseif Ev == 3631 then local WY = UK; U2[26]:AddLabel(WY[1002.], true); U2[26]:AddLabel(WY[179], true); U2[26]:AddDivider(); U2[20] = { WY[1710.], WY[1403], WY[37], WY[695], WY[1742], WY[1612] }; Ev = 363. else Ev = 2790.; continue
+end elseif Ev < 3635 then if Ev < 3634 then if Ev < 3633. then if Ev == 3632 then Ev = 836 else Ev = 3152; continue end elseif Ev == 3633. then U2[10] = nil; local WY = UK; U2[10] = WY[327.] - WY[1165]; U2[10] = WY[327.] - WY[1165]; U2[10] = WY[650] + WY[1292];
+Ev = 1095. else Ev = 3696.; continue end else Eg = UK[1185.]:GetService(UK[1249]); Ev = 188 end elseif Ev < 3636. then Ev = if U2[16] <= UK[1413.] then 458 else 481 elseif Ev == 3636. then Ev = 841 else Ev = 3351.; continue end elseif Ev < 3642. then if Ev < 3640 then
+if Ev < 3639. then if Ev < 3638 then Ev = 83 elseif Ev == 3638 then local WY = UK; U2[18.] = { WY[1499], WY[1817], WY[937], WY[714.], WY[595], WY[97], WY[897.], WY[855.], WY[763], WY[1847], WY[1038.] }; local Zl = U2[10]; U2[1] = U2[18.][Zl % WY[1478] + WY[1292]];
+Ev = if U2[1]:len() >= U2[1]:gsub(WY[1246], WY[298], Zl % WY[1165] % WY[2008] + WY[1292]):len() then 857 else 353 else Ev = 3105.; continue end else U2[18.] = (U2[26] * UK[1165] + UK[1165]) % UK[633.] + UK[1292]; Ev = 544 end elseif Ev < 3641 then if Ev == 3640 then
+U2[20] = (U2[20] + UK[633.]) % UK[1984]; Ev = 703 else Ev = 3007; continue end else Ev = if U2[18.] <= UK[2008] then 348. else 1264 end elseif Ev < 3644 then if Ev < 3643 then Ev = 619 elseif Ev == 3643 then U2[23]:LoadAutoloadConfig(); local Zm = UK[28][UK[2023]];
+local WY = UK; U2[16]:SetGlow(true, { [WY[1513]] = WY[1855](WY[271], WY[433], WY[675.]), [WY[1300]] = WY[624.], [WY[842]] = WY[1776.] }); Zm = WY[1957][WY[551]]; WY[1809.](WY[1858]); Zm = WY[1957][WY[394]]; WY[1383.](function() local Uk, Um, Un, Uo, Uq, Us, Ut, Uu, Uw, Uy, Uz, UA, UB, UD, UF, UI = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local Ul = nil; Ul = 1; while true do Ul = 5584 - Ul; do if Ul < 11377 then if Ul < 5584 then if Ul < 3387. then break elseif Ul < 5583. then break elseif Ul == 5583. then local Zn = UK[1957][UK[438.]]; UK[1433](UK[1576]); Uk = { UK[478], UK[1952], UK[294.],
+UK[274], UK[557], UK[1019], UK[152], UK[128], UK[1220], UK[820], UK[332], UK[932], UK[1671.], UK[446], UK[872], UK[1724], UK[1822], UK[656], UK[17], UK[662], UK[972.], UK[352], UK[1285], UK[1992.], UK[1751], UK[1674.], UK[1059.], UK[696.], UK[870.], UK[545],
+UK[129.], UK[1784], UK[1846] }; Un = false; for vk, vl in UK[1295](Uk) do local Uh = nil; Uo = vk; Uq = vl; local Up = Uo; local Ur = Uq; local Um = nil; Um = UK[1165]; while true do if Um < 3. then if Um < 1 then Um = UK[2008] elseif Um < 2 then UK[879.](function()
+local Ub = nil; Ub = 3.; while true do Ub = 12166 - Ub; do if Ub < 9763 then break elseif Ub < 12166 then if Ub < 12164 then if Ub < 12163 then break else Ub = if type(Uh[UK[1977.]]) == UK[1217] then 0. else 2 end elseif Ub < 12165. then Ub = 1 else break end
+elseif Ub < 15477. then if Ub < 12560 then if Ub == 12166 then Uh[UK[1977.]](Uh[UK[248]]); Ub = 2 else break end else break end else break end end end end); Um = UK[650] else break end elseif Um < 5 then if Um < 4 then Uh = Dl[Ur]; Uk = Uh; Um = if Uk then UK[1579] else UK[633.]
+else Un = true; Um = UK[2008] end elseif Um < 6. then Um = if Uk then UK[1292] else UK[650] else Uk = Uh[UK[248]] == true; Um = UK[633.] end end; if Un then break end end; Uk = { UK[511], UK[1739], UK[335], UK[678.], UK[736], UK[526], UK[843.], UK[1623.], UK[2028.] };
+Ut = false; for vr, vs in UK[1295](Uk) do local Uj = nil; Uu = vr; Uw = vs; local Uv = Uu; local Ux = Uw; local Us = nil; Us = UK[633.]; while true do if Us < 4 then if Us < 2 then if Us < 1 then UK[879.](function() local Ud, Ue, Uf = nil, nil, nil; local Uc = nil;
+Uc = 2; while true do Uc = 6699. - Uc; do if Uc < 6694 then break elseif Uc < 6698 then if Uc < 6696. then if Uc < 6695 then break else Uc = if (Ud * UK[1422.] + Ue * UK[84.] + Ud * Ue) % UK[1264] == UK[383] then 1 else 0. end elseif Uc < 6697 then if Uc == 6696. then
+Ue = UK[481] * Uf + UK[836] * (UK[1292] - Uf); Uc = 4 else Uc = 1763; continue end elseif Uc == 6697 then Uf = if type(Uj[UK[1977.]]) == UK[1217] then UK[1292] else UK[650]; Ud = UK[566] * Uf + UK[954.] * (UK[1292] - Uf); Uc = 3. else Uc = 6696.; continue end
+elseif Uc < 7227. then if Uc < 6699. then if Uc == 6698 then Uj[UK[1977.]](Uj[UK[248]]); Uc = 0. else Uc = 2880.; continue end elseif Uc == 6699. then Uc = 5 else break end else break end end end end); Us = UK[2008] else Uz = UK[2036] * UA + UK[2041] * (UK[1292] - UA);
+Us = UK[1165] end elseif Us < 3. then Us = UK[749] else Us = if (Uy * UK[377] + Uz * UK[1829] + Uy * Uz) % UK[1264] == UK[344] then UK[597.] else UK[327.] end elseif Us < 6. then if Us < 5 then Us = if Uk then UK[650] else UK[2008] else Uj = Dd[Ux]; Uk = Uj;
+UA = if Uk then UK[1292] else UK[650]; Uy = UK[1360] * UA + UK[790] * (UK[1292] - UA); Us = UK[1292] end elseif Us < 7 then Ut = true; Us = UK[749] elseif Us < 8 then Uk = Uj[UK[248]]; Us = UK[327.] else break end end; if Ut then break end end; Uk = { [UK[789.]] = function(vx)
+DR = vx end, [UK[1200.]] = function(vA) Dz = vA end, [UK[227]] = function(vD) DF = vD end, [UK[1175]] = function(vG) DL = vG end, [UK[220]] = function(vJ) Dn = vJ end, [UK[857]] = function(vM) DB = vM end, [UK[315.]] = function(vP) Dw = vP end, [UK[39.]] = function(vS)
+DA = vS end }; Ut = false; for vW, vX in UK[1189](Uk) do local Ui = nil; UB = vW; UD = vX; local UC = UB; local UE = UD; local Us = nil; Us = UK[650]; while true do if Us < 3. then if Us < 1 then Ui = Dd[UC]; Uk = Ui; Us = if Uk then UK[1165] else UK[327.]
+elseif Us < 2 then UK[879.](function() UE(Ui[UK[248]]) end); Us = UK[1579] else Ut = true; Us = UK[633.] end elseif Us < 5 then if Us < 4 then Uk = Ui[UK[248]]; Us = UK[327.] else Us = if Uk then UK[1292] else UK[1579] end elseif Us < 6. then break else Us = UK[633.]
+end end; if Ut then break end end; Uk = { [UK[11]] = function(v1) Di = v1 end, [UK[50]] = function(v4) Db = v4 end }; Ut = false; for v8, v9 in UK[1189](Uk) do local Ug = nil; UF = v8; UI = v9; local UH = UF; local UJ = UI; local Us = nil; Us = UK[1579]; while true do
+if Us < 3. then if Us < 1 then break elseif Us < 2 then Us = UK[650] else Ut = true; Us = UK[650] end elseif Us < 5 then if Us < 4 then Uk = Ug[UK[248]]; Us = UK[633.] else UK[879.](function() UJ(Ug[UK[248]]) end); Us = UK[1292] end elseif Us < 6. then Us = if Uk then UK[327.] else UK[1292]
+else Ug = Dd[UH]; Uk = Ug; Us = if Uk then UK[1165] else UK[633.] end end; if Ut then break end end; DJ:Notify(UK[2069], UK[1165]); Ul = 0. else Ul = 5584; continue end else break end else break end end end end); DJ:Notify(WY[300.] .. Dk[WY[821]], WY[633.]);
+Ev = 95 else Ev = 4009; continue end elseif Ev < 3645. then Ev = 850 else Ev = if U2[20] <= UK[1292] then 127 else 412 end elseif Ev < 3656 then if Ev < 3652 then if Ev < 3650 then if Ev < 3648. then if Ev < 3647 then local WY = UK; U2[26]:AddDropdown(WY[335], { [WY[181]] = WY[1291],
+[WY[592]] = WY[732.], [WY[1977.]] = WY[867.], [WY[1697]] = { WY[1794.], WY[1548.], WY[1291] } }); U2[26]:AddToggle(WY[128], { [WY[592]] = WY[1135], [WY[181]] = false }); Ev = 149 else Cs = UK[1185.]:GetService(UK[1725.]); Ev = 477. end elseif Ev < 3649 then
+if Ev == 3648. then Ev = 25 else Ev = 2984; continue end elseif Ev == 3649 then Ev = if U2[16] <= UK[206] then 29 else 752 else Ev = 3423.; continue end elseif Ev < 3651. then if Ev == 3650 then local WY = UK; D8[WY[1818.]]:Connect(WY[262]); local Zo = WY[1957][WY[394]];
+WY[1383.](WY[1240]); U2[20] = U2[14][WY[1747]]:AddRightGroupbox(WY[1924], WY[603.]); Ev = 309. else Ev = 3849.; continue end else Ev = 792. end elseif Ev < 3654. then if Ev < 3653 then Ev = 1211 elseif Ev == 3653 then Ev = 1123 else Ev = 2865.; continue end
+elseif Ev < 3655 then if Ev == 3654. then Ev = if U2[16] <= UK[1337] then 254 else 425 else Ev = 2948; continue end else Ev = if U2[26] <= UK[1579] then 379 else 800 end elseif Ev < 3661 then if Ev < 3659 then if Ev < 3658 then if Ev < 3657. then Ev = if U2[10] <= UK[1292] then 519. else 705.
+elseif Ev == 3657. then local WY = UK; U2[18.]:AddToggle(WY[1671.], { [WY[592]] = WY[2019.], [WY[181]] = false }); U2[18.]:AddDivider(); U2[18.]:AddButton({ [WY[592]] = WY[1452.], [WY[1441]] = WY[329] }); Ev = 213. else Ev = 3320; continue end elseif Ev == 3658 then
+local WY = UK; U2[26]:AddDropdown(WY[1623.], { [WY[1977.]] = WY[299], [WY[592]] = WY[276.], [WY[302]] = WY[2011], [WY[1697]] = { WY[1481], WY[201.] }, [WY[181]] = WY[1481] }); U2[26]:AddToggle(WY[1724], { [WY[592]] = WY[1565], [WY[181]] = false }); U2[26]:AddDivider();
+U2[26]:AddButton({ [WY[592]] = WY[1625], [WY[1441]] = WY[1431.] }); U2[26]:AddButton({ [WY[592]] = WY[715], [WY[1441]] = WY[744.] }); Ev = 637 else Ev = 2987; continue end elseif Ev < 3660. then Ev = 1222 else U2[8] = UK[700] * U2[17] + UK[1660] * (UK[1292] - U2[17]);
+Ev = 893 end elseif Ev < 3663. then if Ev < 3662 then local WY = UK; U2[26] = CX:AddLabel(b(WY[1904]) .. c(WY[204.], WY[1927]), true); C0 = CX:AddLabel(b(WY[157]) .. c(WY[204.], WY[345.]), true); Ev = 721 else Ev = if (U2[20] * UK[1620.] + UK[1620.]) % UK[1060] == UK[749] then 922 else 1226
+end elseif Ev < 3664 then if Ev == 3663. then Ev = 1145 else Ev = 3611; continue end elseif Ev == 3664 then U2[18.] = U2[14][UK[705.]]:AddLeftGroupbox(UK[1928], UK[1573]); Ev = 355 else Ev = 3952; continue end elseif Ev < 3685 then if Ev < 3675. then if Ev < 3671 then
+if Ev < 3668 then if Ev < 3667 then if Ev < 3666. then if Ev == 3665 then local WY = UK; U2[20] = (vector.create((U2[10] * WY[2008] + WY[327.]) % WY[1478] + WY[1292], (U2[10] * WY[327.] + WY[1165]) % WY[1149.] + WY[1292], (U2[10] * WY[633.] + WY[633.]) % WY[1628] + WY[1292]));
+U2[26] = (vector.create((U2[10] * WY[1165] + WY[597.]) % WY[1478] + WY[1292], (U2[10] * WY[2008] + WY[1165]) % WY[1149.] + WY[1292], (U2[10] * WY[597.] + WY[1143.]) % WY[1628] + WY[1292])); U2[1] = (vector.create((U2[10] * WY[633.] + WY[1292]) % WY[633.] + WY[1292], (U2[10] * WY[1292] + WY[327.]) % WY[597.] + WY[1292], (U2[10] * WY[327.] + WY[327.]) % WY[1620.] + WY[1292]));
+Ev = if math.abs((vector.angle(U2[20], U2[26], U2[1]))) - math.abs((vector.angle(U2[26], U2[20], U2[1]))) == WY[650] + WY[327.] then 73 else 228. else Ev = 3691; continue end else Ev = 920 end elseif Ev == 3667 then U2[10] = (U2[10] + UK[1478]) % UK[591.];
+Ev = 345. else Ev = 2918; continue end elseif Ev < 3669. then Ev = if U2[10] <= UK[1292] then 327. else 648. elseif Ev < 3670 then Ev = 1075 else Ev = if U2[26] * UK[436] + UK[327.] + UK[327.] <= U2[26] * UK[436] + UK[327.] + UK[327.] + UK[1292] then 739 else 99.
+end elseif Ev < 3673 then if Ev < 3672. then if Ev == 3671 then local WY = UK; U2[26] = (vector.create((U2[20] * WY[1579] + WY[633.]) % WY[1478] + WY[1292], (U2[20] * WY[1620.] + WY[1149.]) % WY[1149.] + WY[1292], (U2[20] * WY[1620.] + WY[1413.]) % WY[1628] + WY[1292]));
+U2[10] = (vector.create((U2[20] * WY[597.] + WY[597.]) % WY[1478] + WY[1292], (U2[20] * WY[2008] + WY[1756]) % WY[1149.] + WY[1292], (U2[20] * WY[749] + WY[1413.]) % WY[1628] + WY[1292])); U2[18.] = (vector.create((U2[20] * WY[1292] + WY[1579]) % WY[633.] + WY[1292], (U2[20] * WY[1292] + WY[1579]) % WY[597.] + WY[1292], (U2[20] * WY[2008] + WY[1292]) % WY[1620.] + WY[1292]));
+Ev = if math.abs((vector.angle(U2[26], U2[10], U2[18.]))) - math.abs((vector.angle(U2[10], U2[26], U2[18.]))) == WY[650] + WY[1292] then 1163 else 596 else Ev = 3932; continue end elseif Ev == 3672. then local WY = UK; U2[26] = (vector.create((U2[20] * WY[1165] + WY[1165]) % WY[1478] + WY[1292], (U2[20] * WY[1579] + WY[1292]) % WY[1149.] + WY[1292], (U2[20] * WY[1478] + WY[597.]) % WY[1628] + WY[1292]));
+U2[10] = (vector.create((U2[20] * WY[327.] + WY[1579]) % WY[1478] + WY[1292], (U2[20] * WY[1478] + WY[1756]) % WY[1149.] + WY[1292], (U2[20] * WY[1756] + WY[1288]) % WY[1628] + WY[1292])); U2[18.] = (vector.create((U2[20] * WY[1165] + WY[1292]) % WY[633.] + WY[1292], (U2[20] * WY[633.] + WY[1292]) % WY[597.] + WY[1292], (U2[20] * WY[1165] + WY[1292]) % WY[1620.] + WY[1292]));
+Ev = if math.abs((vector.angle(U2[26], U2[10], U2[18.]))) - math.abs((vector.angle(U2[10], U2[26], U2[18.]))) == WY[650] + WY[633.] then 472 else 383 else Ev = 3875; continue end elseif Ev < 3674 then local WY = UK; U2[16] = (vector.create((U2[20] * WY[597.] + WY[633.]) % WY[1478] + WY[1292], (U2[20] * WY[1756] + WY[1620.]) % WY[1149.] + WY[1292], (U2[20] * WY[1165] + WY[1292]) % WY[1628] + WY[1292]));
+U2[26] = (vector.create((U2[20] * WY[1165] + WY[633.]) % WY[1478] + WY[1292], (U2[20] * WY[1478] + WY[1620.]) % WY[1149.] + WY[1292], (U2[20] * WY[1149.] + WY[1620.]) % WY[1628] + WY[1292])); local Zp = vector.cross(U2[16], U2[26]); local Zq = vector.dot(U2[16], U2[26]);
+Ev = if vector.dot(Zp, Zp) + Zq * Zq == vector.dot(U2[16], U2[16]) * vector.dot(U2[26], U2[26]) + WY[1165] then 118 else 907 elseif Ev == 3674 then Ev = 51. else Ev = 3554; continue end elseif Ev < 3681. then if Ev < 3678. then if Ev < 3677 then if Ev < 3676 then
+U2[10] = (U2[10] + UK[1478]) % UK[1060]; Ev = 1099 elseif Ev == 3676 then local WY = UK; U2[26] = U2[14][WY[1747]]:AddLeftGroupbox(WY[893], WY[106]); U2[26]:AddLabel(sz(b(createMultiGradientText(WY[1043], U2[4][WY[943]])), WY[466]), true); U2[26]:AddLabel(c(i(WY[1905.]), WY[1239.]), true);
+U2[26]:AddLabel(c(b(WY[1430]), WY[1940]) .. c(b(WY[193]), WY[602]) .. c(WY[1907], WY[663.]) .. c(b(WY[1792]), WY[1940]) .. c(b(WY[455]), WY[661]), true); U2[26]:AddDivider(); U2[26]:AddLabel(sz(b(createMultiGradientText(WY[781], U2[4][WY[1406]])), WY[1143.]), true);
+U2[26]:AddLabel(sz(b(createMultiGradientText(WY[1488.], U2[4][WY[1406]])), WY[1143.]), true); U2[26]:AddButton({ [WY[592]] = WY[1641.], [WY[1441]] = WY[1897] }); U2[26]:AddButton({ [WY[592]] = WY[873.], [WY[1441]] = WY[1985] }); U2[1] = U2[14][WY[1747]]:AddLeftGroupbox(WY[1821.], WY[814]);
+Ev = 714. else Ev = 3779; continue end else local WY = UK; U2[26]:AddLabel(b(WY[753.]), true); U2[26]:AddDivider(); U2[26]:AddToggle(WY[478], { [WY[592]] = WY[2015], [WY[181]] = false }); U2[26]:AddDropdown(WY[511], { [WY[1697]] = { WY[699.], WY[1048], WY[1183],
+WY[285.], WY[2044] }, [WY[181]] = WY[699.], [WY[592]] = WY[1], [WY[1977.]] = WY[1487] }); U2[26]:AddDropdown(WY[1739], { [WY[1697]] = { WY[694], WY[258.] }, [WY[181]] = WY[694], [WY[592]] = WY[251], [WY[1977.]] = WY[819.] }); U2[26]:AddSlider(WY[789.], { [WY[592]] = WY[1648],
+[WY[181]] = WY[1478], [WY[834.]] = -WY[624.], [WY[1873]] = WY[1096], [WY[1734.]] = WY[650], [WY[1977.]] = WY[1720] }); U2[26]:AddSlider(WY[1200.], { [WY[592]] = WY[155], [WY[181]] = WY[795.], [WY[834.]] = WY[466], [WY[1873]] = WY[1244], [WY[1734.]] = WY[650],
+[WY[1977.]] = WY[527] }); U2[20] = U2[14][WY[1722.]]:AddRightGroupbox(WY[98], WY[1772]); Ev = 326 end elseif Ev < 3679 then local WY = UK; C9 = WY[512]; C3 = WY[535]; Ev = 665 elseif Ev < 3680 then Ev = 528. elseif Ev == 3680 then C_ = UK[1481]; Ev = 510. else
+Ev = 3944; continue end elseif Ev < 3683 then if Ev < 3682 then if Ev == 3681. then local WY = UK; Dd:AddToggle(WY[501.], { [WY[1977.]] = WY[556], [WY[592]] = WY[1922], [WY[181]] = false }); Dd:AddDropdown(WY[2028.], { [WY[1697]] = { WY[1197.], WY[235] }, [WY[592]] = WY[1678],
+[WY[181]] = WY[235], [WY[1854.]] = true, [WY[1977.]] = function(sv) UK[879.](function() local R_ = nil; local R0 = nil; R0 = 3.; while true do R0 = 9692 - R0; do if R0 < 8373. then break elseif R0 < 9691 then if R0 < 9689 then break elseif R0 < 9690. then if R0 == 9689 then
+R_ = sv; R0 = if R_ then 1 else 0. else R0 = 9690.; continue end else break end elseif R0 < 14811. then if R0 < 9692 then DJ:SetNotifySide(R_); R0 = 2 elseif R0 == 9692 then R_ = UK[235]; R0 = 1 else break end else break end end end end) end }); Dd:AddLabel(WY[1021]):AddKeyPicker(WY[67], { [WY[145]] = true,
+[WY[181]] = WY[1089.], [WY[592]] = WY[959] }); U2[4][WY[708.]] = DJ[WY[67]]; Dd:AddButton(WY[1045], WY[1319]); Ev = 549. else Ev = 3040; continue end else Ev = 207. end elseif Ev < 3684. then Ev = 634 else CO = nil; CS = nil; Ev = 491 end elseif Ev < 3697 then
+if Ev < 3692 then if Ev < 3689 then if Ev < 3687. then if Ev < 3686 then Ev = 751 else Ev = if U2[18.] <= UK[1292] then 1136 else 899 end elseif Ev < 3688 then if Ev == 3687. then U2[26], U2[20] = nil, nil; U2[20] = UK[650]; Ev = 1085 else Ev = 3173; continue
+end else local WY = UK; DV = DW[WY[1931]]:Connect(WY[1009]); Dj = D8[WY[1818.]]:Connect(WY[1718]); Ev = 582. end elseif Ev < 3691 then if Ev < 3690. then if Ev == 3689 then U2[18.], U2[10] = nil, nil; U2[10] = UK[1149.]; Ev = 244 else Ev = 2796.; continue end
+elseif Ev == 3690. then Ev = 1173. else Ev = 3845; continue end elseif Ev == 3691 then Ev = 813. else Ev = 3587; continue end elseif Ev < 3695 then if Ev < 3693. then if Ev == 3692 then Ev = 710 else Ev = 3955; continue end elseif Ev < 3694 then Ev = 103 else
+DN = {}; DH = {}; Ev = 1265 end elseif Ev < 3696. then if Ev == 3695 then U2[10] = (U2[10] + UK[597.]) % UK[1060]; Ev = 825. else Ev = 3965; continue end elseif Ev == 3696. then Ev = 643 else Ev = 3036.; continue end elseif Ev < 3702. then if Ev < 3700 then
+if Ev < 3699. then if Ev < 3698 then if Ev == 3697 then U2[26]:AddToggle(UK[274], { [UK[592]] = UK[669.], [UK[181]] = false }); Ev = 547 else Ev = 3753.; continue end elseif Ev == 3698 then U2[20] = (U2[20] + UK[749]) % UK[466]; Ev = 233 else Ev = 3657.; continue
+end elseif Ev == 3699. then Ev = 960. else Ev = 2982.; continue end elseif Ev < 3701 then U2[1] = nil; local WY = UK; U2[1] = WY[327.] - WY[1165]; U2[1] = WY[650] + WY[1292]; U2[1] = WY[633.] - WY[327.]; U2[1] = WY[1165] - WY[2008]; Ev = 360. elseif Ev == 3701 then
+U2[1] = nil; local WY = UK; U2[1] = WY[327.] - WY[1165]; U2[1] = WY[650] + WY[1292]; U2[1] = WY[1165] - WY[2008]; U2[1] = WY[650] + WY[1292]; Ev = 58 else Ev = 3400; continue end elseif Ev < 3704 then if Ev < 3703 then if Ev == 3702. then U2[26] = nil; local WY = UK;
+U2[26] = WY[2008] - WY[1292]; U2[26] = WY[1165] - WY[2008]; U2[26] = WY[650] + WY[1292]; U2[26] = WY[1165] - WY[2008]; U2[26] = WY[650] + WY[1292]; Ev = 969. else Ev = 3239; continue end elseif Ev == 3703 then Ev = 400 else Ev = 3386; continue end elseif Ev < 3705. then
+U2[10] = (U2[10] + UK[1149.]) % UK[206]; Ev = 378. else U2[10] = (U2[10] + UK[1579]) % UK[1456]; Ev = 178 end elseif Ev < 3868 then if Ev < 3788 then if Ev < 3748 then if Ev < 3727 then if Ev < 3717. then if Ev < 3712 then if Ev < 3710 then if Ev < 3709 then
+if Ev < 3708. then if Ev < 3707 then if Ev == 3706 then U2[20], U2[26] = nil, nil; U2[26] = UK[1165]; Ev = 775 else Ev = 3126.; continue end elseif Ev == 3707 then Ev = 805 else Ev = 4024; continue end elseif Ev == 3708. then Ev = 1085 else Ev = 3192.; continue
+end else local WY = UK; U2[20]:AddToggle(WY[557], { [WY[592]] = WY[601], [WY[181]] = false }); U2[20]:AddDivider(); U2[20]:AddButton({ [WY[592]] = WY[426.], [WY[1441]] = function() local Zr = UK[1957][UK[394]]; UK[1383.](function() local O0; O0 = nil; local O2, O3, O4, O5, O6 = nil, nil, nil, nil, nil;
+local O1 = nil; O1 = 8; while true do O1 = 9161 - O1; do if O1 < 9159. then if O1 < 9158 then if O1 < 9157 then if O1 < 9154 then if O1 < 9153. then break else O0 = ad_getNearestChest(); O1 = if not O0 then 7 else 1 end elseif O1 < 9155 then if O1 == 9154 then
+DJ:Notify(UK[731]); return else O1 = 9155; continue end elseif O1 < 9156. then break else O1 = if O4 <= UK[1096] then 4 else 0. end elseif O1 == 9157 then O5 = O4; O1 = 3. else O1 = 9159.; continue end elseif O1 == 9158 then O6 = O5; local Zs = UK; Zs[879.](function()
+local OZ = nil; local O_ = nil; O_ = 0.; while true do O_ = 7112 - O_; do if O_ < 7109 then if O_ < 3365 then break elseif O_ < 6527 then break elseif O_ < 7107. then break elseif O_ < 7108 then break else fireproximityprompt(O0[UK[378.]], UK[650]); O_ = 3.
+end elseif O_ < 11517. then if O_ < 7111 then if O_ < 7110. then if O_ == 7109 then O_ = 5 else O_ = 7112; continue end elseif O_ == 7110. then OZ = O0[UK[378.]][UK[499]]; O_ = 1 else O_ = 14702; continue end elseif O_ < 7112 then if O_ == 7111 then O_ = if OZ then 4 else 3.
+else O_ = 12580; continue end elseif O_ == 7112 then OZ = O0[UK[378.]]; O_ = if OZ then 2 else 1 else O_ = 629; continue end else break end end end end); local Zt = Zs[1957][Zs[438.]]; Zs[1433](); O1 = 2 else O1 = 9153.; continue end elseif O1 < 9161 then if O1 < 9160 then
+O4 += UK[1292]; O1 = 5 elseif O1 == 9160 then local Zs = UK; Zs[879.](function() local Zu = UK; O0[Zu[378.]][Zu[722]] = Zu[185]; O0[Zu[378.]][Zu[373]] = false; O0[Zu[378.]][Zu[688]] = Zu[650]; O0[Zu[378.]][Zu[141.]] = true end); Zs[879.](function() local OW, OX = nil, nil;
+local OY = nil; OY = 3.; while true do OY = 11265. - OY; do if OY < 9616 then break elseif OY < 11263 then if OY < 9737 then break elseif OY < 11262. then break else OW = O0[UK[1825]]:GetPivot()[UK[2060]]; OX = ad_getHRP(); OY = if OX then 0. else 1 end elseif OY < 11264 then
+break elseif OY < 11265. then if OY == 11264 then OY = 2 else OY = 11263; continue end elseif OY == 11265. then local Zv = UK[1618][UK[1182.]]; OX[UK[1077.]] = UK[359][UK[1182.]](OW + UK[1417](UK[650], UK[1165], UK[650]), OW); OY = 1 else OY = 9396.; continue
+end end end end); local Zw = Zs[1957][Zs[438.]]; Zs[1433](Zs[1317.]); O4 = Zs[1292]; O1 = 5 else O1 = 9161; continue end elseif O1 < 12025 then if O1 < 10079 then if O1 == 9161 then DJ:Notify(UK[1814]); O1 = 6. else O1 = 14299; continue end else break end else
+break end end end end) end }); Ev = 819. end elseif Ev < 3711. then if Ev == 3710 then Ev = if ((D7 and D7 and (not D7 and U2[20]) or (D7 or not D7 or U2[4] and not D7)) and (D7 and not D7 and (U2[20] or not U2[20]) and ((U2[4] or D7) and (not U2[4] and not D7))) or (D7 and D7 and (not U2[20] and not U2[4]) or not D7 and not D7 and (U2[20] or U2[4])) and ((U2[4] or U2[20]) and (not U2[4] or not U2[20]) or not U2[4] and D7 and (not U2[4] or not U2[20]))) and not ((D7 and D7 and (not D7 and U2[20]) or (D7 or not D7 or U2[4] and not D7)) and (D7 and not D7 and (U2[20] or not U2[20]) and ((U2[4] or D7) and (not U2[4] and not D7))) or (D7 and D7 and (not U2[20] and not U2[4]) or not D7 and not D7 and (U2[20] or U2[4])) and ((U2[4] or U2[20]) and (not U2[4] or not U2[20]) or not U2[4] and D7 and (not U2[4] or not U2[20]))) then 1229 else 72.
+else Ev = 3705.; continue end else Ev = 755 end elseif Ev < 3715 then if Ev < 3714. then if Ev < 3713 then if Ev == 3712 then Ev = 241 else Ev = 3456.; continue end elseif Ev == 3713 then U2[20] = nil; U2[20] = UK[2008] - UK[1292]; Ev = 994 else Ev = 3496;
+continue end else Ev = 1145 end elseif Ev < 3716 then if Ev == 3715 then Ev = 468. else Ev = 3258.; continue end else Ev = if (U2[20] * UK[2008] + UK[633.]) * UK[1756] % UK[1165] == ((U2[20] * UK[2008] + UK[633.]) * UK[1756] + (UK[1579] + UK[1292])) % UK[1165] then 895 else 1240
+end elseif Ev < 3722 then if Ev < 3720. then if Ev < 3719 then if Ev < 3718 then if Ev == 3717. then U2[14] = U2[26][UK[923]]:AddLeftGroupbox(UK[1467.], UK[338]); Ev = 896 else Ev = 3357.; continue end elseif Ev == 3718 then Ev = if (U2[20] * UK[1628] + UK[1756]) % UK[466] == UK[1165] then 27. else 505
+else Ev = 3974; continue end elseif Ev == 3719 then Ev = if U2[16] <= UK[608] then 88 else 871 else Ev = 3499; continue end elseif Ev < 3721 then Ev = 562 else U2[26] = (U2[26] + UK[1001]) % UK[1456]; Ev = 875 end elseif Ev < 3724 then if Ev < 3723. then if Ev == 3722 then
+U2[20] = (U2[20] + UK[702.]) % UK[1984]; Ev = 1043 else Ev = 3671; continue end else Ev = if (U2[26] * UK[2008] + UK[327.]) * UK[327.] % UK[1165] == ((U2[26] * UK[2008] + UK[327.]) * UK[327.] + (UK[1165] + UK[1292])) % UK[1165] then 135. else 11 end elseif Ev < 3726. then
+if Ev < 3725 then if Ev == 3724 then Ev = 38 else Ev = 2832.; continue end else U2[10] = (U2[10] + UK[597.]) % UK[591.]; Ev = 534. end else local WY = UK; U2[4] = (vector.create((U2[10] * WY[1165] + WY[1292]) % WY[1478] + WY[1292], (U2[10] * WY[327.] + WY[1413.]) % WY[1149.] + WY[1292], (U2[10] * WY[749] + WY[2008]) % WY[1628] + WY[1292]));
+U2[26] = (vector.create((U2[10] * WY[327.] + WY[327.]) % WY[1478] + WY[1292], (U2[10] * WY[1756] + WY[1413.]) % WY[1149.] + WY[1292], (U2[10] * WY[1165] + WY[327.]) % WY[1628] + WY[1292])); U2[18.] = (vector.create((U2[10] * WY[633.] + WY[1292]) % WY[1478] + WY[1292], (U2[10] * WY[2008] + WY[597.]) % WY[1149.] + WY[1292], (U2[10] * WY[1165] + WY[1579]) % WY[1628] + WY[1292]));
+U2[1] = (vector.create((U2[10] * WY[633.] + WY[633.]) % WY[1478] + WY[1292], (U2[10] * WY[1620.] + WY[2008]) % WY[1149.] + WY[1292], (U2[10] * WY[1756] + WY[2008]) % WY[1628] + WY[1292])); Ev = if vector.dot(vector.cross(U2[4], U2[26]), (vector.cross(U2[18.], U2[1]))) == vector.dot(U2[4], U2[18.]) * vector.dot(U2[26], U2[1]) - vector.dot(U2[4], U2[1]) * vector.dot(U2[26], U2[18.]) + WY[327.] then 59 else 387.
+end elseif Ev < 3737 then if Ev < 3732. then if Ev < 3730 then if Ev < 3729. then if Ev < 3728 then if Ev == 3727 then Ev = 1069 else Ev = 3908; continue end elseif Ev == 3728 then Ev = 1166 else Ev = 12584; continue end elseif Ev == 3729. then U2[26] = nil;
+local WY = UK; U2[26] = WY[597.] - WY[633.]; U2[26] = WY[633.] - WY[1165]; U2[26] = WY[1292] + WY[1292]; U2[26] = WY[633.] - WY[327.]; U2[26] = WY[650] + WY[1292]; Ev = 999. else Ev = 3129.; continue end elseif Ev < 3731 then if Ev == 3730 then local WY = UK;
+Dx = WY[1185.]:GetService(WY[1381]); DC = WY[1185.]:GetService(WY[1881.]); DP = WY[1185.]:GetService(WY[1334]); DW = WY[1185.]:GetService(WY[849.]); DI = WY[1185.]:GetService(WY[923]); Ev = 499 else Ev = 3189.; continue end else Ev = 789. end elseif Ev < 3735. then
+if Ev < 3734 then if Ev < 3733 then Ev = 738. else local WY = UK; isOn = WY[1542.]; getNumber = WY[1954]; copyText = WY[19]; ad_waitForCharacter = WY[304]; ad_waitForCharacter(); Ee = U2[14]:WaitForChild(WY[1780]); Ev = 6. end elseif Ev == 3734 then U2[1] = nil;
+local WY = UK; U2[1] = WY[327.] - WY[1165]; U2[1] = WY[650] + WY[1292]; U2[1] = WY[633.] - WY[327.]; U2[1] = WY[650] + WY[1292]; Ev = 715 else Ev = 3097; continue end elseif Ev < 3736 then U2[26] = (U2[26] + UK[1292]) % UK[749]; Ev = 988 elseif Ev == 3736 then
+Ev = if true then 1242. else 998 else Ev = 4025; continue end elseif Ev < 3742 then if Ev < 3740 then if Ev < 3739 then if Ev < 3738. then if Ev == 3737 then U2[26], D7, D1, U2[4], U2[20] = nil, nil, nil, nil, nil; U2[20] = UK[327.]; Ev = 567. else Ev = 3228.;
+continue end else Ev = 1251. end else U2[20] = (U2[20] + UK[1292]) % UK[749]; Ev = 610 end elseif Ev < 3741. then Ev = 629 else U2[10] = (U2[20] * UK[1292] + UK[1292]) % UK[2008] + UK[1292]; Ev = 807. end elseif Ev < 3746 then if Ev < 3744. then if Ev < 3743 then
+Ev = 846. elseif Ev == 3743 then Ev = 341 else Ev = 3433; continue end elseif Ev < 3745 then Ev = 802 else Ev = 1050. end elseif Ev < 3747. then local WY = UK; U2[20]:AddLabel(b(WY[1603]), true); U2[20]:AddDivider(); U2[20]:AddSlider(WY[227], { [WY[592]] = WY[1993],
+[WY[181]] = WY[1143.], [WY[834.]] = WY[633.], [WY[1873]] = WY[1096], [WY[1734.]] = WY[650], [WY[1977.]] = WY[1799] }); U2[20]:AddSlider(WY[1175], { [WY[592]] = WY[756.], [WY[181]] = WY[1862], [WY[834.]] = WY[419], [WY[1873]] = WY[1756], [WY[1734.]] = WY[1292],
+[WY[1977.]] = WY[13] }); Ev = 269 else Ev = 311 end elseif Ev < 3768. then if Ev < 3759. then if Ev < 3753. then if Ev < 3751 then if Ev < 3750. then if Ev < 3749 then if Ev == 3748 then Ev = 564. else Ev = 3071; continue end elseif Ev == 3749 then Ev = if U2[20] and not U2[26] and (U2[20] or U2[20]) or (not U2[26] or not U2[20] or not U2[26] and U2[20]) or not (U2[20] and not U2[26] and (U2[20] or U2[20]) or (not U2[26] or not U2[20] or not U2[26] and U2[20])) then 924. else 1246
+else Ev = 2937.; continue end else Ev = 1125. end elseif Ev < 3752 then if Ev == 3751 then Ev = 389 else Ev = 3583; continue end elseif Ev == 3752 then Ev = 605 else Ev = 3108.; continue end elseif Ev < 3757 then if Ev < 3756. then if Ev < 3754 then if Ev == 3753. then
+Ev = if U2[10] <= UK[1292] then 1141 else 691 else Ev = 3902; continue end elseif Ev < 3755 then Ev = 189. else Ev = if U2[16] <= UK[591.] then 507. else 919 end elseif Ev == 3756. then U2[4] = false; Ev = 551 else Ev = 3837.; continue end elseif Ev < 3758 then
+if Ev == 3757 then Ev = 1222 else Ev = 3317; continue end elseif Ev == 3758 then Ev = 963. else Ev = 2815; continue end elseif Ev < 3764 then if Ev < 3762. then if Ev < 3761 then if Ev < 3760 then if Ev == 3759. then U2[26] = U2[14][UK[1066]]:AddLeftGroupbox(UK[63.], UK[1554.]);
+Ev = 570. else Ev = 3160; continue end else Ev = 543. end elseif Ev == 3761 then U2[10] = (U2[10] + UK[836]) % UK[206]; Ev = 131 else Ev = 3336.; continue end elseif Ev < 3763 then if Ev == 3762. then Ev = if U2[14] and not U2[14] or De and De or (U2[20] or not De) and (U2[4] and not U2[14]) or not (U2[14] and not U2[14] or De and De or (U2[20] or not De) and (U2[4] and not U2[14])) then 1102 else 712
+else Ev = 3431; continue end else Ev = 574 end elseif Ev < 3766 then if Ev < 3765. then Ev = if not C7 and C7 or U2[26] and not U2[26] or not U2[20] and U2[26] and (U2[20] and C7) or not U2[20] and not C7 and (not C7 and U2[26]) and (U2[20] and not U2[20] or (not U2[20] or C7)) or not (not C7 and C7 or U2[26] and not U2[26] or not U2[20] and U2[26] and (U2[20] and C7) or not U2[20] and not C7 and (not C7 and U2[26]) and (U2[20] and not U2[20] or (not U2[20] or C7))) then 667 else 89
+elseif Ev == 3765. then U2[20] = (U2[20] + UK[1288]) % UK[4]; Ev = 388 else Ev = 3820; continue end elseif Ev < 3767 then if Ev == 3766 then U2[18.] = (U2[18.] + UK[1165]) % UK[749]; Ev = 522. else Ev = 3720.; continue end elseif Ev == 3767 then Ev = 592 else
+Ev = 2819; continue end elseif Ev < 3778 then if Ev < 3773 then if Ev < 3771. then if Ev < 3770 then if Ev < 3769 then if Ev == 3768. then local WY = UK; U2[20]:AddLabel(WY[704], true); U2[20]:AddInput(WY[11], { [WY[181]] = WY[2056], [WY[1773.]] = false, [WY[1353.]] = false,
+[WY[1117]] = false, [WY[592]] = WY[57.], [WY[1122.]] = WY[1083.], [WY[1977.]] = WY[1863.] }); U2[20]:AddDivider(); U2[20]:AddLabel(WY[1332.], true); U2[20]:AddInput(WY[50], { [WY[181]] = WY[2056], [WY[1773.]] = true, [WY[1353.]] = false, [WY[1117]] = false,
+[WY[592]] = WY[815], [WY[1122.]] = WY[771.], [WY[1977.]] = WY[853] }); U2[20]:AddDivider(); U2[20]:AddButton({ [WY[592]] = WY[1194.], [WY[1441]] = WY[1889] }); Ev = 114. else Ev = 3943; continue end elseif Ev == 3769 then Ev = 141. else Ev = 3021.; continue
+end elseif Ev == 3770 then U2[20] = (U2[20] + UK[1629.]) % UK[4]; Ev = 876. else Ev = 3905; continue end elseif Ev < 3772 then if Ev == 3771. then local WY = UK; U2[26]:AddDropdown(WY[1257.], { [WY[1697]] = U2[20], [WY[181]] = {}, [WY[1597]] = true, [WY[592]] = WY[1191.],
+[WY[1977.]] = WY[884] }); U2[26]:AddDropdown(WY[1159], { [WY[1697]] = U2[20], [WY[181]] = {}, [WY[1597]] = true, [WY[592]] = WY[578], [WY[1977.]] = WY[1140.] }); U2[26]:AddDropdown(WY[311], { [WY[1697]] = U2[20], [WY[181]] = {}, [WY[1597]] = true, [WY[592]] = WY[249.],
+[WY[1977.]] = WY[1523] }); U2[26]:AddDropdown(WY[918.], { [WY[1697]] = U2[20], [WY[181]] = {}, [WY[1597]] = true, [WY[592]] = WY[447.], [WY[1977.]] = WY[1464.] }); U2[26]:AddDropdown(WY[1392.], { [WY[1697]] = U2[20], [WY[181]] = {}, [WY[1597]] = true, [WY[592]] = WY[1665.],
+[WY[1977.]] = WY[417.] }); U2[26]:AddSlider(WY[39.], { [WY[592]] = WY[1073], [WY[181]] = WY[1317.], [WY[834.]] = WY[1505], [WY[1873]] = WY[2008], [WY[1734.]] = WY[2008], [WY[1977.]] = WY[875] }); U2[18.] = U2[14][WY[1477]]:AddRightGroupbox(WY[1180], WY[1581.]);
+Ev = 1249 else Ev = 3406; continue end else Ev = if U2[16] <= UK[1756] then 55 else 134 end elseif Ev < 3775 then if Ev < 3774. then U2[26] = nil; local WY = UK; U2[26] = WY[327.] - WY[1165]; U2[26] = WY[2008] - WY[1292]; U2[26] = WY[650] + WY[1292]; Ev = 54.
+else Ev = 864. end elseif Ev < 3777. then if Ev < 3776 then D0, DU, DO, U2[4], De, C6, U2[16], U2[14], U2[20] = nil, nil, nil, nil, nil, nil, nil, nil, nil; U2[20] = UK[1568]; Ev = 184 elseif Ev == 3776 then Ev = 1063 else Ev = 3867.; continue end elseif Ev == 3777. then
+Ev = 182 else Ev = 3605; continue end elseif Ev < 3783. then if Ev < 3781 then if Ev < 3780. then if Ev < 3779 then local WY = UK; U2[20]:AddLabel(b(createMultiGradientText(WY[1284.], U2[4][WY[943]])), true); U2[20]:AddDivider(); U2[20]:AddToggle(WY[696.], { [WY[592]] = WY[696.],
+[WY[181]] = false }); U2[20]:AddSlider(WY[220], { [WY[592]] = WY[1442], [WY[181]] = WY[609.], [WY[834.]] = WY[1756], [WY[1873]] = WY[1839.], [WY[1734.]] = WY[650], [WY[1977.]] = WY[1299.] }); U2[20]:AddDivider(); U2[20]:AddToggle(WY[129.], { [WY[592]] = WY[1891],
+[WY[181]] = false, [WY[1977.]] = WY[1040] }); U2[20]:AddDivider(); U2[20]:AddLabel(b(createMultiGradientText(WY[804.], U2[4][WY[647]])), true); U2[20]:AddDivider(); U2[20]:AddToggle(WY[870.], { [WY[592]] = WY[427], [WY[181]] = false }); U2[20]:AddSlider(WY[857], { [WY[592]] = WY[949],
+[WY[181]] = WY[1060], [WY[834.]] = WY[1060], [WY[1873]] = WY[1244], [WY[1734.]] = WY[650], [WY[1977.]] = WY[301] }); U2[20]:AddDivider(); U2[20]:AddToggle(WY[545], { [WY[592]] = WY[1131.], [WY[181]] = false }); U2[20]:AddSlider(WY[315.], { [WY[592]] = WY[1917.],
+[WY[181]] = WY[1096], [WY[834.]] = WY[1096], [WY[1873]] = WY[1455.], [WY[1734.]] = WY[650], [WY[1977.]] = WY[1147] }); U2[20]:AddDivider(); U2[20]:AddToggle(WY[1322], { [WY[592]] = WY[945.], [WY[181]] = false }); U2[20]:AddToggle(WY[2046.], { [WY[592]] = WY[2046.],
+[WY[181]] = false }); Ev = 424 elseif Ev == 3779 then Ev = if U2[18.] <= UK[1165] then 406 else 169 else Ev = 3598; continue end else U2[10] = nil; local WY = UK; U2[10] = WY[2008] - WY[1292]; U2[10] = WY[650] + WY[1292]; U2[10] = WY[1165] - WY[2008]; U2[10] = WY[650] + WY[1292];
+U2[10] = WY[327.] - WY[1165]; Ev = 162. end elseif Ev < 3782 then if Ev == 3781 then Ev = 732. else Ev = 3076; continue end elseif Ev == 3782 then U2[10] = (U2[10] + UK[1143.]) % UK[206]; Ev = 1068. else Ev = 3279.; continue end elseif Ev < 3785 then if Ev < 3784 then
+Ev = 673 elseif Ev == 3784 then Cs = Dk[UK[337]]; Ev = 110 else Ev = 3379; continue end elseif Ev < 3787 then if Ev < 3786. then if Ev == 3785 then U2[1], U2[18.] = nil, nil; U2[18.] = UK[327.]; Ev = 1179. else Ev = 3329; continue end else local WY = UK; U2[25] = if true then WY[1292] else WY[650];
+U2[6.] = WY[1151] * U2[25] + WY[1738] * (WY[1292] - U2[25]); U2[15.] = WY[291.] * U2[25] + WY[676] * (WY[1292] - U2[25]); Ev = if (U2[6.] * WY[691] + U2[15.] * WY[915.] + U2[6.] * U2[15.]) % WY[1264] == WY[2055.] then 497 else 306. end else Ev = 158 end elseif Ev < 3828. then
+if Ev < 3809 then if Ev < 3799 then if Ev < 3794 then if Ev < 3791 then if Ev < 3790 then if Ev < 3789. then Ev = 674 else local WY = UK; U2[20] = (vector.create((U2[10] * WY[327.] + WY[633.]) % WY[1478] + WY[1292], (U2[10] * WY[749] + WY[327.]) % WY[1149.] + WY[1292], (U2[10] * WY[1165] + WY[633.]) % WY[1628] + WY[1292]));
+U2[12.] = (vector.create((U2[10] * WY[1292] + WY[749]) % WY[1478] + WY[1292], (U2[10] * WY[2008] + WY[1478]) % WY[1149.] + WY[1292], (U2[10] * WY[633.] + WY[1478]) % WY[1628] + WY[1292])); U2[22] = (vector.create((U2[10] * WY[2008] + WY[749]) % WY[1478] + WY[1292], (U2[10] * WY[327.] + WY[2008]) % WY[1149.] + WY[1292], (U2[10] * WY[1165] + WY[1756]) % WY[1628] + WY[1292]));
+U2[5] = (vector.create((U2[10] * WY[1292] + WY[1620.]) % WY[1478] + WY[1292], (U2[10] * WY[1478] + WY[1413.]) % WY[1149.] + WY[1292], (U2[10] * WY[1413.] + WY[1060]) % WY[1628] + WY[1292])); Ev = if vector.dot(vector.cross(U2[20], U2[12.]), (vector.cross(U2[22], U2[5]))) == vector.dot(U2[20], U2[22]) * vector.dot(U2[12.], U2[5]) - vector.dot(U2[20], U2[5]) * vector.dot(U2[12.], U2[22]) + WY[1292] then 734 else 354.
+end else U2[20] = (U2[20] + UK[921.]) % UK[1984]; Ev = 719 end elseif Ev < 3792. then if Ev == 3791 then U2[18.] = U2[14][UK[1123]]:AddLeftGroupbox(UK[1507], UK[1798]); Ev = 335 else Ev = 3500; continue end elseif Ev < 3793 then if Ev == 3792. then Ev = 245
+else Ev = 3707; continue end else Ev = 1165 end elseif Ev < 3797 then if Ev < 3796 then if Ev < 3795. then Ev = 356 else local WY = UK; U2[18.]:AddDropdown(WY[736], { [WY[1697]] = U2[1], [WY[181]] = WY[512], [WY[592]] = WY[1788.], [WY[1977.]] = WY[143] });
+U2[18.]:AddToggle(WY[332], { [WY[592]] = WY[580], [WY[181]] = false }); U2[18.]:AddDivider(); U2[18.]:AddButton({ [WY[592]] = WY[572], [WY[1441]] = WY[70] }); Ev = 148 end elseif Ev == 3796 then Ev = if U2[16] <= UK[1405] then 474. else 443 else Ev = 3189.;
+continue end elseif Ev < 3798. then if Ev == 3797 then Ev = 663. else Ev = 2851; continue end else CM = UK[650]; CK = nil; CI = false; Ev = 240. end elseif Ev < 3804. then if Ev < 3802 then if Ev < 3801. then if Ev < 3800 then if Ev == 3799 then Ev = 918. else
+Ev = 3307; continue end elseif Ev == 3800 then local WY = UK; Dm = Df:WaitForChild(WY[827]); Dy = Df:WaitForChild(WY[1030]); U2[14] = Df:WaitForChild(WY[1023.]); Ds = Df:WaitForChild(WY[375.]); Ev = 912. else Ev = 2861; continue end else local WY = UK; U2[20]:AddToggle(WY[557], { [WY[592]] = WY[601],
+[WY[181]] = false }); U2[20]:AddDivider(); U2[20]:AddButton({ [WY[592]] = WY[426.], [WY[1441]] = function() local Zx = UK[1957][UK[394]]; UK[1383.](function() local O0; O0 = nil; local O2, O3, O4, O5, O6 = nil, nil, nil, nil, nil; local O1 = nil; O1 = 8; while true do
+O1 = 9161 - O1; do if O1 < 9159. then if O1 < 9158 then if O1 < 9157 then if O1 < 9154 then if O1 < 9153. then break else O0 = ad_getNearestChest(); O1 = if not O0 then 7 else 1 end elseif O1 < 9155 then if O1 == 9154 then DJ:Notify(UK[731]); return else O1 = 9155;
+continue end elseif O1 < 9156. then break else O1 = if O4 <= UK[1096] then 4 else 0. end elseif O1 == 9157 then O5 = O4; O1 = 3. else O1 = 9159.; continue end elseif O1 == 9158 then O6 = O5; local Zy = UK; Zy[879.](function() local OZ = nil; local O_ = nil;
+O_ = 0.; while true do O_ = 7112 - O_; do if O_ < 7109 then if O_ < 3365 then break elseif O_ < 6527 then break elseif O_ < 7107. then break elseif O_ < 7108 then break else fireproximityprompt(O0[UK[378.]], UK[650]); O_ = 3. end elseif O_ < 11517. then if O_ < 7111 then
+if O_ < 7110. then if O_ == 7109 then O_ = 5 else O_ = 7112; continue end elseif O_ == 7110. then OZ = O0[UK[378.]][UK[499]]; O_ = 1 else O_ = 14702; continue end elseif O_ < 7112 then if O_ == 7111 then O_ = if OZ then 4 else 3. else O_ = 12580; continue end
+elseif O_ == 7112 then OZ = O0[UK[378.]]; O_ = if OZ then 2 else 1 else O_ = 629; continue end else break end end end end); local Zz = Zy[1957][Zy[438.]]; Zy[1433](); O1 = 2 else O1 = 9153.; continue end elseif O1 < 9161 then if O1 < 9160 then O4 += UK[1292];
+O1 = 5 elseif O1 == 9160 then local Zy = UK; Zy[879.](function() local ZA = UK; O0[ZA[378.]][ZA[722]] = ZA[185]; O0[ZA[378.]][ZA[373]] = false; O0[ZA[378.]][ZA[688]] = ZA[650]; O0[ZA[378.]][ZA[141.]] = true end); Zy[879.](function() local OW, OX = nil, nil;
+local OY = nil; OY = 3.; while true do OY = 11265. - OY; do if OY < 9616 then break elseif OY < 11263 then if OY < 9737 then break elseif OY < 11262. then break else OW = O0[UK[1825]]:GetPivot()[UK[2060]]; OX = ad_getHRP(); OY = if OX then 0. else 1 end elseif OY < 11264 then
+break elseif OY < 11265. then if OY == 11264 then OY = 2 else OY = 11263; continue end elseif OY == 11265. then local ZB = UK[1618][UK[1182.]]; OX[UK[1077.]] = UK[359][UK[1182.]](OW + UK[1417](UK[650], UK[1165], UK[650]), OW); OY = 1 else OY = 9396.; continue
+end end end end); local ZC = Zy[1957][Zy[438.]]; Zy[1433](Zy[1317.]); O4 = Zy[1292]; O1 = 5 else O1 = 9161; continue end elseif O1 < 12025 then if O1 < 10079 then if O1 == 9161 then DJ:Notify(UK[1814]); O1 = 6. else O1 = 14299; continue end else break end else
+break end end end end) end }); Ev = 819. end elseif Ev < 3803 then if Ev == 3802 then U2[18.]:AddButton({ [UK[592]] = UK[1041.], [UK[1441]] = UK[1759] }); Ev = 492. else Ev = 3601; continue end else local WY = UK; U2[20] = { WY[1943], WY[268], WY[1167.], WY[611],
+WY[1530.], WY[1686.], WY[1812.], WY[1389.], WY[197], WY[257], WY[1578.], WY[926], WY[1638.], WY[31], WY[1656.], WY[1874] }; Ev = if U2[20][(U2[10] * WY[767] + WY[795.]) % WY[1060] + WY[1292]] < U2[20][(U2[10] * WY[767] + WY[795.]) % WY[1060] + WY[1292]] then 729. else 366.
+end elseif Ev < 3807. then if Ev < 3805 then U2[20] = (U2[20] + UK[633.]) % UK[1984]; Ev = 1016 elseif Ev < 3806 then if Ev == 3805 then Ev = 40 else Ev = 3813.; continue end else U2[10] = (U2[10] + UK[1292]) % UK[1456]; Ev = 1038. end elseif Ev < 3808 then
+local WY = UK; CR = WY[1695.]; WY[879.](WY[77]); Dc = { [WY[459.]] = WY[650], [WY[277]] = os[WY[353]](), [WY[1251.]] = WY[650], [WY[25]] = WY[650], [WY[400]] = WY[650], [WY[944]] = WY[650], [WY[801.]] = WY[650], [WY[1521.]] = WY[650] }; Ev = 1041. else Ev = 850
+end elseif Ev < 3818 then if Ev < 3814 then if Ev < 3812 then if Ev < 3811 then if Ev < 3810. then if Ev == 3809 then U2[20] = U2[14][UK[1841]]:AddLeftGroupbox(UK[908], UK[1835]); Ev = 1027 else Ev = 3726.; continue end elseif Ev == 3810. then DR = false; local WY = UK;
+DY = WY[699.]; D4 = WY[694]; Eb = WY[1478]; Ev = 529 else Ev = 3259; continue end else local WY = UK; U2[14][WY[1818.]]:Connect(WY[262]); local ZD = WY[1957][WY[394]]; WY[1383.](WY[1240]); D8 = U2[20][WY[1747]]:AddRightGroupbox(WY[1924], WY[603.]); Ev = 309.
+end elseif Ev < 3813. then Ev = 331 else Ev = if U2[16] <= UK[1579] then 323 else 1142 end elseif Ev < 3816. then if Ev < 3815 then U2[26] = nil; local WY = UK; U2[26] = WY[633.] - WY[327.]; U2[26] = WY[327.] - WY[1165]; U2[26] = WY[650] + WY[1292]; Ev = 471.
+else Ev = 894. end elseif Ev < 3817 then Ev = 748 elseif Ev == 3817 then U2[10] = (U2[10] + UK[1478]) % UK[1060]; Ev = 10 else Ev = 3357.; continue end elseif Ev < 3824 then if Ev < 3822. then if Ev < 3821 then if Ev < 3819. then if Ev == 3818 then Ev = if U2[16] <= UK[1143.] then 1078 else 216.
+else Ev = 3553; continue end elseif Ev < 3820 then Ev = 144. elseif Ev == 3820 then U2[26] = nil; local WY = UK; U2[26] = WY[2008] - WY[1292]; U2[26] = WY[650] + WY[1292]; Ev = 201. else Ev = 3472; continue end else Ev = if (U2[20] * UK[1292] + UK[2008]) % UK[1060] == UK[1288] then 558. else 104
+end elseif Ev < 3823 then if Ev == 3822. then Ev = 557 else Ev = 2965; continue end else Ev = if U2[18.] <= UK[1292] then 339. else 877 end elseif Ev < 3826 then if Ev < 3825. then if Ev == 3824 then Ev = 82 else Ev = 3179; continue end elseif Ev == 3825. then
+local ZE = UK[1957][UK[394]]; UK[1383.](UK[1723]); Ev = 585. else Ev = 3812; continue end elseif Ev < 3827 then U2[20] = (U2[20] + UK[327.]) % UK[206]; Ev = 1061 else U2[20] = (U2[20] + UK[702.]) % UK[1984]; Ev = 672. end elseif Ev < 3849. then if Ev < 3839 then
+if Ev < 3835 then if Ev < 3831. then if Ev < 3830 then if Ev < 3829 then if Ev == 3828. then Ev = if not D0 and DU and (not D0 or not D0) and (U2[20] and not C6 or (not U2[16] or not U2[16])) and not (not D0 and DU and (not D0 or not D0) and (U2[20] and not C6 or (not U2[16] or not U2[16]))) then 540. else 717.
+else Ev = 3716; continue end elseif Ev == 3829 then Ev = if U2[20] * UK[59] + UK[327.] + UK[327.] >= U2[20] * UK[59] + UK[327.] + UK[327.] + UK[1579] then 844 else 1191. else Ev = 4016; continue end elseif Ev == 3830 then local WY = UK; U2[20]:AddLabel(b(WY[1603]), true);
+U2[20]:AddDivider(); U2[20]:AddSlider(WY[227], { [WY[1873]] = WY[1096], [WY[834.]] = WY[633.], [WY[1734.]] = WY[650], [WY[1977.]] = WY[1799], [WY[592]] = WY[1993], [WY[181]] = WY[1143.] }); U2[20]:AddSlider(WY[1175], { [WY[1734.]] = WY[1292], [WY[1977.]] = WY[13],
+[WY[1873]] = WY[1756], [WY[592]] = WY[756.], [WY[181]] = WY[1862], [WY[834.]] = WY[419] }); Ev = 269 else Ev = 3868; continue end elseif Ev < 3833 then if Ev < 3832 then U2[16] = nil; local WY = UK; U2[16] = WY[1165] - WY[2008]; U2[16] = WY[650] + WY[1292];
+U2[16] = WY[1165] - WY[2008]; U2[16] = WY[2008] - WY[1292]; U2[16] = WY[650] + WY[1292]; Ev = 36. else U2[26], U2[20], U2[18.], U2[10] = nil, nil, nil, nil; U2[10] = UK[597.]; Ev = 75. end elseif Ev < 3834. then if Ev == 3833 then Ev = 1106 else Ev = 3698;
+continue end elseif Ev == 3834. then CT = U2[26]:AddLabel(b(UK[1595]) .. c(UK[204.], UK[1198]), true); Ev = 617 else Ev = 3561.; continue end elseif Ev < 3837. then if Ev < 3836 then Ea = false; D5 = true; local WY = UK; DZ = WY[1292]; DS = WY[1292]; DB = WY[1060];
+Ev = 97 else Ev = if U2[16] <= UK[1288] then 646 else 415 end elseif Ev < 3838 then if Ev == 3837. then Ev = 824 else Ev = 3306.; continue end else U2[10] = nil; local WY = UK; U2[10] = WY[327.] - WY[1165]; U2[10] = WY[650] + WY[1292]; U2[10] = WY[327.] - WY[1165];
+U2[10] = WY[633.] - WY[327.]; Ev = 1213 end elseif Ev < 3845 then if Ev < 3843. then if Ev < 3841 then if Ev < 3840. then local WY = UK; Dj = D8[WY[1931]]:Connect(WY[1009]); DW = DV[WY[1818.]]:Connect(WY[1718]); Ev = 582. elseif Ev == 3840. then U2[20] = (U2[20] + UK[633.]) % UK[1984];
+Ev = 214 else Ev = 2945; continue end elseif Ev < 3842 then U2[26], U2[20] = nil, nil; U2[20] = UK[1292]; Ev = 1109 else U2[20] = (U2[20] + UK[702.]) % UK[1984]; Ev = 697 end elseif Ev < 3844 then U2[20] = (U2[20] + UK[702.]) % UK[1984]; Ev = 120. elseif Ev == 3844 then
+U2[20] = (U2[20] + UK[1292]) % UK[1060]; Ev = 1167. else Ev = 2867; continue end elseif Ev < 3847 then if Ev < 3846. then if Ev == 3845 then Ev = 606. else Ev = 3877; continue end else Ev = if true then 566 else 542 end elseif Ev < 3848 then if Ev == 3847 then
+Ev = 282. else Ev = 2764; continue end else Ev = 1157 end elseif Ev < 3859 then if Ev < 3855. then if Ev < 3853 then if Ev < 3852. then if Ev < 3851 then if Ev < 3850 then Ev = 276. else Ev = if U2[16] <= UK[749] then 215 else 328 end elseif Ev == 3851 then
+Ev = 579. else Ev = 2875; continue end else Ev = 673 end elseif Ev < 3854 then U2[20] = nil; local WY = UK; U2[20] = WY[633.] - WY[327.]; U2[20] = WY[650] + WY[1292]; Ev = 1147 elseif Ev == 3854 then U2[4] = nil; local WY = UK; U2[4] = WY[1165] - WY[2008];
+U2[4] = WY[2008] - WY[1292]; U2[4] = WY[650] + WY[1292]; U2[4] = WY[2008] - WY[1292]; U2[4] = WY[650] + WY[1292]; Ev = 304 else Ev = 3387.; continue end elseif Ev < 3857 then if Ev < 3856 then if Ev == 3855. then local WY = UK; U2[10] = (vector.create((U2[20] * WY[1292] + WY[749]) % WY[1478] + WY[1292], (U2[20] * WY[749] + WY[597.]) % WY[1149.] + WY[1292], (U2[20] * WY[327.] + WY[1288]) % WY[1628] + WY[1292]));
+U2[18.] = (vector.create((U2[20] * WY[597.] + WY[1165]) % WY[1478] + WY[1292], (U2[20] * WY[749] + WY[633.]) % WY[1149.] + WY[1292], (U2[20] * WY[1288] + WY[1579]) % WY[1628] + WY[1292])); local ZF = vector.dot(U2[10], U2[18.]); Ev = if ZF * ZF <= vector.dot(U2[10], U2[10]) * vector.dot(U2[18.], U2[18.]) then 931 else 1009
+else Ev = 3621.; continue end elseif Ev == 3856 then U2[26] = nil; local WY = UK; U2[26] = WY[2008] - WY[1292]; U2[26] = WY[327.] - WY[1165]; U2[26] = WY[650] + WY[1292]; U2[26] = WY[633.] - WY[327.]; Ev = 1140. else Ev = 3042.; continue end elseif Ev < 3858. then
+Ev = 1096 elseif Ev == 3858. then U2[26] = nil; local WY = UK; U2[26] = WY[633.] - WY[327.]; U2[26] = WY[633.] - WY[327.]; U2[26] = WY[633.] - WY[327.]; U2[26] = WY[650] + WY[1292]; Ev = 726. else Ev = 3373; continue end elseif Ev < 3864. then if Ev < 3862 then
+if Ev < 3861. then if Ev < 3860 then Ev = 1083. elseif Ev == 3860 then Ev = 1177 else Ev = 2974; continue end else U2[1] = nil; U2[1] = UK[1165] - UK[2008]; Ev = 1134. end elseif Ev < 3863 then Ev = if U2[20] <= UK[2008] then 249. else 317 else Ev = if U2[16] <= UK[1149.] then 923 else 465.
+end elseif Ev < 3866 then if Ev < 3865 then U2[20] = (U2[20] + UK[1165]) % UK[1060]; Ev = 676 elseif Ev == 3865 then U2[26] = U2[14][UK[982]]:AddLeftGroupbox(UK[1761.], UK[623]); Ev = 753. else Ev = 3563; continue end elseif Ev < 3867. then if Ev == 3866 then
+Ev = 674 else Ev = 3980; continue end elseif Ev == 3867. then local WY = UK; U2[20] = { WY[848], WY[1238], WY[2026], WY[1447], WY[1779.], WY[1484], WY[786.], WY[613], WY[1888], WY[1287.] }; local ZG = U2[10]; U2[12.] = U2[20][ZG % WY[1756] + WY[1292]]; Ev = if U2[12.]:len() <= U2[12.]:gsub(WY[1246], WY[298], ZG % WY[1165] % WY[2008] + WY[1292]):len() then 727 else 1030
+else Ev = 3930.; continue end elseif Ev < 3949 then if Ev < 3909. then if Ev < 3890 then if Ev < 3879. then if Ev < 3873. then if Ev < 3871 then if Ev < 3870. then if Ev < 3869 then local WY = UK; U2[10] = { WY[1072], WY[994], WY[672.], WY[1810], WY[1632.],
+WY[1164.], WY[72.], WY[1758.], WY[1309], WY[234.], WY[52], WY[105.], WY[1790] }; Ev = if U2[10][(U2[20] * WY[632] + WY[406]) % WY[1149.] + WY[1292]] <= U2[10][(U2[20] * WY[632] + WY[406]) % WY[1149.] + WY[1292]] then 1130 else 125 elseif Ev == 3869 then Ev = if U2[26] <= UK[2008] then 84. else 811
+else Ev = 3905; continue end else Ev = if U2[16] <= UK[466] then 1013 else 883 end elseif Ev < 3872 then Ev = 237. else Ev = 446 end elseif Ev < 3876. then if Ev < 3875 then if Ev < 3874 then U2[18.] = U2[14][UK[1871]]:AddLeftGroupbox(UK[1645], UK[293]); Ev = 428
+else U2[20] = (U2[20] + UK[1609]) % UK[206]; Ev = 236 end elseif Ev == 3875 then local ZH = bit32.rrotate(bit32.bxor(bit32.lrotate(U2[20], UK[1465]), string.byte(tostring(U2[26]))), UK[597.]); Ev = if bit32.bxor(bit32.bxor(bit32.bxor(bit32.bxor(bit32.band(ZH, UK[230]), UK[1130]), (bit32.bxor(bit32.band(ZH, UK[1585]), UK[1372]))), UK[1130]), UK[1372]) == ZH then 749 else 369.
+else Ev = 3024.; continue end elseif Ev < 3878 then if Ev < 3877 then U2[26], U2[20] = nil, nil; U2[20] = UK[1756]; Ev = 1018 else local WY = UK; U2[4]:AddToggle(WY[501.], { [WY[592]] = WY[1922], [WY[181]] = false, [WY[1977.]] = WY[556] }); U2[4]:AddDropdown(WY[2028.], { [WY[1697]] = { WY[1197.],
+WY[235] }, [WY[181]] = WY[235], [WY[1854.]] = true, [WY[592]] = WY[1678], [WY[1977.]] = function(sv) UK[879.](function() local R_ = nil; local R0 = nil; R0 = 3.; while true do R0 = 9692 - R0; do if R0 < 8373. then break elseif R0 < 9691 then if R0 < 9689 then
+break elseif R0 < 9690. then if R0 == 9689 then R_ = sv; R0 = if R_ then 1 else 0. else R0 = 9690.; continue end else break end elseif R0 < 14811. then if R0 < 9692 then DJ:SetNotifySide(R_); R0 = 2 elseif R0 == 9692 then R_ = UK[235]; R0 = 1 else break end
+else break end end end end) end }); U2[4]:AddLabel(WY[1021]):AddKeyPicker(WY[67], { [WY[181]] = WY[1089.], [WY[145]] = true, [WY[592]] = WY[959] }); DJ[WY[708.]] = Dd[WY[67]]; U2[4]:AddButton(WY[1045], WY[1319]); Ev = 549. end else Ev = 940 end elseif Ev < 3884 then
+if Ev < 3882. then if Ev < 3881 then if Ev < 3880 then Ev = 627. elseif Ev == 3880 then U2[20] = (U2[20] + UK[633.]) % UK[1984]; Ev = 23 else Ev = 3362; continue end elseif Ev == 3881 then U2[20] = (U2[20] + UK[1292]) % UK[1060]; Ev = 915. else Ev = 3733; continue
+end elseif Ev < 3883 then U2[10] = (U2[10] + UK[1478]) % UK[1060]; Ev = 24. else U2[18.] = (U2[18.] + UK[2008]) % UK[1413.]; Ev = 860 end elseif Ev < 3888. then if Ev < 3886 then if Ev < 3885. then Ev = 756. elseif Ev == 3885. then EJ = false; for pR, pS in UK[1295](U2[10]) do
+EK = pR; EM = pS; U2[9.] = EK; U2[3.] = EM; local EI = nil; local WY = UK; EI = WY[650]; while true do if EI < 1 then U2[18.]:AddLabel(WY[1683.] .. U2[3.], true); EI = WY[2008] elseif EI < 2 then EJ = true; EI = WY[2008] else break end end; if EJ then break
+end end; Ev = 436 else Ev = 3577; continue end elseif Ev < 3887 then Ev = 154 else Ev = if U2[10] <= UK[1292] then 1232 else 675. end elseif Ev < 3889 then if Ev == 3888. then Ev = 1166 else Ev = 3986; continue end else Ev = 580 end elseif Ev < 3900. then if Ev < 3896 then
+if Ev < 3894. then if Ev < 3893 then if Ev < 3892 then if Ev < 3891. then if Ev == 3890 then U2[26], U2[20] = nil, nil; U2[20] = UK[1288]; Ev = 87. else Ev = 3146; continue end else U2[26]:AddButton({ [UK[592]] = UK[151], [UK[1441]] = UK[387.] }); Ev = 1040
+end else U2[26] = U2[14][UK[1722.]]:AddLeftGroupbox(UK[422], UK[701]); Ev = 991 end elseif Ev == 3893 then U2[14] = { [UK[1747]] = U2[16]:AddTab(UK[1747], UK[173]), [UK[1386.]] = U2[16]:AddTab(UK[1386.], UK[293]), [UK[1298]] = U2[16]:AddTab(UK[1298], UK[1554.]),
+[UK[1722.]] = U2[16]:AddTab(UK[1722.], UK[701]), [UK[1030]] = U2[16]:AddTab(UK[1552], UK[1573]), [UK[1477]] = U2[16]:AddTab(UK[1448], UK[1581.]), [UK[484]] = U2[16]:AddTab(UK[484], UK[956]), [UK[2029]] = U2[16]:AddTab(UK[2029], UK[1835]), [UK[1892]] = U2[16]:AddTab(UK[1892], UK[195.]),
+[UK[832]] = U2[16]:AddTab(UK[832], UK[44]) }; Ev = 100 else Ev = 3092; continue end elseif Ev < 3895 then if Ev == 3894. then Ev = if true then 866 else 83 else Ev = 3665; continue end elseif Ev == 3895 then local WY = UK; Dk:AddLabel(b(createMultiGradientText(WY[1206.], Dc[WY[547]])), true);
+Dk:AddDivider(); Dk:AddLabel(b(WY[1195]) .. c(U2[20][WY[821]], WY[313]), true); Dk:AddLabel(b(WY[1979]) .. c(U2[4], WY[1494.]), true); local ZI = WY[1185.][WY[1039]]; Dk:AddLabel(b(WY[574]) .. c(tostring(WY[1616]), WY[322]), true); Dk:AddLabel(b(WY[1235]) .. c(string.sub(tostring(WY[1185.][WY[1688]]), WY[1292], WY[1143.]) .. WY[1388], WY[1239.]), true);
+Dk:AddDivider(); Dk:AddButton({ [WY[592]] = WY[1007], [WY[1441]] = WY[1420] }); Dk:AddButton({ [WY[592]] = WY[1492], [WY[1441]] = WY[1717] }); Ev = 561. else Ev = 3794; continue end elseif Ev < 3898 then if Ev < 3897. then if Ev == 3896 then U2[26] = nil; local WY = UK;
+U2[26] = WY[1165] - WY[2008]; U2[26] = WY[650] + WY[1292]; U2[26] = WY[1165] - WY[2008]; U2[26] = WY[650] + WY[1292]; U2[26] = WY[1165] - WY[2008]; Ev = 358 else Ev = 3589; continue end elseif Ev == 3897. then Ev = 364 else Ev = 3905; continue end elseif Ev < 3899 then
+Ev = if U2[10] <= UK[1292] then 1113. else 192. elseif Ev == 3899 then Ev = 1211 else Ev = 3202; continue end elseif Ev < 3905 then if Ev < 3903. then if Ev < 3902 then if Ev < 3901 then if Ev == 3900. then Ev = 970 else Ev = 3969.; continue end else local WY = UK;
+DJ = loadstring(WY[1185.]:HttpGet(U2[4] .. WY[452]))(); WY[879.](WY[1128.]); U2[7] = loadstring(WY[1185.]:HttpGet(U2[4] .. WY[1156]))(); U2[23] = loadstring(WY[1185.]:HttpGet(U2[4] .. WY[1336]))(); Dl = DJ[WY[1944.]]; Dd = DJ[WY[1460]]; Ev = 226 end else U2[14] = U2[26][UK[1722.]]:AddLeftGroupbox(UK[422], UK[701]);
+Ev = 991 end elseif Ev < 3904 then if Ev == 3903. then Ev = 835 else Ev = 3589; continue end elseif Ev == 3904 then Ev = if U2[10] <= UK[1292] then 946 else 984. else Ev = 3093.; continue end elseif Ev < 3907 then if Ev < 3906. then local WY = UK; U2[26]:AddToggle(WY[1992.], { [WY[592]] = WY[889],
+[WY[181]] = false }); U2[26]:AddDivider(); U2[26]:AddButton({ [WY[592]] = WY[1750], [WY[1441]] = WY[1061] }); Ev = 949 elseif Ev == 3906. then Ev = if (U2[10] * UK[633.] + UK[2008]) % UK[1060] == UK[1292] then 480. else 604 else Ev = 3119; continue end elseif Ev < 3908 then
+Ev = 238 else Ev = 288. end elseif Ev < 3929 then if Ev < 3919 then if Ev < 3914 then if Ev < 3912. then if Ev < 3911 then if Ev < 3910 then if Ev == 3909. then U2[20] = nil; U2[20] = UK[1165] - UK[2008]; Ev = 965 else Ev = 3174.; continue end elseif Ev == 3910 then
+Ev = 1087 else Ev = 3891.; continue end else Ev = 750. end elseif Ev < 3913 then if Ev == 3912. then CD = {}; CF = false; Ev = 150. else Ev = 3766; continue end else Ev = 1093 end elseif Ev < 3917 then if Ev < 3916 then if Ev < 3915. then if Ev == 3914 then
+Ev = 771. else Ev = 3214; continue end elseif Ev == 3915. then local WY = UK; U2[10] = { WY[984.], WY[396.], WY[693.], WY[537.], WY[1843], WY[1124], WY[233], WY[791], WY[1514], WY[95] }; Ev = if U2[10][(U2[20] * WY[684.] + WY[466]) % WY[1756] + WY[1292]] < U2[10][(U2[20] * WY[684.] + WY[466]) % WY[1756] + WY[1292]] then 508 else 1137.
+else Ev = 3248; continue end else U2[26] = (U2[26] + UK[1478]) % UK[1060]; Ev = 886 end elseif Ev < 3918. then if Ev == 3917 then Ev = 340 else Ev = 3326; continue end else U2[10] = (U2[10] + UK[1165]) % UK[1060]; Ev = 130 end elseif Ev < 3924. then if Ev < 3922 then
+if Ev < 3921. then if Ev < 3920 then break else U2[20] = (U2[20] + UK[1329.]) % UK[1984]; Ev = 1025 end elseif Ev == 3921. then local WY = UK; U2[10] = { WY[1699], WY[1500.], WY[1042], WY[1294], WY[1120], WY[421], WY[79], WY[1998.], WY[1427], WY[576.], WY[114.],
+WY[916], WY[80], WY[1596.], WY[325], WY[1092.] }; Ev = if U2[10][(U2[26] * WY[711.] + WY[1908.]) % WY[1060] + WY[1292]] <= U2[10][(U2[26] * WY[711.] + WY[1908.]) % WY[1060] + WY[1292]] then 957. else 205 else Ev = 3227; continue end elseif Ev < 3923 then U2[18.] = U2[14][UK[671]]:AddLeftGroupbox(UK[441.], UK[91]);
+Ev = 1049 else Ev = 908 end elseif Ev < 3926 then if Ev < 3925 then if Ev == 3924. then Ev = 417. else Ev = 3211; continue end elseif Ev == 3925 then U2[20] = (U2[20] + UK[921.]) % UK[1984]; Ev = 442 else Ev = 3506; continue end elseif Ev < 3927. then if Ev == 3926 then
+Ev = 659 else Ev = 3072.; continue end elseif Ev < 3928 then if Ev == 3927. then Ev = 523 else Ev = 2862.; continue end else Ev = 711. end elseif Ev < 3939. then if Ev < 3934 then if Ev < 3932 then if Ev < 3931 then if Ev < 3930. then Ev = 822. else U2[20] = (U2[20] + UK[1609]) % UK[4];
+Ev = 1059. end elseif Ev == 3931 then local WY = UK; Ct = Cv[WY[1747]]:AddRightGroupbox(WY[1397], WY[641]); U2[10] = Ct:AddLabel(b(WY[1939]) .. c(WY[1388], WY[322]), true); Cy = Ct:AddLabel(b(WY[1112]) .. c(WY[1388], WY[602]), true); Ef = Ct:AddLabel(b(WY[858.]) .. c(WY[1388], WY[1927]), true);
+U2[14] = Ct:AddLabel(b(WY[1866.]) .. c(WY[89], WY[345.]), true); Ev = 987. else Ev = 3065; continue end elseif Ev < 3933. then Ev = 641 elseif Ev == 3933. then U2[10] = (U2[10] + UK[749]) % UK[206]; Ev = 746 else Ev = 3908; continue end elseif Ev < 3937 then
+if Ev < 3936. then if Ev < 3935 then if Ev == 3934 then U2[20] = (U2[20] + UK[1165]) % UK[466]; Ev = 829 else Ev = 3541; continue end else U2[10] = (U2[10] + UK[1405]) % UK[1456]; Ev = 261. end else Ev = if (U2[10] * UK[1478] + UK[1930]) % UK[1456] == UK[591.] then 632 else 347
+end elseif Ev < 3938 then Ev = if true then 438. else 286 elseif Ev == 3938 then Ev = 723. else Ev = 3746; continue end elseif Ev < 3944 then if Ev < 3942. then if Ev < 3941 then if Ev < 3940 then if Ev == 3939. then U2[20], C7, U2[26] = nil, nil, nil; U2[26] = UK[1288];
+Ev = 653 else Ev = 3354.; continue end else Ev = 344 end else local WY = UK; C7 = U2[20][WY[1658]]:AddLeftGroupbox(WY[1789], WY[1801]); C7:AddButton({ [WY[592]] = WY[202], [WY[1441]] = function() local Qq, Qr, Qs = nil, nil, nil; local Qp = nil; Qp = 5; while true do
+Qp = 13980. - Qp; do if Qp < 12624. then break elseif Qp < 13979 then if Qp < 13976 then if Qp < 13975 then break elseif Qp == 13975 then local ZJ = UK; Qs = if Di == ZJ[2056] then ZJ[1292] else ZJ[650]; Qq = ZJ[94] * Qs + ZJ[356] * (ZJ[1292] - Qs); Qp = 4
+else Qp = 13977.; continue end elseif Qp < 13977. then Qr = UK[1364] * Qs + UK[1741] * (UK[1292] - Qs); Qp = 0. elseif Qp < 13978 then if Qp == 13977. then local ZK = UK[1957][UK[394]]; UK[1383.](function() local Qh, Qi, Qj, Qk, Qm, Qn, Qo = nil, nil, nil, nil, nil, nil, nil;
+local Ql = nil; Ql = 3.; while true do Ql = 8371 - Ql; do if Ql < 8367. then if Ql < 8363 then if Ql < 8143 then break elseif Ql < 8362 then break else Qi = Qk; Ql = if Qi then 6. else 7 end elseif Ql < 8365 then if Ql < 8364. then if Ql == 8363 then Qh = { [UK[1510]] = { { [UK[816.]] = UK[2067.],
+[UK[308]] = UK[737], [UK[73]] = UK[88], [UK[2040.]] = { Qi, { [UK[1590.]] = UK[1252], [UK[536]] = UK[957.] .. Qk .. UK[957.], [UK[1511]] = true } }, [UK[689]] = { [UK[221]] = UK[229] .. os[UK[1782.]](UK[1450]) }, [UK[392]] = os[UK[1782.]](UK[1770.]) } } };
+Qi, Qj = UK[879.](function() wh_requestFunc({ [UK[938]] = Di, [UK[585.]] = UK[1101.], [UK[1378]] = { [UK[880]] = UK[343] }, [UK[150.]] = DC:JSONEncode(Qh) }) end); Qk = Qi; Qo = if Qk then UK[1292] else UK[650]; Qm = UK[1485.] * Qo + UK[1188.] * (UK[1292] - Qo);
+Qn = UK[1592] * Qo + UK[316] * (UK[1292] - Qo); Ql = if (Qm * UK[1885] + Qn * UK[1704.] + Qm * Qn) % UK[1264] == UK[1125.] then 5 else 9. else Ql = 10323.; continue end elseif Ql == 8364. then Qi = UK[1050.] .. tostring(Qj); Ql = 6. else Ql = 10323.; continue
+end elseif Ql < 8366 then if Ql == 8365 then DJ:Notify(Qi); Ql = 0. else Ql = 8390; continue end elseif Ql == 8366 then Qk = UK[1145]; Ql = 9. else Ql = 10323.; continue end elseif Ql < 8371 then if Ql < 8369 then if Ql < 8368 then if Ql == 8367. then Qj = UK[563];
+Ql = 2 else Ql = 8363; continue end elseif Ql == 8368 then Qi = { [UK[1590.]] = UK[1892], [UK[536]] = UK[957.] .. Dk[UK[821]] .. UK[957.], [UK[1511]] = true }; Qj = Db ~= UK[2056]; Ql = if Qj then 4 else 2 else Ql = 8371; continue end elseif Ql < 8370. then
+Qk = Qj; Ql = if Qk then 8 else 1 else Qk = UK[564.]; Ql = 8 end else break end end end end); Qp = 2 else Qp = 1349; continue end else break end elseif Qp < 14577. then if Qp < 13980. then if Qp == 13979 then DJ:Notify(UK[1268]); return else Qp = 13975; continue
+end elseif Qp == 13980. then Qp = if (Qq * UK[1929.] + Qr * UK[1643] + Qq * Qr) % UK[1264] == UK[232] then 1 else 3. else break end else break end end end end }); C7:AddButton({ [WY[592]] = WY[1144], [WY[1441]] = function() local QP = nil; QP = 3.; while true do
+QP = 769 - QP; do if QP < 1734. then if QP < 767 then if QP < 572 then break elseif QP < 766 then break elseif QP == 766 then QP = if Di == UK[2056] then 0. else 1 else QP = 1734.; continue end elseif QP < 769 then if QP < 768. then break elseif QP == 768. then
+local ZL = UK[1957][UK[394]]; UK[1383.](function() local Qt, Qu, Qv, Qw, Qx, Qy, QA, QB, QC, QE, QG, QH, QI, QJ, QK, QL, QN = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local Qz = nil; Qz = 15.; while true do Qz = 3946 - Qz;
+do if Qz < 3938 then if Qz < 3933. then if Qz < 3932 then if Qz < 2368 then break elseif Qz < 3931 then break else Qu = {}; Qv = { { [UK[821]] = UK[363.], [UK[697]] = UK[695], [UK[404]] = UK[111.] }, { [UK[821]] = UK[358], [UK[697]] = UK[1403], [UK[404]] = UK[476] },
+{ [UK[821]] = UK[1836.], [UK[697]] = UK[1710.], [UK[404]] = UK[111.] } }; QB = false; for qe, qf in UK[1295](Qv) do QC = qe; QE = qf; local QD = QC; local QF = QE; local QA = nil; QA = UK[2008]; while true do if QA < 1 then break elseif QA < 2 then QB = true;
+QA = UK[650] else table.insert(Qu, wh_rarityEmoji(QF[UK[697]]) .. UK[1491.] .. QF[UK[821]] .. UK[758] .. QF[UK[697]] .. UK[1976]); QA = UK[650] end end; if QB then break end end; Qw = false; Qx = Db ~= UK[2056]; Qy = C5; QI = if Qy then UK[1292] else UK[650];
+QG = UK[1633] * QI + UK[1498] * (UK[1292] - QI); Qz = 12. end elseif Qz == 3932 then Qw = UK[2056]; Qz = 5 else Qz = 9988; continue end elseif Qz < 3936. then if Qz < 3934 then QK = false; for ql, qm in UK[1295](Qv) do QL = ql; QN = qm; local QM = QL; local QO = QN;
+local QJ = nil; QJ = UK[1292]; while true do if QJ < 2 then if QJ < 1 then Qw = true; QJ = UK[327.] else QJ = if wh_shouldPingForItem(QO[UK[697]], QO[UK[404]]) then UK[650] else UK[2008] end elseif QJ < 3. then QJ = UK[1165] elseif QJ < 4 then break else QK = true;
+QJ = UK[1165] end end; if QK then break end end; Qz = 9. elseif Qz < 3935 then if Qz == 3934 then QH = UK[1731.] * QI + UK[1613] * (UK[1292] - QI); Qz = 1 else Qz = 3940; continue end elseif Qz == 3935 then Qz = if Qy then 13 else 9. else Qz = 6093.; continue
+end elseif Qz < 3937 then Qu = Qw; Qz = if Qu then 2 else 8 else Qv = Qw; Qz = if Qv then 4 else 7 end elseif Qz < 4363 then if Qz < 3946 then if Qz < 3942. then if Qz < 3940 then if Qz < 3939. then Qu = UK[1050.] .. tostring(Qv); Qz = 2 elseif Qz == 3939. then
+Qw = Qv; Qz = if Qw then 5 else 14 else Qz = 6093.; continue end elseif Qz < 3941 then if Qz == 3940 then Qy = Qx; Qz = 11 else Qz = 3931; continue end else Qv = Qw; Qt = { [UK[1527.]] = Qv, [UK[1510]] = { { [UK[816.]] = UK[805], [UK[308]] = UK[1857.], [UK[73]] = wh_rarityColor(UK[695]),
+[UK[2040.]] = { { [UK[1590.]] = UK[1892], [UK[536]] = UK[957.] .. Dk[UK[821]] .. UK[957.], [UK[1511]] = true }, { [UK[1590.]] = UK[1340], [UK[536]] = UK[544], [UK[1511]] = true }, { [UK[1590.]] = UK[99.], [UK[536]] = UK[99.], [UK[1511]] = false }, { [UK[1590.]] = UK[838],
+[UK[536]] = UK[643], [UK[1511]] = true }, { [UK[1590.]] = UK[1877], [UK[536]] = UK[320], [UK[1511]] = true }, { [UK[1590.]] = UK[1879], [UK[536]] = UK[664], [UK[1511]] = true }, { [UK[1590.]] = UK[1644.], [UK[536]] = UK[1186], [UK[1511]] = true }, { [UK[1590.]] = UK[587],
+[UK[536]] = UK[612.], [UK[1511]] = true }, { [UK[1590.]] = UK[99.], [UK[536]] = UK[99.], [UK[1511]] = false }, { [UK[1590.]] = UK[579.], [UK[536]] = table.concat(Qu, UK[450.]), [UK[1511]] = false } }, [UK[689]] = { [UK[221]] = UK[904] .. os[UK[1782.]](UK[1450]) },
+[UK[392]] = os[UK[1782.]](UK[1770.]) } } }; Qu, Qv = UK[879.](function() wh_requestFunc({ [UK[938]] = Di, [UK[585.]] = UK[1101.], [UK[1378]] = { [UK[880]] = UK[343] }, [UK[150.]] = DC:JSONEncode(Qt) }) end); Qw = Qu; Qz = if Qw then 3. else 10 end elseif Qz < 3944 then
+if Qz < 3943 then Qv = UK[477.] .. Db .. UK[1730]; Qz = 7 elseif Qz == 3943 then Qw = UK[807.]; Qz = 10 else Qz = 12695; continue end elseif Qz < 3945. then DJ:Notify(Qu); Qz = 0. else Qz = if (QG * UK[588.] + QH * UK[1351] + QG * QH) % UK[1264] == UK[2050] then 6. else 11
+end else break end else break end end end end); QP = 2 else QP = 470; continue end elseif QP < 1450 then if QP == 769 then DJ:Notify(UK[1268]); return else break end else break end else break end end end end }); C7:AddDivider(); U2[14] = C7:AddLabel(WY[1037], true);
+Ev = 28 end elseif Ev < 3943 then Ev = 818 else Ev = if true then 874 else 983 end elseif Ev < 3946 then if Ev < 3945. then if Ev == 3944 then U2[20] = (U2[20] + UK[1329.]) % UK[1984]; Ev = 545 else Ev = 2774; continue end else local WY = UK; U2[10] = (vector.create((U2[20] * WY[1292] + WY[1292]) % WY[1478] + WY[1292], (U2[20] * WY[1620.] + WY[1579]) % WY[1149.] + WY[1292], (U2[20] * WY[1620.] + WY[1478]) % WY[1628] + WY[1292]));
+U2[18.] = (vector.create((U2[20] * WY[633.] + WY[749]) % WY[1478] + WY[1292], (U2[20] * WY[633.] + WY[1579]) % WY[1149.] + WY[1292], (U2[20] * WY[1288] + WY[1292]) % WY[1628] + WY[1292])); U2[1] = (vector.create((U2[20] * WY[597.] + WY[749]) % WY[1478] + WY[1292], (U2[20] * WY[1292] + WY[1579]) % WY[1149.] + WY[1292], (U2[20] * WY[1292] + WY[1478]) % WY[1628] + WY[1292]));
+U2[12.] = (vector.create((U2[20] * WY[1165] + WY[597.]) % WY[633.] + WY[1292], (U2[20] * WY[1292] + WY[1579]) % WY[597.] + WY[1292], (U2[20] * WY[1292] + WY[327.]) % WY[1620.] + WY[1292])); Ev = if vector.dot(vector.cross(U2[10], (vector.cross(U2[18.], U2[1]))), U2[12.]) == vector.dot(U2[18.] * vector.dot(U2[10], U2[1]) - U2[1] * vector.dot(U2[10], U2[18.]), U2[12.]) then 870. else 808
+end elseif Ev < 3947 then if Ev == 3946 then Ev = 914 else Ev = 3747.; continue end elseif Ev < 3948. then Ev = 441. else Ev = 948. end elseif Ev < 3992 then if Ev < 3969. then if Ev < 3959 then if Ev < 3954. then if Ev < 3952 then if Ev < 3951. then if Ev < 3950 then
+U2[12.] = nil; local WY = UK; U2[12.] = WY[633.] - WY[327.]; U2[12.] = WY[650] + WY[1292]; Ev = 1135 elseif Ev == 3950 then Ev = if U2[10] <= UK[327.] then 649 else 49 else Ev = 3252.; continue end elseif Ev == 3951. then local WY = UK; U2[1]:AddDropdown(WY[736], { [WY[1697]] = U2[18.],
+[WY[181]] = WY[512], [WY[1977.]] = WY[143], [WY[592]] = WY[1788.] }); U2[1]:AddToggle(WY[332], { [WY[592]] = WY[580], [WY[181]] = false }); U2[1]:AddDivider(); U2[1]:AddButton({ [WY[592]] = WY[572], [WY[1441]] = WY[70] }); Ev = 148 else Ev = 3547; continue
+end elseif Ev < 3953 then local WY = UK; U2[26]:AddDropdown(WY[678.], { [WY[1697]] = U2[1], [WY[181]] = WY[512], [WY[592]] = WY[1434.], [WY[1977.]] = WY[1617.] }); U2[26]:AddToggle(WY[820], { [WY[592]] = WY[1557.], [WY[181]] = false }); U2[26]:AddDivider();
+U2[26]:AddButton({ [WY[592]] = WY[135.], [WY[1441]] = WY[182] }); Ev = 1256 else Ev = 1225 end elseif Ev < 3957. then if Ev < 3956 then if Ev < 3955 then local WY = UK; U2[20]:AddDropdown(WY[526], { [WY[1697]] = U2[1], [WY[181]] = WY[512], [WY[592]] = WY[326],
+[WY[1977.]] = WY[1134.] }); U2[20]:AddToggle(WY[932], { [WY[592]] = WY[319], [WY[181]] = false }); U2[20]:AddDivider(); U2[20]:AddButton({ [WY[592]] = WY[1910], [WY[1441]] = WY[679] }); Ev = 878 elseif Ev == 3955 then Ev = if true then 405. else 225. else Ev = 3514;
+continue end elseif Ev == 3956 then local WY = UK; U2[18.] = { WY[1453], WY[1331], WY[341], WY[1925], WY[1094], WY[1547], WY[1746.], WY[75.], WY[1266.], WY[1986.], WY[1211], WY[331] }; local ZM = U2[10]; U2[1] = U2[18.][ZM % WY[1413.] + WY[1292]]; Ev = if U2[1]:len() >= U2[1]:reverse():rep(ZM % WY[1165] + WY[2008]):len() then 128 else 138.
+else Ev = 3730; continue end elseif Ev < 3958 then if Ev == 3957. then U2[18.]:AddButton({ [UK[592]] = UK[1041.], [UK[1441]] = UK[1759] }); Ev = 492. else Ev = 2874.; continue end elseif Ev == 3958 then U2[26] = U2[14][UK[832]]:AddLeftGroupbox(UK[1274], UK[641]);
+Ev = 96. else Ev = 3201.; continue end elseif Ev < 3965 then if Ev < 3962 then if Ev < 3961 then if Ev < 3960. then if Ev == 3959 then Ev = 1207 else Ev = 3417.; continue end elseif Ev == 3960. then Ev = 1084 else Ev = 3671; continue end else U2[14] = U2[26][UK[1953.]]:AddLeftGroupbox(UK[1820], UK[293]);
+Ev = 536 end elseif Ev < 3963. then if Ev == 3962 then Ev = 692 else Ev = 3126.; continue end elseif Ev < 3964 then if Ev == 3963. then Ev = 485 else Ev = 3716; continue end else Ev = if U2[18.] <= UK[1579] then 788 else 451 end elseif Ev < 3967 then if Ev < 3966. then
+CD = UK[1185.]:GetService(UK[1015]); Ev = 814 elseif Ev == 3966. then Ev = 420. else Ev = 3816.; continue end elseif Ev < 3968 then if Ev == 3967 then Ec = D8[UK[1236.]]:Connect(UK[2071]); Ev = 325 else Ev = 2937.; continue end else U2[18.] = nil; local WY = UK;
+U2[18.] = WY[1579] - WY[327.]; U2[18.] = WY[650] + WY[2008]; U2[18.] = WY[633.] - WY[327.]; U2[18.] = WY[650] + WY[1292]; Ev = 80 end elseif Ev < 3980 then if Ev < 3974 then if Ev < 3972. then if Ev < 3971 then if Ev < 3970 then CI = UK[650]; CM = nil; CK = false;
+Ev = 240. else CP = U2[26]:AddLabel(b(UK[310]) .. c(UK[204.], UK[1289]), true); Ev = 16 end else Dk:LoadAutoloadConfig(); local ZN = UK[28][UK[2023]]; local WY = UK; DJ:SetGlow(true, { [WY[842]] = WY[1776.], [WY[1300]] = WY[624.], [WY[1513]] = WY[1855](WY[271], WY[433], WY[675.]) });
+ZN = WY[1957][WY[551]]; WY[1809.](WY[1858]); ZN = WY[1957][WY[394]]; WY[1383.](function() local Uk, Um, Un, Uo, Uq, Us, Ut, Uu, Uw, Uy, Uz, UA, UB, UD, UF, UI = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local Ul = nil;
+Ul = 1; while true do Ul = 5584 - Ul; do if Ul < 11377 then if Ul < 5584 then if Ul < 3387. then break elseif Ul < 5583. then break elseif Ul == 5583. then local ZO = UK[1957][UK[438.]]; UK[1433](UK[1576]); Uk = { UK[478], UK[1952], UK[294.], UK[274], UK[557],
+UK[1019], UK[152], UK[128], UK[1220], UK[820], UK[332], UK[932], UK[1671.], UK[446], UK[872], UK[1724], UK[1822], UK[656], UK[17], UK[662], UK[972.], UK[352], UK[1285], UK[1992.], UK[1751], UK[1674.], UK[1059.], UK[696.], UK[870.], UK[545], UK[129.], UK[1784],
+UK[1846] }; Un = false; for vk, vl in UK[1295](Uk) do local Uh = nil; Uo = vk; Uq = vl; local Up = Uo; local Ur = Uq; local Um = nil; Um = UK[1165]; while true do if Um < 3. then if Um < 1 then Um = UK[2008] elseif Um < 2 then UK[879.](function() local Ub = nil;
+Ub = 3.; while true do Ub = 12166 - Ub; do if Ub < 9763 then break elseif Ub < 12166 then if Ub < 12164 then if Ub < 12163 then break else Ub = if type(Uh[UK[1977.]]) == UK[1217] then 0. else 2 end elseif Ub < 12165. then Ub = 1 else break end elseif Ub < 15477. then
+if Ub < 12560 then if Ub == 12166 then Uh[UK[1977.]](Uh[UK[248]]); Ub = 2 else break end else break end else break end end end end); Um = UK[650] else break end elseif Um < 5 then if Um < 4 then Uh = Dl[Ur]; Uk = Uh; Um = if Uk then UK[1579] else UK[633.] else
+Un = true; Um = UK[2008] end elseif Um < 6. then Um = if Uk then UK[1292] else UK[650] else Uk = Uh[UK[248]] == true; Um = UK[633.] end end; if Un then break end end; Uk = { UK[511], UK[1739], UK[335], UK[678.], UK[736], UK[526], UK[843.], UK[1623.], UK[2028.] };
+Ut = false; for vr, vs in UK[1295](Uk) do local Uj = nil; Uu = vr; Uw = vs; local Uv = Uu; local Ux = Uw; local Us = nil; Us = UK[633.]; while true do if Us < 4 then if Us < 2 then if Us < 1 then UK[879.](function() local Ud, Ue, Uf = nil, nil, nil; local Uc = nil;
+Uc = 2; while true do Uc = 6699. - Uc; do if Uc < 6694 then break elseif Uc < 6698 then if Uc < 6696. then if Uc < 6695 then break else Uc = if (Ud * UK[1422.] + Ue * UK[84.] + Ud * Ue) % UK[1264] == UK[383] then 1 else 0. end elseif Uc < 6697 then if Uc == 6696. then
+Ue = UK[481] * Uf + UK[836] * (UK[1292] - Uf); Uc = 4 else Uc = 1763; continue end elseif Uc == 6697 then Uf = if type(Uj[UK[1977.]]) == UK[1217] then UK[1292] else UK[650]; Ud = UK[566] * Uf + UK[954.] * (UK[1292] - Uf); Uc = 3. else Uc = 6696.; continue end
+elseif Uc < 7227. then if Uc < 6699. then if Uc == 6698 then Uj[UK[1977.]](Uj[UK[248]]); Uc = 0. else Uc = 2880.; continue end elseif Uc == 6699. then Uc = 5 else break end else break end end end end); Us = UK[2008] else Uz = UK[2036] * UA + UK[2041] * (UK[1292] - UA);
+Us = UK[1165] end elseif Us < 3. then Us = UK[749] else Us = if (Uy * UK[377] + Uz * UK[1829] + Uy * Uz) % UK[1264] == UK[344] then UK[597.] else UK[327.] end elseif Us < 6. then if Us < 5 then Us = if Uk then UK[650] else UK[2008] else Uj = Dd[Ux]; Uk = Uj;
+UA = if Uk then UK[1292] else UK[650]; Uy = UK[1360] * UA + UK[790] * (UK[1292] - UA); Us = UK[1292] end elseif Us < 7 then Ut = true; Us = UK[749] elseif Us < 8 then Uk = Uj[UK[248]]; Us = UK[327.] else break end end; if Ut then break end end; Uk = { [UK[789.]] = function(vx)
+DR = vx end, [UK[1200.]] = function(vA) Dz = vA end, [UK[227]] = function(vD) DF = vD end, [UK[1175]] = function(vG) DL = vG end, [UK[220]] = function(vJ) Dn = vJ end, [UK[857]] = function(vM) DB = vM end, [UK[315.]] = function(vP) Dw = vP end, [UK[39.]] = function(vS)
+DA = vS end }; Ut = false; for vW, vX in UK[1189](Uk) do local Ui = nil; UB = vW; UD = vX; local UC = UB; local UE = UD; local Us = nil; Us = UK[650]; while true do if Us < 3. then if Us < 1 then Ui = Dd[UC]; Uk = Ui; Us = if Uk then UK[1165] else UK[327.]
+elseif Us < 2 then UK[879.](function() UE(Ui[UK[248]]) end); Us = UK[1579] else Ut = true; Us = UK[633.] end elseif Us < 5 then if Us < 4 then Uk = Ui[UK[248]]; Us = UK[327.] else Us = if Uk then UK[1292] else UK[1579] end elseif Us < 6. then break else Us = UK[633.]
+end end; if Ut then break end end; Uk = { [UK[11]] = function(v1) Di = v1 end, [UK[50]] = function(v4) Db = v4 end }; Ut = false; for v8, v9 in UK[1189](Uk) do local Ug = nil; UF = v8; UI = v9; local UH = UF; local UJ = UI; local Us = nil; Us = UK[1579]; while true do
+if Us < 3. then if Us < 1 then break elseif Us < 2 then Us = UK[650] else Ut = true; Us = UK[650] end elseif Us < 5 then if Us < 4 then Uk = Ug[UK[248]]; Us = UK[633.] else UK[879.](function() UJ(Ug[UK[248]]) end); Us = UK[1292] end elseif Us < 6. then Us = if Uk then UK[327.] else UK[1292]
+else Ug = Dd[UH]; Uk = Ug; Us = if Uk then UK[1165] else UK[633.] end end; if Ut then break end end; DJ:Notify(UK[2069], UK[1165]); Ul = 0. else Ul = 5584; continue end else break end else break end end end end); U2[16]:Notify(WY[300.] .. U2[23][WY[821]], WY[633.]);
+Ev = 95 end elseif Ev < 3973 then Ev = if U2[18.] <= UK[327.] then 993. else 689 elseif Ev == 3973 then Ev = 107 else Ev = 3552.; continue end elseif Ev < 3977 then if Ev < 3976 then if Ev < 3975. then if Ev == 3974 then Ev = if (U2[10] * UK[2008] + UK[1292]) * UK[1149.] % UK[1165] == ((U2[10] * UK[2008] + UK[1292]) * UK[1149.] + UK[650]) % UK[1165] then 235 else 79
+else Ev = 3859; continue end else Ev = 966. end else local WY = UK; U2[26] = (vector.create((U2[20] * WY[327.] + WY[1620.]) % WY[1478] + WY[1292], (U2[20] * WY[2008] + WY[2008]) % WY[1149.] + WY[1292], (U2[20] * WY[1165] + WY[1620.]) % WY[1628] + WY[1292]));
+U2[10] = (vector.create((U2[20] * WY[1292] + WY[749]) % WY[1478] + WY[1292], (U2[20] * WY[327.] + WY[633.]) % WY[1149.] + WY[1292], (U2[20] * WY[1165] + WY[597.]) % WY[1628] + WY[1292])); U2[18.] = (vector.create((U2[20] * WY[2008] + WY[1165]) % WY[1478] + WY[1292], (U2[20] * WY[1620.] + WY[1292]) % WY[1149.] + WY[1292], (U2[20] * WY[1165] + WY[1060]) % WY[1628] + WY[1292]));
+U2[1] = (vector.create((U2[20] * WY[2008] + WY[1292]) % WY[633.] + WY[1292], (U2[20] * WY[327.] + WY[327.]) % WY[597.] + WY[1292], (U2[20] * WY[2008] + WY[2008]) % WY[1620.] + WY[1292])); Ev = if vector.dot(vector.cross(U2[26], (vector.cross(U2[10], U2[18.]))), U2[1]) == vector.dot(U2[10] * vector.dot(U2[26], U2[18.]) - U2[18.] * vector.dot(U2[26], U2[10]), U2[1]) + WY[327.] then 223 else 1227.
+end elseif Ev < 3978. then U2[26], U2[20] = nil, nil; U2[20] = UK[1478]; Ev = 692 elseif Ev < 3979 then if Ev == 3978. then Ev = 976 else Ev = 2834; continue end else Ev = 1160 end elseif Ev < 3986 then if Ev < 3983 then if Ev < 3982 then if Ev < 3981. then
+Ev = if Dk[UK[1988]] then 426. else 255. elseif Ev == 3981. then U2[10] = nil; local WY = UK; U2[10] = WY[327.] - WY[1165]; U2[10] = WY[633.] - WY[327.]; U2[10] = WY[650] + WY[1292]; Ev = 320 else Ev = 3795.; continue end else Ev = if U2[1] <= UK[1292] then 488 else 296
+end elseif Ev < 3984. then if Ev == 3983 then function applyFPSBoost(rR) UK[879.](function() local U1 = table.clear; local RG, RH, RI, RK, RL, RM, RO, RQ, RR, RS, RT, RU, RV, RX = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil; local RJ = nil;
+RJ = 12.; while true do RJ = 3335 - RJ; do if RJ < 3329 then if RJ < 3324. then if RJ < 3322 then if RJ < 3320 then if RJ < 3129. then break elseif RJ < 3319 then break elseif RJ == 3319 then RJ = if not D1 then 7 else 14 else RJ = 15272; continue end elseif RJ < 3321. then
+if RJ == 3320 then D1 = true; U1(D7); local ZP = UK; settings()[ZP[1698.]][ZP[160]] = ZP[1209.][ZP[160]][ZP[286]]; ZP[1560.][ZP[1964]] = ZP[1209.][ZP[1964]][ZP[124]]; D7[ZP[952]] = RG[ZP[952]]; RG[ZP[952]] = false; RG[ZP[86]] = false; RG[ZP[1304]] = ZP[28][ZP[2023]](ZP[123.], ZP[123.], ZP[123.]);
+RJ = if RH then 11 else 9. else RJ = 3322; continue end else D1 = false; local ZP = UK; settings()[ZP[1698.]][ZP[160]] = ZP[1209.][ZP[160]][ZP[464]]; ZP[1560.][ZP[1964]] = ZP[1209.][ZP[1964]][ZP[444.]]; RS = if D7[ZP[952]] ~= nil then ZP[1292] else ZP[650];
+RQ = ZP[999.] * RS + ZP[1558] * (ZP[1292] - RS); RR = ZP[475] * RS + ZP[1572.] * (ZP[1292] - RS); RJ = if (RQ * ZP[1856] + RR * ZP[1307] + RQ * RR) % ZP[1264] == ZP[491] then 3. else 4 end elseif RJ < 3323 then RU = false; for r_, r0 in UK[1189](D7) do RV = r_;
+RX = r0; local RW = RV; local RY = RX; local RT = nil; local ZP = UK; RT = ZP[650]; while true do if RT < 1 then ZP[879.](function() local Rs, Ru, Rv, Rw = nil, nil, nil, nil; local Rt = nil; Rt = 1; while true do Rt = 5162 - Rt; do if Rt < 5145. then if Rt < 5133. then
+if Rt < 5127. then if Rt < 3203 then break elseif Rt < 3289 then break elseif Rt < 5126 then break else Rs = (RW:IsA(UK[261.])); Rw = if Rs then UK[1292] else UK[650]; Ru = UK[1245.] * Rw + UK[480.] * (UK[1292] - Rw); Rv = UK[1705] * Rw + UK[1081] * (UK[1292] - Rw);
+Rt = if (Ru * UK[979] + Rv * UK[752] + Ru * Rv) % UK[1264] == UK[456.] then 7 else 6. end elseif Rt < 5130. then if Rt < 5128 then Rw = if Rs then UK[1292] else UK[650]; Ru = UK[1328] * Rw + UK[1160] * (UK[1292] - Rw); Rv = UK[1391] * Rw + UK[960.] * (UK[1292] - Rw);
+Rt = if (Ru * UK[874] + Rv * UK[1740.] + Ru * Rv) % UK[1264] == UK[1031] then 21. else 28 elseif Rt < 5129 then break else Rs = RW:IsA(UK[224]); Rt = 35 end elseif Rt < 5131 then Rt = if Rs then 35 else 33. elseif Rt < 5132 then Rt = if RW:IsA(UK[878]) then 16 else 2
+else Rt = if Rs then 18. else 4 end elseif Rt < 5139. then if Rt < 5136. then if Rt < 5134 then Rt = if Rs then 19 else 8 elseif Rt < 5135 then if Rt == 5134 then Rs = RW:IsA(UK[1610]); Rt = 21. else Rt = 5133.; continue end elseif Rt == 5135 then Rw = if Rs then UK[1292] else UK[650];
+Ru = UK[405.] * Rw + UK[760] * (UK[1292] - Rw); Rv = UK[1508] * Rw + UK[184] * (UK[1292] - Rw); Rt = if (Ru * UK[1707.] + Rv * UK[1010] + Ru * Rv) % UK[1264] == UK[461] then 10 else 20 else Rt = 5156; continue end elseif Rt < 5137 then if Rt == 5136. then Rt = if Rs then 32 else 15.
+else Rt = 5150; continue end elseif Rt < 5138 then Rs = RW:IsA(UK[1602.]); Rt = 14 else Rt = 8 end elseif Rt < 5142. then if Rt < 5140 then Rt = 24. elseif Rt < 5141 then RW[UK[488]] = RY; Rt = 23 elseif Rt == 5141 then Rt = if Rs then 9. else 36. else Rt = 5142.;
+continue end elseif Rt < 5143 then Rs = RW:IsA(UK[263]); Rt = 10 elseif Rt < 5144 then Rs = (RW:IsA(UK[726.])); Rt = if Rs then 30. else 17 elseif Rt == 5144 then Rt = if Rs then 14 else 25 else Rt = 5150; continue end elseif Rt < 5156 then if Rt < 5150 then
+if Rt < 5147 then if Rt < 5146 then if Rt == 5145. then Rs = RW:IsA(UK[586]); Rt = 30. else Rt = 5157.; continue end elseif Rt == 5146 then RW[UK[1192]] = RY[UK[1005.]]; RW[UK[116]] = RY[UK[483.]]; Rt = 2 else Rt = 5156; continue end elseif Rt < 5148. then
+if Rt == 5147 then Rs = RW:IsA(UK[367]); Rt = 32 else Rt = 5148.; continue end elseif Rt < 5149 then if Rt == 5148. then Rw = if Rs then UK[1292] else UK[650]; Ru = UK[1887.] * Rw + UK[668] * (UK[1292] - Rw); Rv = UK[1901] * Rw + UK[1458.] * (UK[1292] - Rw);
+Rt = if (Ru * UK[1033] + Rv * UK[1646] + Ru * Rv) % UK[1264] == UK[1121] then 27. else 5 else Rt = 5139.; continue end else Rs = RW:IsA(UK[797]); Rt = 26 end elseif Rt < 5153 then if Rt < 5151. then RW[UK[773]] = RY; Rt = 11 elseif Rt < 5152 then if Rt == 5151. then
+Rt = 23 else Rt = 5141; continue end else Rt = if Rs then 26 else 13 end elseif Rt < 5154. then RW[UK[141.]] = true; Rt = 24. elseif Rt < 5155 then Rt = 34 else Rw = if Rs then UK[1292] else UK[650]; Ru = UK[1972] * Rw + UK[1333] * (UK[1292] - Rw); Rv = UK[5] * Rw + UK[1166] * (UK[1292] - Rw);
+Rt = if (Ru * UK[1399] + Rv * UK[881] + Ru * Rv) % UK[1264] == UK[1074.] then 22 else 0. end elseif Rt < 5162 then if Rt < 5159 then if Rt < 5157. then if Rt == 5156 then Rs = RW:IsA(UK[488]); Rt = 7 else Rt = 5137; continue end elseif Rt < 5158 then if Rt == 5157. then
+Rs = RW:IsA(UK[562]); Rt = 27. else Rt = 5147; continue end else Rs = RW:IsA(UK[388]); Rt = 18. end elseif Rt < 5160. then if Rt == 5159 then Rs = RW[UK[499]]; Rt = 29 else Rt = 5152; continue end elseif Rt < 5161 then Rt = 11 elseif Rt == 5161 then Rs = typeof(RW) == UK[673];
+Rt = if Rs then 3. else 29 else Rt = 5146; continue end elseif Rt < 13306 then if Rt < 5882 then if Rt == 5162 then Rw = if RW:IsA(UK[402.]) then UK[1292] else UK[650]; Ru = UK[216.] * Rw + UK[1687] * (UK[1292] - Rw); Rv = UK[1524.] * Rw + UK[504.] * (UK[1292] - Rw);
+Rt = if (Ru * UK[1347.] + Rv * UK[2064.] + Ru * Rv) % UK[1264] == UK[605] then 12. else 31 else Rt = 13306; continue end else break end else break end end end end); RT = ZP[2008] elseif RT < 2 then RU = true; RT = ZP[2008] else break end end; if RU then break
+end end; U1(D7); RJ = 8 elseif RJ == 3323 then local ZP = UK; RG = ZP[1185.]:GetService(ZP[882.]); RH = ZP[1560.]:FindFirstChildOfClass(ZP[1078]); RJ = if rR then 10 else 16 else RJ = 3329; continue end elseif RJ < 3328 then if RJ < 3327. then if RJ < 3325 then
+local ZP = UK; D7[ZP[1078]] = { [ZP[1208]] = RH[ZP[1208]], [ZP[1693]] = RH[ZP[1693]], [ZP[58]] = RH[ZP[58]], [ZP[782]] = RH[ZP[782]], [ZP[1343]] = RH[ZP[1343]] }; RH[ZP[1208]] = false; RH[ZP[1693]] = ZP[650]; RH[ZP[58]] = ZP[650]; RH[ZP[782]] = ZP[650]; RH[ZP[1343]] = ZP[650];
+RJ = 9. elseif RJ < 3326 then if RJ == 3325 then RJ = if D1 then 2 else 15. else RJ = 15109; continue end elseif RJ == 3326 then RL = false; local ZP = UK; for r9, sc in ZP[1295](ZP[1560.]:GetDescendants()) do RM = r9; RO = sc; local RN = RM; local RP = RO;
+local RK = nil; RK = ZP[1827.]; while true do if RK < 23 then if RK < 11 then if RK < 5 then if RK < 2 then if RK < 1 then RL = true; RK = ZP[1035.] else RI = RP:IsA(ZP[224]); RK = ZP[1765] end elseif RK < 3. then RK = if RI then ZP[350] else ZP[1405] elseif RK < 4 then
+RI = RP:IsA(ZP[367]); RK = ZP[1465] else D7[RP] = { [ZP[1005.]] = false, [ZP[483.]] = RP[ZP[116]] }; RK = ZP[1143.] end elseif RK < 8 then if RK < 6. then RK = ZP[1035.] elseif RK < 7 then RK = if RI then ZP[2008] else ZP[597.] else RI = RP:IsA(ZP[1602.]);
+RK = ZP[2008] end elseif RK < 9. then D7[RP] = true; RP[ZP[141.]] = false; RK = ZP[1620.] elseif RK < 10 then RK = ZP[633.] else RK = if RI then ZP[1465] else ZP[1165] end elseif RK < 17 then if RK < 14 then if RK < 12. then RK = ZP[1664] elseif RK < 13 then
+RK = ZP[1329.] else RK = ZP[1478] end elseif RK < 15. then RP[ZP[116]] = ZP[1209.][ZP[116]][ZP[720.]]; RK = ZP[1001] elseif RK < 16 then RI = RP:IsA(ZP[586]); RK = ZP[14] else RK = if RP[ZP[488]] ~= ZP[2056] then ZP[1456] else ZP[1149.] end elseif RK < 20 then
+if RK < 18. then RI = RP:IsA(ZP[263]); RK = ZP[1355] elseif RK < 19 then RK = if RP[ZP[141.]] then ZP[553] else ZP[1930] else RK = if RP:IsA(ZP[878]) then ZP[1221.] else ZP[1001] end elseif RK < 21. then RI = RP:IsA(ZP[488]); RK = ZP[1222] elseif RK < 22 then
+RI = RP:IsA(ZP[797]); RK = ZP[1756] else RK = if RI then ZP[608] else ZP[850] end elseif RK < 34 then if RK < 28 then if RK < 25 then if RK < 24. then RK = if RP:IsA(ZP[402.]) then ZP[624.] else ZP[836] else RI = RP:IsA(ZP[388]); RK = ZP[1579] end elseif RK < 26 then
+RK = if RI then ZP[1765] else ZP[1292] elseif RK < 27. then RI = (RP:IsA(ZP[562])); RK = if RI then ZP[1355] else ZP[1628] else RK = ZP[1329.] end elseif RK < 31 then if RK < 29 then RK = if RI then ZP[1756] else ZP[976] elseif RK < 30. then RK = if RI then ZP[1609] else ZP[1629.]
+else RK = if RP[ZP[773]] ~= ZP[2056] then ZP[978.] else ZP[1413.] end elseif RK < 32 then D7[RP] = true; RP[ZP[141.]] = false; RK = ZP[1930] elseif RK < 33. then D7[RP] = { [ZP[1005.]] = true, [ZP[483.]] = RP[ZP[116]] }; RP[ZP[1192]] = false; RK = ZP[1143.]
+else RK = if RI then ZP[1060] else ZP[1337] end elseif RK < 40 then if RK < 37 then if RK < 35 then RK = ZP[633.] elseif RK < 36. then RK = if RP[ZP[141.]] then ZP[749] else ZP[1620.] else RK = if RP[ZP[1192]] then ZP[591.] else ZP[327.] end elseif RK < 38 then
+break elseif RK < 39. then RK = ZP[1664] else RK = ZP[1478] end elseif RK < 43 then if RK < 41 then D7[RP] = RP[ZP[488]]; RP[ZP[488]] = ZP[2056]; RK = ZP[1149.] elseif RK < 42. then RK = if RI then ZP[1579] else ZP[206] else RI = (RP:IsA(ZP[726.])); RK = if RI then ZP[14] else ZP[1288]
+end elseif RK < 44 then RI = RP:IsA(ZP[1610]); RK = ZP[1609] elseif RK < 45. then RI = (RP:IsA(ZP[261.])); RK = if RI then ZP[1222] else ZP[466] else D7[RP] = RP[ZP[773]]; RP[ZP[773]] = ZP[2056]; RK = ZP[1413.] end end; if RL then break end end; local ZQ = ZP[1957][ZP[394]];
+ZP[1383.](function() local Rx, Ry, RA, RB, RC, RE = nil, nil, nil, nil, nil, nil; local Rz = nil; Rz = 8; while true do Rz = 15859 - Rz; do if Rz < 15856 then if Rz < 15854 then if Rz < 15853 then if Rz < 8340. then break elseif Rz < 15767 then break elseif Rz < 15851 then
+if Rz < 15850 then break elseif Rz == 15850 then Rx = not DJ[UK[1902.]]; Rz = 2 else Rz = 15859; continue end elseif Rz < 15852. then Rz = 4 elseif Rz == 15852. then Rz = 0. else Rz = 5722; continue end else break end elseif Rz < 15855. then if Rz == 15854 then
+RB = false; for sl, sm in UK[1295](UK[1560.]:GetChildren()) do RC = sl; RE = sm; local RD = RC; local RF = RE; local RA = nil; RA = UK[1756]; while true do if RA < 5 then if RA < 2 then if RA < 1 then Ry = RF[UK[821]]:lower():find(UK[2033]); RA = UK[633.] else
+Ry = (RF[UK[821]]:lower():find(UK[683])); RA = if Ry then UK[633.] else UK[650] end elseif RA < 3. then RF:ClearAllChildren(); RA = UK[1579] elseif RA < 4 then break else Rx = Ry; RA = UK[1620.] end elseif RA < 8 then if RA < 6. then RA = if Ry then UK[327.] else UK[597.]
+elseif RA < 7 then RA = UK[1165] else Ry = RF[UK[821]]:lower():find(UK[490]); RA = UK[327.] end elseif RA < 9. then RB = true; RA = UK[1165] elseif RA < 10 then RA = if Rx then UK[2008] else UK[1579] else Rx = (RF:IsA(UK[62])); RA = if Rx then UK[1292] else UK[1620.]
+end end; if RB then break end end; local ZR = UK[1957][UK[438.]]; UK[1433](UK[1576]); Rz = 3. else Rz = 7126; continue end elseif Rz == 15855. then Rz = if true then 1 else 0. else Rz = 8340.; continue end elseif Rz < 15858. then if Rz < 15857 then if Rz == 15856 then
+Rz = 4 else Rz = 5722; continue end elseif Rz == 15857 then Rz = if Rx then 5 else 7 else Rz = 15767; continue end elseif Rz < 15859 then if Rz == 15858. then Rx = D1; Rz = if Rx then 9. else 2 else Rz = 15855.; continue end elseif Rz == 15859 then Rz = 6.
+else Rz = 15854; continue end end end end); RJ = 8 else RJ = 9749; continue end else RJ = 5 end else return end elseif RJ < 3333. then if RJ < 3331 then if RJ < 3330. then RG = D7[UK[1078]]; RJ = 1 else break end elseif RJ < 3332 then if RJ == 3331 then RG = RH;
+RJ = if RG then 6. else 1 else RJ = 3327.; continue end elseif RJ == 3332 then RG[UK[952]] = D7[UK[952]]; RJ = 4 else RJ = 10190; continue end elseif RJ < 4714 then if RJ < 3335 then if RJ < 3334 then if RJ == 3333. then return else RJ = 3320; continue end
+elseif RJ == 3334 then RJ = if RG then 0. else 13 else RJ = 3335; continue end elseif RJ == 3335 then local ZP = UK; RG = D7[ZP[1078]]; RH[ZP[1208]] = RG[ZP[1208]]; RH[ZP[1693]] = RG[ZP[1693]]; RH[ZP[58]] = RG[ZP[58]]; RH[ZP[782]] = RG[ZP[782]]; RH[ZP[1343]] = RG[ZP[1343]];
+RJ = 13 else break end else break end end end end) end; local WY = UK; U2[26]:AddToggle(WY[1846], { [WY[592]] = WY[1831], [WY[181]] = false, [WY[1977.]] = applyFPSBoost }); U2[26]:AddToggle(WY[1784], { [WY[592]] = WY[487], [WY[181]] = false, [WY[1977.]] = WY[729.] });
+U2[26]:AddToggle(WY[1220], { [WY[592]] = WY[539], [WY[181]] = true }); U2[4] = U2[14][WY[832]]:AddRightGroupbox(WY[706], WY[44]); Ev = 332 else Ev = 3705.; continue end elseif Ev < 3985 then Ev = 1156 elseif Ev == 3985 then U2[10] = (U2[20] * UK[1292] + UK[1292]) % UK[2008] + UK[1292];
+Ev = 126. else Ev = 3238; continue end elseif Ev < 3989 then if Ev < 3987. then CY = false; CU = {}; Ev = 869 elseif Ev < 3988 then if Ev == 3987. then Ev = 46 else Ev = 3066.; continue end elseif Ev == 3988 then U2[20] = (U2[20] + UK[633.]) % UK[749]; Ev = 1112
+else Ev = 3310; continue end elseif Ev < 3990. then Ev = 56 elseif Ev < 3991 then if Ev == 3990. then Ev = 1051 else Ev = 2782; continue end elseif Ev == 3991 then U2[10] = nil; local WY = UK; U2[10] = WY[633.] - WY[327.]; U2[10] = WY[650] + WY[1292]; Ev = 30.
+else Ev = 3721; continue end elseif Ev < 4013 then if Ev < 4003 then if Ev < 3998 then if Ev < 3996. then if Ev < 3995 then if Ev < 3994 then if Ev < 3993. then Ev = 140 elseif Ev == 3993. then U2[20] = (U2[20] + UK[1329.]) % UK[1984]; Ev = 1262 else Ev = 3019;
+continue end elseif Ev == 3994 then Ev = if U2[20] * UK[911] + UK[633.] + UK[2008] <= U2[20] * UK[911] + UK[633.] + UK[2008] + UK[633.] then 890 else 1224. else Ev = 3154; continue end elseif Ev == 3995 then U2[18.] = nil; local WY = UK; U2[18.] = WY[327.] - WY[1165];
+U2[18.] = WY[2008] - WY[1292]; U2[18.] = WY[650] + WY[1292]; U2[18.] = WY[1165] - WY[2008]; Ev = 588. else Ev = 3246.; continue end elseif Ev < 3997 then Ev = 798. else U2[10] = nil; local WY = UK; U2[10] = WY[2008] - WY[1292]; U2[10] = WY[650] + WY[1292];
+U2[10] = WY[1165] - WY[2008]; U2[10] = WY[650] + WY[1292]; U2[10] = WY[633.] - WY[327.]; Ev = 1011. end elseif Ev < 4001 then if Ev < 4000 then if Ev < 3999. then if Ev == 3998 then Ev = 641 else Ev = 3532; continue end else Ev = if (U2[20] and U2[26] or (not U2[26] or U2[26]) or (not U2[20] or not U2[20]) and (U2[26] or not U2[26])) and ((U2[26] or not U2[26] or U2[20] and U2[20]) and (not U2[20] or not U2[26] or not U2[20] and not U2[20])) or not ((U2[20] and U2[26] or (not U2[26] or U2[26]) or (not U2[20] or not U2[20]) and (U2[26] or not U2[26])) and ((U2[26] or not U2[26] or U2[20] and U2[20]) and (not U2[20] or not U2[26] or not U2[20] and not U2[20]))) then 165. else 765.
+end else local WY = UK; U2[25] = if not U2[26] and not U2[20] or (not U2[20] or not U2[20]) or (not U2[20] or not U2[26] or (not U2[20] or not U2[20])) or not (not U2[26] and not U2[20] or (not U2[20] or not U2[20]) or (not U2[20] or not U2[26] or (not U2[20] or not U2[20]))) then WY[1292] else WY[650];
+U2[6.] = WY[1013] * U2[25] + WY[1359.] * (WY[1292] - U2[25]); U2[15.] = WY[1259] * U2[25] + WY[1727] * (WY[1292] - U2[25]); Ev = if (U2[6.] * WY[1719.] + U2[15.] * WY[1069] + U2[6.] * U2[15.]) % WY[1264] == WY[1052] then 333. else 831. end elseif Ev < 4002. then
+if Ev == 4001 then Ev = 376 else Ev = 2838.; continue end else U2[26] = (U2[26] + UK[633.]) % UK[1060]; Ev = 386 end elseif Ev < 4009 then if Ev < 4007 then if Ev < 4005. then if Ev < 4004 then if Ev == 4003 then Ev = 668 else Ev = 3322; continue end else Ev = 106
+end elseif Ev < 4006 then Ev = 514 elseif Ev == 4006 then Ev = 688 else Ev = 2772.; continue end elseif Ev < 4008. then Ev = 57. else U2[26] = nil; local WY = UK; U2[26] = WY[1149.] - WY[1579]; U2[26] = WY[327.] + WY[1165]; Ev = 167 end elseif Ev < 4011. then
+if Ev < 4010 then Ev = 331 elseif Ev == 4010 then Ev = 124 else Ev = 3550; continue end elseif Ev < 4012 then if Ev == 4011. then DA = UK[1481]; Ev = 510. else Ev = 3015.; continue end else Ev = 93. end elseif Ev < 4022 then if Ev < 4018 then if Ev < 4016 then
+if Ev < 4015 then if Ev < 4014. then Ev = if U2[16] <= UK[1060] then 338 else 257 else U2[20] = (U2[20] + UK[1337]) % UK[591.]; Ev = 1245. end else U2[20] = (U2[20] + UK[597.]) % UK[591.]; Ev = 185 end elseif Ev < 4017. then if Ev == 4016 then U2[18.] = nil;
+local WY = UK; U2[18.] = WY[327.] - WY[1165]; U2[18.] = WY[650] + WY[1292]; Ev = 1129 else Ev = 2948; continue end else Ev = 983 end elseif Ev < 4020. then if Ev < 4019 then U2[14] = U2[26][UK[1066]]:AddLeftGroupbox(UK[63.], UK[1554.]); Ev = 570. elseif Ev == 4019 then
+local WY = UK; U2[20]:AddLabel(b(createMultiGradientText(WY[1206.], U2[4][WY[547]])), true); U2[20]:AddDivider(); U2[20]:AddLabel(b(WY[1195]) .. c(Dk[WY[821]], WY[313]), true); U2[20]:AddLabel(b(WY[1979]) .. c(Dc, WY[1494.]), true); local ZS = WY[1185.][WY[1039]];
+U2[20]:AddLabel(b(WY[574]) .. c(tostring(WY[1616]), WY[322]), true); U2[20]:AddLabel(b(WY[1235]) .. c(string.sub(tostring(WY[1185.][WY[1688]]), WY[1292], WY[1143.]) .. WY[1388], WY[1239.]), true); U2[20]:AddDivider(); U2[20]:AddButton({ [WY[592]] = WY[1007],
+[WY[1441]] = WY[1420] }); U2[20]:AddButton({ [WY[592]] = WY[1492], [WY[1441]] = WY[1717] }); Ev = 561. else Ev = 3008; continue end elseif Ev < 4021 then Ev = 119 else U2[20] = (U2[20] + UK[633.]) % UK[1984]; Ev = 599 end elseif Ev < 4028 then if Ev < 4025 then
+if Ev < 4024 then if Ev < 4023. then Ev = 500 elseif Ev == 4023. then U2[10] = (U2[20] * UK[1292] + UK[1292]) % UK[2008] + UK[1292]; Ev = 1205 else Ev = 3666.; continue end elseif Ev == 4024 then U2[20] = (U2[20] + UK[702.]) % UK[1984]; Ev = 151 else Ev = 3729.;
+continue end elseif Ev < 4027 then if Ev < 4026. then U2[18.], U2[10] = nil, nil; U2[10] = UK[1478]; Ev = 1238 elseif Ev == 4026. then U2[10] = (U2[10] + UK[597.]) % UK[1060]; Ev = 493 else Ev = 3690.; continue end else U2[26] = nil; local WY = UK; U2[26] = WY[1165] - WY[2008];
+U2[26] = WY[597.] - WY[633.]; U2[26] = WY[1292] + WY[1292]; Ev = 180. end elseif Ev < 4030 then if Ev < 4029. then Ev = if true then 1180 else 43 elseif Ev == 4029. then local WY = UK; wh_requestFunc = WY[260]; wh_formatNumber = WY[1272.]; wh_rarityColor = WY[1535];
+wh_rarityEmoji = WY[440]; wh_shouldPingForItem = WY[1950.]; wh_snapshotStats = WY[266]; ad_isHelmetByName = WY[948.]; ad_isBodyArmorByName = WY[209]; function wh_sendWebhook() local UM = math.max; local F_, F0, F1, F2, F3, F4, F5, F6, F7, F8, F9, Ga, Gc, Gd, Ge, Gf, Gg, Gh, Gj, Gl, Gm, Gn, Gp = nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil;
+local Gb = nil; Gb = 37; while true do Gb = 8669 - Gb; do if Gb < 8635 then if Gb < 8621 then if Gb < 8615 then if Gb < 7436 then break elseif Gb < 8611 then if Gb < 7935. then break elseif Gb < 8610. then break else return end elseif Gb < 8613. then if Gb < 8612 then
+if Gb == 8611 then F8 = F0; F_ = { [UK[1527.]] = F8, [UK[1510]] = { { [UK[816.]] = UK[1247], [UK[308]] = UK[1857.], [UK[73]] = F9, [UK[2040.]] = { { [UK[1590.]] = UK[171.], [UK[536]] = UK[957.] .. Dk[UK[821]] .. UK[957.], [UK[1511]] = true }, { [UK[1590.]] = UK[780.],
+[UK[536]] = UK[957.] .. tostring(F1) .. UK[957.], [UK[1511]] = true }, { [UK[1590.]] = UK[99.], [UK[536]] = UK[99.], [UK[1511]] = false }, { [UK[1590.]] = UK[2022.], [UK[536]] = UK[646] .. wh_formatNumber(F3) .. UK[957.], [UK[1511]] = true }, { [UK[1590.]] = UK[1373],
+[UK[536]] = UK[646] .. wh_formatNumber(F4) .. UK[957.], [UK[1511]] = true }, { [UK[1590.]] = UK[1234], [UK[536]] = UK[646] .. wh_formatNumber(F5) .. UK[957.], [UK[1511]] = true }, { [UK[1590.]] = UK[1263.], [UK[536]] = UK[957.] .. tostring(F6) .. UK[957.],
+[UK[1511]] = true }, { [UK[1590.]] = UK[538], [UK[536]] = UK[957.] .. tostring(F7) .. UK[957.], [UK[1511]] = true }, { [UK[1590.]] = UK[99.], [UK[536]] = UK[99.], [UK[1511]] = false }, { [UK[1590.]] = UK[1025] .. tostring(#CU) .. UK[2032], [UK[536]] = F2, [UK[1511]] = false } },
+[UK[689]] = { [UK[221]] = UK[904] .. os[UK[1782.]](UK[1450]) }, [UK[392]] = os[UK[1782.]](UK[1770.]) } } }; UK[879.](function() wh_requestFunc({ [UK[938]] = Di, [UK[585.]] = UK[1101.], [UK[1378]] = { [UK[880]] = UK[343] }, [UK[150.]] = DC:JSONEncode(F_) })
+end); CR[UK[1521.]] = CR[UK[1521.]] + UK[1292]; CR[UK[459.]] = CR[UK[459.]] + F3; CR[UK[400]] = CR[UK[400]] + F4; CR[UK[944]] = CR[UK[944]] + F6; CU = {}; local ZT = UK[1957][UK[438.]]; UK[1433](UK[633.]); C1 = false; Gb = 49 else Gb = 8631.; continue end else
+Gb = if Ga then 21. else 44 end elseif Gb < 8614 then if Gb == 8613. then return else Gb = 8663; continue end elseif Gb == 8614 then Gb = if F1 then 4 else 48. else Gb = 13603; continue end elseif Gb < 8618 then if Gb < 8616. then F2 = UK[650]; Gb = 35 elseif Gb < 8617 then
+F2 = F0; F0 = #CU > UK[650]; Gb = if F0 then 23 else 46 else F2 = F1; Gb = if F2 then 35 else 54. end elseif Gb < 8619. then if Gb == 8618 then Gb = if F1 then 47 else 42. else Gb = 8612; continue end elseif Gb < 8620 then if Gb == 8619. then return else Gb = 8645;
+continue end else break end elseif Gb < 8628. then if Gb < 8624 then if Gb < 8622. then F2 = F1; Gb = if F2 then 9. else 41 elseif Gb < 8623 then if Gb == 8622. then F1 = UM(UK[650], F0[UK[411.]][UK[248]] - CL); Gb = 42. else Gb = 8639; continue end else F8 = F0;
+Gb = if F8 then 13 else 39. end elseif Gb < 8626 then if Gb < 8625. then if Gb == 8624 then F0 = F2; Gb = if F0 then 53 else 19 else Gb = 8640.; continue end elseif Gb == 8625. then F8 = F0; Gb = if F8 then 38 else 26 else Gb = 8650; continue end elseif Gb < 8627 then
+F1 = F0; F6 = F2; Gb = if F1 then 20 else 33. elseif Gb == 8627 then F2 = F1; Gb = if F2 then 11 else 40 else Gb = 8619.; continue end elseif Gb < 8631. then if Gb < 8629 then F2 = UK[650]; Gb = 9. elseif Gb < 8630 then if Gb == 8629 then F2 = UK[650]; Gb = 11
+else Gb = 8622.; continue end else F8 = UK[457]; Gb = 13 end elseif Gb < 8633 then if Gb < 8632 then F8 = UK[477.] .. Db .. UK[1867]; Gb = 26 elseif Gb == 8632 then Gb = if C1 then 56 else 16 else Gb = 8668; continue end elseif Gb < 8634. then if Gb == 8633 then
+F1 = F0[UK[1340]][UK[248]]; Gb = 10 else Gb = 8623; continue end elseif Gb == 8634. then F1 = F0; F7 = F2; Gb = if F1 then 18. else 27. else Gb = 8647; continue end elseif Gb < 8655. then if Gb < 8645 then if Gb < 8640. then if Gb < 8637. then if Gb < 8636 then
+if Gb == 8635 then Gb = if F1 then 31 else 22 else Gb = 7935.; continue end elseif Gb == 8636 then Gb = if F1 then 8 else 52 else Gb = 8633; continue end elseif Gb < 8638 then if Gb == 8637. then F0 = UK[650]; Gb = 0. else Gb = 8622.; continue end elseif Gb < 8639 then
+F1 = UM(UK[650], F0[UK[1876]][UK[248]] - CJ); Gb = 22 elseif Gb == 8639 then Gb = if Di == UK[2056] then 59 else 6. else Gb = 8622.; continue end elseif Gb < 8642 then if Gb < 8641 then if Gb == 8640. then F2 = table.concat(F0, UK[450.]); Gb = 45. else Gb = 8624;
+continue end elseif Gb == 8641 then F2 = F1; Gb = if F2 then 15. else 25 else Gb = 8846; continue end elseif Gb < 8643. then Gb = if F1 then 36. else 10 elseif Gb < 8644 then F0 = F8; Gb = if F0 then 58 else 24. else F2 = UK[650]; Gb = 15. end elseif Gb < 8650 then
+if Gb < 8647 then if Gb < 8646. then F0 = UK[2056]; Gb = 58 elseif Gb == 8646. then F0 = wh_rarityColor(CU[UK[1292]][UK[697]]); Gb = 46 else Gb = 4354; continue end elseif Gb < 8648 then F2 = F1; Gb = if F2 then 43 else 7 elseif Gb < 8649. then if Gb == 8648 then
+Gm = false; for cT, cU in UK[1295](CU) do Gn = cT; Gp = cU; local Go = Gn; local Gq = Gp; local Gl = nil; Gl = UK[327.]; while true do if Gl < 2 then if Gl < 1 then Gl = UK[2008] else Gm = true; Gl = UK[2008] end elseif Gl < 3. then break elseif Gl < 4 then
+F0 = true; Gl = UK[1292] else Gl = if wh_shouldPingForItem(Gq[UK[697]], Gq[UK[404]]) then UK[1165] else UK[650] end end; if Gm then break end end; Gb = 44 else Gb = 8622.; continue end elseif Gb == 8649. then F1 = F0:FindFirstChild(UK[162.]); Gb = 33. else
+Gb = 8612; continue end elseif Gb < 8652. then if Gb < 8651 then if Gb == 8650 then F0 = UK[1757]; Gb = 53 else Gb = 8648; continue end else F1 = F0:FindFirstChild(UK[1340]); Gb = 27. end elseif Gb < 8653 then if Gb == 8652. then F1 = F0:FindFirstChild(UK[1876]);
+Gb = 34 else Gb = 8646.; continue end elseif Gb < 8654 then if Gb == 8653 then Gb = if not CY then 50 else 30. else Gb = 8660; continue end elseif Gb == 8654 then F1 = F0; F4 = F2; Ge = if F1 then UK[1292] else UK[650]; Gc = UK[18.] * Ge + UK[60.] * (UK[1292] - Ge);
+Gd = UK[817] * Ge + UK[1315] * (UK[1292] - Ge); Gb = if (Gc * UK[934] + Gd * UK[1716.] + Gc * Gd) % UK[1264] == UK[2052.] then 12. else 51. else Gb = 8653; continue end elseif Gb < 8665 then if Gb < 8660 then if Gb < 8657 then if Gb < 8656 then F1 = F0:FindFirstChild(UK[1486]);
+Gb = 55 elseif Gb == 8656 then F0 = false; F9 = F8; F8 = Db ~= UK[2056]; Ga = C5; Gb = if Ga then 3. else 57. else Gb = 8636; continue end elseif Gb < 8658. then if Gb == 8657 then F1 = F0:FindFirstChild(UK[411.]); Gb = 51. else Gb = 8627; continue end elseif Gb < 8659 then
+if Gb == 8658. then F1 = F0; F5 = F2; Gb = if F1 then 17 else 34 else Gb = 8846; continue end else F0 = F1; Gb = if F0 then 0. else 32 end elseif Gb < 8662 then if Gb < 8661. then if Gb == 8660 then F1 = F0; F3 = F2; Gb = if F1 then 5 else 2 else Gb = 8630;
+continue end else F1 = UM(UK[650], F0[UK[162.]][UK[248]] - CH); Gb = 52 end elseif Gb < 8663 then F2 = UK[650]; Gb = 43 elseif Gb < 8664. then C1 = true; CY = false; local ZU = UK[1957][UK[438.]]; UK[1433](UK[2008]); F0 = Dk:FindFirstChild(UK[468.]); F1 = F0;
+Gb = if F1 then 14 else 55 else F1 = F0:FindFirstChild(UK[187]); Gb = 2 end elseif Gb < 8846 then if Gb < 8667. then if Gb < 8666 then F1 = UM(UK[650], F0[UK[1486]][UK[248]] - CQ); Gb = 48. else Ga = F8; Gb = 57. end elseif Gb < 8668 then Gb = if F1 then 1 else 28
+elseif Gb < 8669 then F1 = UM(UK[650], F0[UK[187]][UK[248]] - CN); Gb = 28 elseif Gb == 8669 then F1 = F0; table.sort(CU, function(cJ, cK) local FX, FY = nil, nil; local FZ = nil; FZ = 0.; while true do FZ = 10373 - FZ; do if FZ < 10372 then if FZ < 10051 then
+break elseif FZ < 10369 then if FZ < 10368. then break elseif FZ == 10368. then return FX < FY else FZ = 10051; continue end elseif FZ < 10370 then break elseif FZ < 10371. then if FZ == 10370 then FY = UK[1579]; FZ = 5 else FZ = 15387.; continue end else FY = Cx[cK[UK[697]]];
+FZ = if FY then 5 else 3. end elseif FZ < 12327. then if FZ < 10741 then if FZ < 10373 then if FZ == 10372 then FX = UK[1579]; FZ = 2 else FZ = 3295; continue end elseif FZ == 10373 then FX = Cx[cJ[UK[697]]]; FZ = if FX then 2 else 1 else FZ = 10369; continue
+end else break end else break end end end end); F0 = {}; Gg = false; for cM, cN in UK[1295](CU) do Gh = cM; Gj = cN; local Gi = Gh; local Gk = Gj; local Gf = nil; Gf = UK[2008]; while true do if Gf < 1 then break elseif Gf < 2 then Gg = true; Gf = UK[650] else
+table.insert(F0, wh_rarityEmoji(Gk[UK[697]]) .. UK[1491.] .. Gk[UK[821]] .. UK[758] .. Gk[UK[697]] .. UK[1976]); Gf = UK[650] end end; if Gg then break end end; F2 = #F0 > UK[650]; Gb = if F2 then 29 else 45. else Gb = 13603; continue end else break end end
+end end; DD:WaitForChild(WY[1915])[WY[1652]]:Connect(WY[365]); local ZV = WY[1957][WY[394]]; WY[1383.](function() local GD; GD = nil; local GE, GG, GH, GI = nil, nil, nil, nil; local GF = nil; GF = 3.; while true do GF = 11563 - GF; do if GF < 11561 then if GF < 11558 then
+break elseif GF < 11559. then GD = GE:WaitForChild(UK[523], UK[624.]); GF = if not GD then 4 else 1 elseif GF < 11560 then if GF == 11559. then return else GF = 13786; continue end else local ZW = UK; GE = ZW[1560.]:WaitForChild(ZW[1968.], ZW[624.]); GI = if not GE then ZW[1292] else ZW[650];
+GG = ZW[1029.] * GI + ZW[1636] * (ZW[1292] - GI); GH = ZW[1621] * GI + ZW[925] * (ZW[1292] - GI); GF = if (GG * ZW[856] + GH * ZW[1459] + GG * GH) % ZW[1264] == ZW[649] then 2 else 5 end elseif GF < 11767 then if GF < 11562. then return elseif GF < 11563 then
+GD:GetPropertyChangedSignal(UK[248]):Connect(function() local GA, GB, GC = nil, nil, nil; local Gz = nil; Gz = 4; while true do Gz = 2816 - Gz; do if Gz < 2815 then if Gz < 2812 then if Gz < 2810 then break elseif Gz < 2811. then local ZX = UK[1957][UK[394]];
+UK[1383.](wh_sendWebhook); Gz = 3. else break end elseif Gz < 2813 then Gz = if GD[UK[248]] == true then 0. else 2 elseif Gz < 2814. then Gz = 1 elseif Gz == 2814. then local ZY = UK; GC = if GD[ZY[248]] == false then ZY[1292] else ZY[650]; GA = ZY[516.] * GC + ZY[1569.] * (ZY[1292] - GC);
+GB = ZY[1631] * GC + ZY[1501] * (ZY[1292] - GC); Gz = if (GA * ZY[709] + GB * ZY[1654] + GA * GB) % ZY[1264] == ZY[87.] then 6. else 3. else Gz = 5807; continue end elseif Gz < 5807 then if Gz < 2816 then Gz = 5 elseif Gz < 5407 then if Gz == 2816 then wh_snapshotStats();
+Gz = 1 else break end else break end else break end end end end); GF = 0. else break end else break end end end end); Dk[WY[1071.]]:Connect(WY[1429]); ad_getHRP = WY[1273]; getHumanoid = WY[910]; makeVec = WY[247]; updateCharParts = WY[1815.]; DD[WY[1567]]:Connect(function(dz)
+local dD; local dI; local dH; updateCharParts(dz); dD = dz[UK[2024]]:Connect(function(dA) local G0 = nil; G0 = 0.; while true do G0 = 9793 - G0; do if G0 < 9792. then if G0 < 6827 then break elseif G0 < 9790 then break elseif G0 < 9791 then G0 = 2 else break
+end elseif G0 < 10942 then if G0 < 9793 then table.insert(CF, dA); G0 = 3. elseif G0 == 9793 then G0 = if dA:IsA(UK[878]) then 1 else 3. else break end else break end end end end); dH = dz[UK[109]]:Connect(function(dE) local G1 = nil; local G2 = nil; G2 = 3.;
+while true do G2 = 2786 - G2; do if G2 < 3538 then if G2 < 2785 then if G2 < 2784. then if G2 == 2783 then G1 = table.find(CF, dE); G2 = if G1 then 0. else 2 else break end elseif G2 == 2784. then G2 = 1 else G2 = 2786; continue end elseif G2 < 2786 then break
+elseif G2 == 2786 then table.remove(CF, G1); G2 = 2 else G2 = 3538; continue end else break end end end end); dI = nil; dI = dz:WaitForChild(UK[985])[UK[29]]:Connect(function() dD:Disconnect(); dH:Disconnect(); dI:Disconnect() end) end); Ev = 203 else Ev = 3376;
+continue end elseif Ev < 8688. then if Ev == 4030 then Ev = 775 else break end else break end end end
