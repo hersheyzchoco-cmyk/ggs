@@ -43,6 +43,7 @@ local poops = {
     [1000628384] = "make-a-drill-farm.lua",
     [444132252] = "make-hotsauce.lua",
     [878417107] = "merge-a-blackhole.lua",
+    [452622736] = "merge-hackers.lua",
     [596089868] = "mine-a-mountain.lua",
     [627287172] = "mine-a-planet.lua",
     [33896179] = "missiles-vs-cities.lua",
