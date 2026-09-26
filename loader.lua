@@ -18,6 +18,7 @@ local poops = {
     [788592731] = "anime-stars.lua",
     [725311854] = "anime-universe.lua",
     [886806949] = "become-an-anime-billionaire.lua",
+    [425964032] = "blue-lock-farm.lua",
     [654102831] = "bomb-fishing.lua",
     [540612760] = "build-a-base-and-steal.lua",
     [308858726] = "build-a-gun-army.lua",
